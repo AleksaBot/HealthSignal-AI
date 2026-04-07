@@ -12,12 +12,12 @@ class NoteInterpretRequest(BaseModel):
 
 
 class RiskInsightRequest(BaseModel):
-    age: int
-    systolic_bp: int
-    diastolic_bp: int
-    fasting_glucose: float
-    hba1c: float
-    ldl_cholesterol: float
+    age: int = Field(ge=0, le=120)
+    systolic_bp: int = Field(ge=70, le=260)
+    diastolic_bp: int = Field(ge=40, le=160)
+    fasting_glucose: float = Field(ge=40, le=600)
+    hba1c: float = Field(ge=3.0, le=20.0)
+    ldl_cholesterol: float = Field(ge=20, le=400)
 
 
 class AnalysisResponse(DisclaimerMixin):
