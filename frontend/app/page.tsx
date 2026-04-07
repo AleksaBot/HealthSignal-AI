@@ -17,7 +17,7 @@ const cards = [
     description: "Submit structured health data to generate stroke, diabetes, and cardiovascular risk insights.",
     href: "/risk-form"
   }
-];
+] as const;
 
 export default function HomePage() {
   return (

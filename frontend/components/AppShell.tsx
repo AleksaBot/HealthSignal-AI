@@ -19,9 +19,9 @@ export function AppShell({ children }: { children: ReactNode }) {
             HealthSignal AI
           </Link>
           <nav className="flex flex-wrap gap-4 text-sm">
-            {navItems.map(([label, href]) => (
-              <Link key={href} href={href} className="text-slate-700 hover:text-brand-700">
-                {label}
+            {navItems.map((item) => (
+              <Link key={item[1]} href={item[1]} className="text-slate-700 hover:text-brand-700">
+                {item[0]}
               </Link>
             ))}
           </nav>
