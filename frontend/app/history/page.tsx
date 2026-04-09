@@ -61,11 +61,11 @@ export default function HistoryPage() {
             {reports.map((report) => (
               <li key={report.id} className="flex items-center justify-between rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
                 <div>
-                  <p className="font-medium text-slate-900">{report.report_type}</p>
+                  <p className="font-medium capitalize text-slate-900">{report.report_type.replaceAll("_", " ")}</p>
                   <p className="text-xs text-slate-500">{new Date(report.created_at).toLocaleString()}</p>
                 </div>
                 <button
-                  className="rounded-md bg-brand-700 px-3 py-1 text-sm text-white disabled:opacity-60"
+                  className="rounded-md bg-brand-700 px-3 py-1.5 text-sm text-white disabled:opacity-60"
                   onClick={() => viewReport(report.id)}
                   disabled={loadingReportId === report.id}
                 >
@@ -77,16 +77,18 @@ export default function HistoryPage() {
         )}
 
         {selectedReport ? (
-          <article className="space-y-3 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-            <h2 className="text-lg font-semibold">Report #{selectedReport.id}</h2>
-            <p className="text-sm text-slate-600">Type: {selectedReport.report_type}</p>
+          <article className="space-y-4 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+            <header className="border-b border-slate-100 pb-3">
+              <h2 className="text-lg font-semibold">Report #{selectedReport.id}</h2>
+              <p className="text-sm capitalize text-slate-600">Type: {selectedReport.report_type.replaceAll("_", " ")}</p>
+            </header>
             <div>
               <h3 className="text-sm font-semibold text-slate-900">Input Payload</h3>
-              <pre className="mt-1 overflow-auto rounded-lg bg-slate-50 p-3 text-xs text-slate-700">{selectedReport.input_payload}</pre>
+              <pre className="mt-1 overflow-auto rounded-lg bg-slate-50 p-3 text-xs leading-5 text-slate-700">{selectedReport.input_payload}</pre>
             </div>
             <div>
               <h3 className="text-sm font-semibold text-slate-900">Output Summary</h3>
-              <pre className="mt-1 overflow-auto rounded-lg bg-slate-50 p-3 text-xs text-slate-700">{selectedReport.output_summary}</pre>
+              <pre className="mt-1 overflow-auto rounded-lg bg-slate-50 p-3 text-xs leading-5 text-slate-700">{selectedReport.output_summary}</pre>
             </div>
           </article>
         ) : null}
