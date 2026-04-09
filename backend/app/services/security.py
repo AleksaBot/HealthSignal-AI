@@ -16,13 +16,26 @@ from passlib.context import CryptContext
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 bearer_scheme = HTTPBearer(auto_error=False)
+BCRYPT_PASSWORD_MAX_BYTES = 72
+BCRYPT_PASSWORD_LENGTH_ERROR_MESSAGE = "Password is too long. Please use 72 characters or fewer."
+
+
+class PasswordValidationError(ValueError):
+    pass
+
+
+def validate_password_for_bcrypt(password: str) -> None:
+    if len(password.encode("utf-8")) > BCRYPT_PASSWORD_MAX_BYTES:
+        raise PasswordValidationError(BCRYPT_PASSWORD_LENGTH_ERROR_MESSAGE)
 
 
 def hash_password(password: str) -> str:
+    validate_password_for_bcrypt(password)
     return pwd_context.hash(password)
 
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
+    validate_password_for_bcrypt(plain_password)
     return pwd_context.verify(plain_password, hashed_password)
 
 

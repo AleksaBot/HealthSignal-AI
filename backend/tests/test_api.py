@@ -1,3 +1,4 @@
+from app.services.security import BCRYPT_PASSWORD_LENGTH_ERROR_MESSAGE
 from fastapi.testclient import TestClient
 
 
@@ -23,6 +24,33 @@ def test_auth_flow(client: TestClient):
     assert login.status_code == 200
     assert login.json()["token_type"] == "bearer"
     assert login.json()["access_token"]
+
+
+def test_signup_rejects_password_too_long(client: TestClient):
+    long_password = "a" * 73
+    signup = client.post(
+        "/api/auth/signup",
+        json={"email": "long-password@example.com", "password": long_password},
+    )
+
+    assert signup.status_code == 400
+    assert signup.json() == {"detail": BCRYPT_PASSWORD_LENGTH_ERROR_MESSAGE}
+
+
+def test_login_rejects_password_too_long_without_500(client: TestClient):
+    client.post(
+        "/api/auth/signup",
+        json={"email": "user2@example.com", "password": "MySecure123"},
+    )
+
+    long_password = "b" * 73
+    login = client.post(
+        "/api/auth/login",
+        json={"email": "user2@example.com", "password": long_password},
+    )
+
+    assert login.status_code == 400
+    assert login.json() == {"detail": BCRYPT_PASSWORD_LENGTH_ERROR_MESSAGE}
 
 
 def test_analyze_endpoints_create_reports(client: TestClient, auth_headers: dict[str, str]):

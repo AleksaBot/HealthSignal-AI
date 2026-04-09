@@ -13,7 +13,14 @@ from app.schemas.user import UserRead
 from app.services.note_interpreter import interpret_note
 from app.services.report_service import create_report_for_analysis
 from app.services.risk_engine import analyze_structured_risk
-from app.services.security import create_access_token, get_current_user, hash_password, verify_password
+from app.services.security import (
+    PasswordValidationError,
+    create_access_token,
+    get_current_user,
+    hash_password,
+    validate_password_for_bcrypt,
+    verify_password,
+)
 from app.services.symptom_analyzer import analyze_symptoms_text
 
 router = APIRouter(prefix="/api", tags=["healthsignal"])
@@ -30,7 +37,17 @@ def auth_signup(payload: AuthSignupRequest, db: Session = Depends(get_db)):
     if existing:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Email is already registered")
 
-    user = User(email=payload.email.lower(), hashed_password=hash_password(payload.password))
+    try:
+        hashed_password = hash_password(payload.password)
+    except PasswordValidationError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Unable to process signup request",
+        ) from exc
+
+    user = User(email=payload.email.lower(), hashed_password=hashed_password)
     db.add(user)
     db.commit()
     db.refresh(user)
@@ -40,7 +57,19 @@ def auth_signup(payload: AuthSignupRequest, db: Session = Depends(get_db)):
 @router.post("/auth/login", response_model=AuthTokenResponse)
 def auth_login(payload: AuthLoginRequest, db: Session = Depends(get_db)):
     user = db.query(User).filter(User.email == payload.email.lower()).first()
-    if not user or not verify_password(payload.password, user.hashed_password):
+
+    try:
+        validate_password_for_bcrypt(payload.password)
+        password_is_valid = user is not None and verify_password(payload.password, user.hashed_password)
+    except PasswordValidationError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Unable to process login request",
+        ) from exc
+
+    if not password_is_valid:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
 
     return AuthTokenResponse(access_token=create_access_token(str(user.id)))
