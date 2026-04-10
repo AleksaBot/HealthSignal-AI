@@ -1,54 +1,36 @@
-# HealthSignal AI (MVP Scaffold)
+# HealthSignal AI
 
-HealthSignal AI is a full-stack health intelligence platform for **educational decision support** and **risk insights**.
+HealthSignal AI is a full-stack clinical decision-support MVP built to transform everyday patient inputs into structured, explainable health insights. It is designed as a **portfolio-ready demonstration** of modern product thinking across UX, API design, and healthcare-safe communication.
 
-> ⚠️ **Medical disclaimer**: This app is not a diagnosis tool. It does not provide medical certainty and should not replace clinical judgment or emergency services.
+> ⚠️ **Medical disclaimer:** This application is for educational support only. It is not a diagnostic system and must not replace clinical judgment, licensed care, or emergency services.
 
-## Product scope
+## Project overview
 
-Users can:
-- Enter symptoms in plain English
-- Paste doctor notes / visit summaries
-- Enter structured health data
+The platform helps users and clinicians-in-training quickly organize and interpret health information from three input modes:
+- free-text symptom descriptions,
+- clinical note text (or uploaded files), and
+- structured risk-factor data.
 
-The system returns:
-- Extracted clinical signals
-- Red-flag alerts
-- Likely diagnostic categories
-- Stroke / diabetes / cardiovascular risk insights
-- Explainable reasoning
-- Saved report history
+The system then returns readable summaries with red-flag detection, likely condition categories, and interpretable risk guidance.
+
+## Key features
+
+- **Symptom Analyzer:** Converts plain-language symptom input into structured clinical signals.
+- **Note Interpreter:** Accepts pasted notes and file uploads (PDF/image) for automated extraction + interpretation.
+- **Risk Screener:** Produces stroke/diabetes/cardiovascular-oriented risk insights from structured inputs.
+- **Report History:** Saves and reviews prior analyses with timestamps and detail payloads.
+- **Explainable output style:** Keeps reasoning transparent and non-diagnostic for MVP safety.
 
 ## Tech stack
 
-- **Frontend:** Next.js 14 + TypeScript + Tailwind CSS
-- **Backend:** FastAPI + Python
-- **Database:** SQLite (SQLAlchemy)
+- **Frontend:** Next.js 14, TypeScript, Tailwind CSS
+- **Backend:** FastAPI, Python
+- **Data layer:** SQLite + SQLAlchemy
+- **Auth model:** Token-based flow for protected app routes
 
-## Repository layout
+## Local setup
 
-```text
-HealthSignal-AI/
-├── frontend/
-│   ├── app/
-│   ├── components/
-│   ├── lib/
-│   └── package.json
-├── backend/
-│   ├── app/
-│   │   ├── api/
-│   │   ├── core/
-│   │   ├── db/
-│   │   ├── models/
-│   │   ├── schemas/
-│   │   └── services/
-│   └── requirements.txt
-└── README.md
-```
-
-## Quick start
-
-### 1) Backend setup
+### 1) Backend
 
 ```bash
 cd backend
@@ -58,11 +40,9 @@ pip install -r requirements.txt
 uvicorn app.main:app --reload --port 8000
 ```
 
-Backend will run at `http://localhost:8000`.
+Backend: `http://localhost:8000`
 
-### 2) Frontend setup
-
-In a new terminal:
+### 2) Frontend
 
 ```bash
 cd frontend
@@ -70,32 +50,32 @@ npm install
 npm run dev
 ```
 
-Frontend will run at `http://localhost:3000`.
+Frontend: `http://localhost:3000`
 
-## Available starter pages
+## OCR and file upload support
 
-- `/` (landing)
-- `/dashboard`
-- `/auth`
-- `/symptom-analyzer`
-- `/note-interpreter`
-- `/risk-form`
-- `/history`
+The note upload endpoint supports:
+- **text-based PDFs** (native extractable text), and
+- **image files** (`png`, `jpg`, `jpeg`) via OCR.
 
-## Backend API starter routes
+For image OCR, **Tesseract OCR must be installed on your system** (e.g., `brew install tesseract` on macOS or `apt-get install tesseract-ocr` on Debian/Ubuntu). If unavailable, the API returns a safe, user-readable error.
 
-- `GET /api/health`
-- `POST /api/analyze/symptoms`
-- `POST /api/analyze/notes`
-- `POST /api/analyze/note-file` (multipart file upload for PDF/image note interpretation)
-- `POST /api/analyze/risk`
-- `POST /api/reports`
-- `GET /api/reports`
+## MVP limitations (current scope)
 
-## MVP notes
+- Outputs are heuristic and educational, not clinically validated predictions.
+- No EHR integrations or live hospital data connections.
+- Minimal user/account profile model intended for MVP demonstration only.
+- UI and analytics are intentionally lightweight to prioritize clarity and foundation quality.
 
-- Analysis outputs are starter heuristics with explainable, non-diagnostic language.
-- Database schema includes `users` and `reports` models.
-- This scaffold is designed for recruiter-quality readability and extension.
-- Note file parsing supports extractable-text PDFs and OCR for PNG/JPG/JPEG images.
-- Image OCR requires system-level **Tesseract OCR** to be installed (for example, `brew install tesseract` on macOS or `apt-get install tesseract-ocr` on Debian/Ubuntu). If not installed, the API returns a clear non-crashing error message.
+## Screenshot guide (README assets)
+
+Add screenshots to a future `docs/screenshots/` folder and wire them below when available.
+
+- **Landing page** → `docs/screenshots/landing-page.png`
+- **Login / Signup** → `docs/screenshots/auth-page.png`
+- **Symptom Analyzer** → `docs/screenshots/symptom-analyzer.png`
+- **Note Interpreter** → `docs/screenshots/note-interpreter.png`
+- **Risk Screener** → `docs/screenshots/risk-screener.png`
+- **Report History** → `docs/screenshots/report-history.png`
+
+> Tip: keep screenshots consistent (desktop viewport, neutral test data, and no personal health information).
