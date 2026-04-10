@@ -3,6 +3,7 @@ import {
   AuthLoginRequest,
   AuthTokenResponse,
   AuthSignupRequest,
+  NoteFileAnalysisResponse,
   NoteInterpretRequest,
   ReportRead,
   RiskInsightRequest,
@@ -95,6 +96,38 @@ async function request<TResponse>(path: string, init?: RequestInit): Promise<TRe
   return (await response.json()) as TResponse;
 }
 
+async function requestForm<TResponse>(path: string, formData: FormData): Promise<TResponse> {
+  const token = getToken();
+  const headers = new Headers();
+  if (token) {
+    headers.set("Authorization", `Bearer ${token}`);
+  }
+
+  const response = await fetch(`${API_BASE}${path}`, {
+    method: "POST",
+    headers,
+    body: formData
+  });
+
+  if (!response.ok) {
+    const fallback = userMessageForStatus(response.status, `Request failed with status ${response.status}`);
+    let message = fallback;
+
+    try {
+      const data = (await response.json()) as { detail?: string };
+      if (typeof data.detail === "string" && data.detail.trim().length > 0) {
+        message = data.detail;
+      }
+    } catch {
+      // keep fallback message when error body is not JSON
+    }
+
+    throw new ApiError(message, response.status);
+  }
+
+  return (await response.json()) as TResponse;
+}
+
 export function postJSON<TRequest, TResponse>(path: string, body: TRequest) {
   return request<TResponse>(path, {
     method: "POST",
@@ -122,6 +155,12 @@ export function analyzeSymptoms(payload: SymptomAnalyzeRequest) {
 
 export function analyzeNotes(payload: NoteInterpretRequest) {
   return postJSON<NoteInterpretRequest, AnalysisResponse>("/api/analyze/notes", payload);
+}
+
+export function analyzeNoteFile(file: File) {
+  const formData = new FormData();
+  formData.append("file", file);
+  return requestForm<NoteFileAnalysisResponse>("/api/analyze/note-file", formData);
 }
 
 export function analyzeRisk(payload: RiskInsightRequest) {

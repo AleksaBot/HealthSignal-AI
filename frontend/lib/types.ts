@@ -29,6 +29,10 @@ export type AnalysisResponse = {
   disclaimer: string;
 };
 
+export type NoteFileAnalysisResponse = AnalysisResponse & {
+  extracted_text: string;
+};
+
 export type SymptomAnalyzeRequest = {
   symptoms: string;
 };

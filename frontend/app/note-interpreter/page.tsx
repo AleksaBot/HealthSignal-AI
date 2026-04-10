@@ -4,27 +4,15 @@ import { ChangeEvent, FormEvent, useMemo, useState } from "react";
 import { DisclaimerBanner } from "@/components/DisclaimerBanner";
 import { AnalysisResultCard } from "@/components/AnalysisResultCard";
 import { RequireAuth } from "@/components/RequireAuth";
-import { analyzeNotes, getUserErrorMessage } from "@/lib/api";
-import { AnalysisResponse } from "@/lib/types";
-
-function buildPayloadText(noteText: string, selectedFileName: string | null) {
-  const trimmedNote = noteText.trim();
-
-  if (trimmedNote) {
-    return trimmedNote;
-  }
-
-  if (selectedFileName) {
-    return `Uploaded file: ${selectedFileName}. File parsing is not enabled yet; please paste note text when available.`;
-  }
-
-  return "";
-}
+import { analyzeNoteFile, analyzeNotes, getUserErrorMessage } from "@/lib/api";
+import { AnalysisResponse, NoteFileAnalysisResponse } from "@/lib/types";
 
 export default function NoteInterpreterPage() {
   const [noteText, setNoteText] = useState("");
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [selectedFileName, setSelectedFileName] = useState<string | null>(null);
   const [result, setResult] = useState<AnalysisResponse | null>(null);
+  const [extractedText, setExtractedText] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -32,6 +20,7 @@ export default function NoteInterpreterPage() {
 
   function onFileChange(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
+    setSelectedFile(file ?? null);
     setSelectedFileName(file?.name ?? null);
   }
 
@@ -39,18 +28,25 @@ export default function NoteInterpreterPage() {
     event.preventDefault();
     setLoading(true);
     setError(null);
+    setResult(null);
+    setExtractedText(null);
 
-    const payloadText = buildPayloadText(noteText, selectedFileName);
-
-    if (!payloadText) {
+    if (!noteText.trim() && !selectedFile) {
       setError("Upload a note file or paste note text to continue.");
       setLoading(false);
       return;
     }
 
     try {
-      const response = await analyzeNotes({ note_text: payloadText });
-      setResult(response);
+      if (selectedFile) {
+        const response: NoteFileAnalysisResponse = await analyzeNoteFile(selectedFile);
+        setExtractedText(response.extracted_text);
+        setResult(response);
+      } else {
+        const response = await analyzeNotes({ note_text: noteText.trim() });
+        setExtractedText(null);
+        setResult(response);
+      }
     } catch (err) {
       setError(getUserErrorMessage(err, "Unable to interpret this note right now."));
     } finally {
@@ -107,6 +103,12 @@ export default function NoteInterpreterPage() {
         {error ? <p className="rounded-lg bg-rose-50 p-3 text-sm text-rose-700">{error}</p> : null}
         {result ? (
           <div className="space-y-2">
+            {extractedText ? (
+              <div className="rounded-xl border border-slate-200 bg-white p-4">
+                <h2 className="text-sm font-semibold text-slate-800">Extracted text preview</h2>
+                <p className="mt-2 whitespace-pre-wrap text-sm text-slate-600">{extractedText.slice(0, 800)}</p>
+              </div>
+            ) : null}
             <p className="text-sm text-slate-600">Interpretation is generated from the current input and should be clinically reviewed.</p>
             <AnalysisResultCard result={result} />
           </div>

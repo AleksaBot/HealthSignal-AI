@@ -1,16 +1,23 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.db.session import get_db
 from app.models.report import Report
 from app.models.user import User
-from app.schemas.analyze import AnalysisResponse, NoteInterpretRequest, RiskInsightRequest, SymptomAnalyzeRequest
+from app.schemas.analyze import (
+    AnalysisResponse,
+    NoteFileAnalysisResponse,
+    NoteInterpretRequest,
+    RiskInsightRequest,
+    SymptomAnalyzeRequest,
+)
 from app.schemas.auth import AuthLoginRequest, AuthSignupRequest, AuthTokenResponse
 
 from app.schemas.report import ReportCreate, ReportRead
 from app.schemas.user import UserRead
 from app.services.note_interpreter import interpret_note
+from app.services.note_file_parser import FileParsingError, extract_text_from_upload
 from app.services.report_service import create_report_for_analysis
 from app.services.risk_engine import analyze_structured_risk
 from app.services.security import (
@@ -107,6 +114,33 @@ def analyze_notes(
         analysis=analysis,
     )
     return analysis
+
+
+@router.post("/analyze/note-file", response_model=NoteFileAnalysisResponse)
+def analyze_note_file(
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    try:
+        extracted_text = extract_text_from_upload(file)
+    except FileParsingError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.message) from exc
+    except Exception:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Unable to parse the uploaded file at this time.",
+        ) from None
+
+    analysis = interpret_note(extracted_text)
+    create_report_for_analysis(
+        db=db,
+        user_id=current_user.id,
+        report_type="notes-file",
+        input_payload={"filename": file.filename, "content_type": file.content_type},
+        analysis=analysis,
+    )
+    return NoteFileAnalysisResponse(extracted_text=extracted_text, **analysis.model_dump())
 
 
 @router.post("/analyze/risk", response_model=AnalysisResponse)

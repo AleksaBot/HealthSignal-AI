@@ -87,6 +87,7 @@ Frontend will run at `http://localhost:3000`.
 - `GET /api/health`
 - `POST /api/analyze/symptoms`
 - `POST /api/analyze/notes`
+- `POST /api/analyze/note-file` (multipart file upload for PDF/image note interpretation)
 - `POST /api/analyze/risk`
 - `POST /api/reports`
 - `GET /api/reports`
@@ -96,3 +97,5 @@ Frontend will run at `http://localhost:3000`.
 - Analysis outputs are starter heuristics with explainable, non-diagnostic language.
 - Database schema includes `users` and `reports` models.
 - This scaffold is designed for recruiter-quality readability and extension.
+- Note file parsing supports extractable-text PDFs and OCR for PNG/JPG/JPEG images.
+- Image OCR requires system-level **Tesseract OCR** to be installed (for example, `brew install tesseract` on macOS or `apt-get install tesseract-ocr` on Debian/Ubuntu). If not installed, the API returns a clear non-crashing error message.

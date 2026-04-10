@@ -26,3 +26,7 @@ class AnalysisResponse(DisclaimerMixin):
     likely_categories: list[str]
     risk_insights: dict[str, str]
     reasoning: str
+
+
+class NoteFileAnalysisResponse(AnalysisResponse):
+    extracted_text: str
