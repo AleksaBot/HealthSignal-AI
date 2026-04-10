@@ -100,3 +100,33 @@ def test_report_listing_and_retrieval(client: TestClient, auth_headers: dict[str
     detail = client.get(f"/api/reports/{report_id}", headers=auth_headers)
     assert detail.status_code == 200
     assert detail.json()["id"] == report_id
+
+
+def test_note_file_analysis_success(client: TestClient, auth_headers: dict[str, str], monkeypatch):
+    monkeypatch.setattr(
+        "app.api.routes.extract_text_from_upload",
+        lambda _: "Patient has dizziness and mild headache for two days.",
+    )
+
+    response = client.post(
+        "/api/analyze/note-file",
+        files={"file": ("note.pdf", b"fake-content", "application/pdf")},
+        headers=auth_headers,
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert "extracted_text" in payload
+    assert payload["extracted_text"].startswith("Patient has dizziness")
+    assert payload["likely_categories"]
+
+
+def test_note_file_analysis_rejects_unsupported_type(client: TestClient, auth_headers: dict[str, str]):
+    response = client.post(
+        "/api/analyze/note-file",
+        files={"file": ("note.txt", b"hello", "text/plain")},
+        headers=auth_headers,
+    )
+
+    assert response.status_code == 400
+    assert response.json()["detail"] == "Unsupported file type. Please upload a PDF, PNG, JPG, or JPEG file."
