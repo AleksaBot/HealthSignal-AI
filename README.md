@@ -60,6 +60,34 @@ The note upload endpoint supports:
 
 For image OCR, **Tesseract OCR must be installed on your system** (e.g., `brew install tesseract` on macOS or `apt-get install tesseract-ocr` on Debian/Ubuntu). If unavailable, the API returns a safe, user-readable error.
 
+## Deployment
+
+### Frontend (Vercel)
+
+- Deploy the `frontend/` project on Vercel.
+- Set `NEXT_PUBLIC_API_URL` to your deployed backend base URL (for example, `https://your-backend.onrender.com`).
+
+### Backend (Render)
+
+- Deploy the `backend/` directory as a Python web service on Render.
+- Use build command: `pip install -r requirements.txt`
+- Use start command: `uvicorn app.main:app --host 0.0.0.0 --port $PORT`
+- A starter `render.yaml` is included at the repository root.
+
+### Required environment variables
+
+Backend:
+- `DATABASE_URL` (defaults to `sqlite:///./healthsignal.db` for local use)
+- `SECRET_KEY` (set a strong random value in production)
+- `JWT_ALGORITHM` (defaults to `HS256`)
+
+Frontend:
+- `NEXT_PUBLIC_API_URL` (the backend API base URL)
+
+### OCR requirement in production
+
+Image OCR for note parsing depends on system-level **Tesseract OCR**. Ensure the deployment environment includes Tesseract (`tesseract-ocr`) or image-based note parsing will fail.
+
 ## MVP limitations (current scope)
 
 - Outputs are heuristic and educational, not clinically validated predictions.
