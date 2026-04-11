@@ -31,6 +31,7 @@ export type AnalysisResponse = {
 
 export type NoteFileAnalysisResponse = AnalysisResponse & {
   extracted_text: string;
+  file_parse_method?: string;
 };
 
 export type SymptomAnalyzeRequest = {
