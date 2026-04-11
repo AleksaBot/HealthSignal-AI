@@ -12,3 +12,5 @@ out/
 .env
 *.db
 backend/healthsignal.db
+.env.local
+frontend/.env.local
