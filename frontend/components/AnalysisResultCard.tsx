@@ -5,7 +5,10 @@ function SectionList({ title, items }: { title: string; items: string[] }) {
     <section className="rounded-lg border border-slate-100 bg-slate-50/70 p-4">
       <h3 className="text-sm font-semibold text-slate-900">{title}</h3>
       {items.length === 0 ? (
-        <p className="mt-1 text-sm text-slate-500">No items returned.</p>
+        <div className="mt-2 flex items-center gap-2 rounded-lg border border-slate-200 bg-white/80 px-3 py-2 text-sm text-slate-500">
+          <span className="flex h-6 w-6 items-center justify-center rounded-md bg-brand-50 text-xs text-brand-600">ℹ</span>
+          <p>No items returned.</p>
+        </div>
       ) : (
         <ul className="mt-2 list-disc space-y-1 pl-5 text-sm leading-6 text-slate-700">
           {items.map((item) => (
@@ -19,7 +22,7 @@ function SectionList({ title, items }: { title: string; items: string[] }) {
 
 export function AnalysisResultCard({ result }: { result: AnalysisResponse }) {
   return (
-    <article className="space-y-4 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+    <article className="frosted-panel animate-fade-up space-y-4 rounded-2xl p-5">
       <h2 className="text-lg font-semibold text-slate-900">Analysis Results</h2>
       <SectionList title="Extracted Signals" items={result.extracted_signals} />
       <SectionList title="Red Flags" items={result.red_flags} />

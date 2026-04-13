@@ -34,9 +34,9 @@ const statCards = [
 export default function DashboardPage() {
   return (
     <RequireAuth>
-      <section className="relative isolate space-y-6 overflow-hidden rounded-[2rem] border border-white/70 bg-white/75 px-6 py-7 shadow-2xl shadow-slate-300/30 backdrop-blur-sm md:px-8">
-        <div className="pointer-events-none absolute -top-20 right-0 h-52 w-52 rounded-full bg-brand-300/20 blur-3xl" />
-        <div className="pointer-events-none absolute -left-20 bottom-8 h-56 w-56 rounded-full bg-cyan-200/25 blur-3xl" />
+      <section className="section-shell space-y-6 px-6 py-7 md:px-8">
+        <div className="ambient-orb -top-20 right-0 h-52 w-52 bg-brand-300/20" />
+        <div className="ambient-orb -left-20 bottom-8 h-56 w-56 bg-cyan-200/25" />
 
         <div className="relative flex flex-wrap items-end justify-between gap-4 border-b border-slate-200/80 pb-4">
           <div className="space-y-2">
@@ -53,10 +53,11 @@ export default function DashboardPage() {
         </div>
 
         <div className="relative grid gap-4 md:grid-cols-3">
-          {statCards.map((card) => (
+          {statCards.map((card, index) => (
             <article
               key={card.label}
-              className="rounded-2xl border border-slate-200/85 bg-white/90 p-4 shadow-md shadow-slate-200/60 transition duration-300 hover:-translate-y-1 hover:border-brand-200 hover:shadow-lg hover:shadow-brand-100/50"
+              style={{ animationDelay: `${index * 50}ms` }}
+              className="premium-card premium-card-interactive animate-fade-up p-4"
             >
               <p className="text-xs uppercase tracking-[0.16em] text-slate-500">{card.label}</p>
               <p className="mt-2 text-2xl font-semibold text-slate-900">{card.value}</p>
@@ -66,11 +67,12 @@ export default function DashboardPage() {
         </div>
 
         <div className="relative grid gap-4 md:grid-cols-2">
-          {quickActions.map((item) => (
+          {quickActions.map((item, index) => (
             <Link
               key={item.title}
               href={item.href}
-              className="group rounded-2xl border border-slate-200/85 bg-white/95 p-5 shadow-md shadow-slate-200/60 transition duration-300 hover:-translate-y-1 hover:border-brand-200 hover:shadow-xl hover:shadow-brand-100/50"
+              style={{ animationDelay: `${120 + index * 60}ms` }}
+              className="premium-card premium-card-interactive animate-fade-up group p-5"
             >
               <h2 className="text-lg font-semibold text-slate-900">{item.title}</h2>
               <p className="mt-2 text-sm text-slate-600">{item.description}</p>
