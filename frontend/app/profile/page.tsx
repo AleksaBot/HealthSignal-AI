@@ -6,7 +6,7 @@ import { RequireAuth } from "@/components/RequireAuth";
 export default function ProfilePage() {
   return (
     <RequireAuth>
-      <section className="section-shell animate-fade-in p-8 dark:border-slate-700/70 dark:bg-slate-900/75 dark:bg-none">
+      <section className="section-shell animate-fade-in p-8">
         <h1 className="text-3xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">Profile</h1>
         <p className="mt-2 max-w-xl text-sm text-slate-600 dark:text-slate-300">
           Profile editing will be available soon. You can already control your workspace appearance in Settings.

@@ -154,6 +154,38 @@ body::after {
   background: radial-gradient(circle, rgba(59, 130, 246, 0.2), transparent 74%);
 }
 
+.dark .glass-panel {
+  @apply border-slate-700/70 shadow-slate-950/45;
+  background-color: rgb(15 23 42 / 0.62);
+}
+
+.dark .frosted-panel {
+  border-color: rgb(71 85 105 / 0.62);
+  background-color: rgb(15 23 42 / 0.78);
+  --tw-shadow-color: rgb(2 6 23 / 0.55);
+}
+
+.dark .premium-card {
+  border-color: rgb(71 85 105 / 0.72);
+  background-color: rgb(15 23 42 / 0.8);
+  --tw-shadow-color: rgb(2 6 23 / 0.56);
+}
+
+.dark .premium-card-interactive:hover {
+  border-color: rgb(59 130 246 / 0.7);
+  --tw-shadow-color: rgb(30 64 175 / 0.36);
+}
+
+.dark .section-shell {
+  border-color: rgb(51 65 85 / 0.72);
+  background-color: rgb(15 23 42 / 0.84);
+  background-image:
+    radial-gradient(circle at 14% 0%, rgb(30 64 175 / 0.3), transparent 44%),
+    radial-gradient(circle at 88% 100%, rgb(30 58 138 / 0.22), transparent 40%),
+    linear-gradient(180deg, rgb(15 23 42 / 0.9) 0%, rgb(15 23 42 / 0.76) 100%);
+  --tw-shadow-color: rgb(2 6 23 / 0.52);
+}
+
 @keyframes fade-in {
   from {
     opacity: 0;

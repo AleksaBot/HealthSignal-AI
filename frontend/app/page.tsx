@@ -52,21 +52,21 @@ export default function HomePage() {
       <div className="pointer-events-none absolute inset-x-10 top-24 h-px bg-gradient-to-r from-transparent via-brand-300/70 to-transparent" />
 
       <div className="relative space-y-6">
-        <p className="inline-flex rounded-full border border-brand-200 bg-brand-50/90 px-3 py-1 text-xs font-medium uppercase tracking-[0.2em] text-brand-700">
+        <p className="inline-flex rounded-full border border-brand-200 bg-brand-50/90 px-3 py-1 text-xs font-medium uppercase tracking-[0.2em] text-brand-700 dark:border-brand-400/30 dark:bg-brand-500/15 dark:text-brand-200">
           Clinical Command Center
         </p>
 
         <div className="grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
           <div className="space-y-5">
-            <h1 className="text-4xl font-semibold tracking-tight text-slate-900 md:text-5xl">Premium clinical intelligence workspace.</h1>
-            <p className="max-w-2xl text-sm leading-relaxed text-slate-600 md:text-base">
+            <h1 className="text-4xl font-semibold tracking-tight text-slate-900 dark:text-slate-100 md:text-5xl">Premium clinical intelligence workspace.</h1>
+            <p className="max-w-2xl text-sm leading-relaxed text-slate-600 dark:text-slate-300 md:text-base">
               HealthSignal AI brings symptom analysis, note interpretation, and risk workflows into one polished environment designed for
               focused, educational decision support.
             </p>
 
             {authenticated ? (
-              <div className="space-y-4 rounded-2xl border border-emerald-200/70 bg-emerald-50/70 p-4">
-                <p className="text-sm font-medium text-emerald-800">
+              <div className="space-y-4 rounded-2xl border border-emerald-200/70 bg-emerald-50/70 p-4 dark:border-emerald-400/30 dark:bg-emerald-900/20">
+                <p className="text-sm font-medium text-emerald-800 dark:text-emerald-100">
                   {firstName ? `Welcome back, ${firstName}.` : "Welcome back."} Your command center is ready.
                 </p>
                 <div className="flex flex-wrap gap-3">
@@ -78,7 +78,7 @@ export default function HomePage() {
                   </Link>
                   <Link
                     href="/history"
-                    className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:-translate-y-0.5 hover:border-slate-400 hover:shadow-sm"
+                    className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:-translate-y-0.5 hover:border-slate-400 hover:shadow-sm dark:border-slate-600 dark:bg-slate-900/80 dark:text-slate-200 dark:hover:border-slate-500"
                   >
                     Review Recent Reports
                   </Link>
@@ -94,7 +94,7 @@ export default function HomePage() {
                 </Link>
                 <Link
                   href="/auth?mode=signup"
-                  className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:-translate-y-0.5 hover:border-slate-400 hover:shadow-sm"
+                  className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:-translate-y-0.5 hover:border-slate-400 hover:shadow-sm dark:border-slate-600 dark:bg-slate-900/80 dark:text-slate-200 dark:hover:border-slate-500"
                 >
                   Create Account
                 </Link>
@@ -103,8 +103,8 @@ export default function HomePage() {
           </div>
 
           <div className="frosted-panel animate-fade-up space-y-3 rounded-2xl p-5 [--stagger:100ms]">
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Workspace Signal</p>
-            <div className="space-y-2 text-sm text-slate-600">
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">Workspace Signal</p>
+            <div className="space-y-2 text-sm text-slate-600 dark:text-slate-300">
               <p>• Educational support only, with transparent interpretation layers.</p>
               <p>• Designed for quick triage framing and longitudinal report review.</p>
               <p>• Secure authentication required for saved report workflows.</p>
@@ -123,9 +123,9 @@ export default function HomePage() {
             style={{ animationDelay: `${140 + index * 70}ms` }}
             className="premium-card premium-card-interactive animate-fade-up group p-5"
           >
-            <h2 className="text-lg font-semibold text-slate-900">{card.title}</h2>
-            <p className="mt-2 text-sm leading-relaxed text-slate-600">{card.description}</p>
-            <p className="mt-4 text-sm font-medium text-brand-700 transition group-hover:translate-x-1">{card.cta} →</p>
+            <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">{card.title}</h2>
+            <p className="mt-2 text-sm leading-relaxed text-slate-600 dark:text-slate-300">{card.description}</p>
+            <p className="mt-4 text-sm font-medium text-brand-700 transition group-hover:translate-x-1 dark:text-brand-300">{card.cta} →</p>
           </Link>
         ))}
       </div>

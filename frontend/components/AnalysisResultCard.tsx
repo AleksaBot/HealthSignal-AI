@@ -2,15 +2,15 @@ import { AnalysisResponse } from "@/lib/types";
 
 function SectionList({ title, items }: { title: string; items: string[] }) {
   return (
-    <section className="rounded-lg border border-slate-100 bg-slate-50/70 p-4">
-      <h3 className="text-sm font-semibold text-slate-900">{title}</h3>
+    <section className="rounded-lg border border-slate-100 bg-slate-50/70 p-4 dark:border-slate-700/80 dark:bg-slate-900/60">
+      <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">{title}</h3>
       {items.length === 0 ? (
-        <div className="mt-2 flex items-center gap-2 rounded-lg border border-slate-200 bg-white/80 px-3 py-2 text-sm text-slate-500">
-          <span className="flex h-6 w-6 items-center justify-center rounded-md bg-brand-50 text-xs text-brand-600">ℹ</span>
+        <div className="mt-2 flex items-center gap-2 rounded-lg border border-slate-200 bg-white/80 px-3 py-2 text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-800/70 dark:text-slate-400">
+          <span className="flex h-6 w-6 items-center justify-center rounded-md bg-brand-50 text-xs text-brand-600 dark:bg-brand-500/20 dark:text-brand-200">ℹ</span>
           <p>No items returned.</p>
         </div>
       ) : (
-        <ul className="mt-2 list-disc space-y-1 pl-5 text-sm leading-6 text-slate-700">
+        <ul className="mt-2 list-disc space-y-1 pl-5 text-sm leading-6 text-slate-700 dark:text-slate-300">
           {items.map((item) => (
             <li key={item}>{item}</li>
           ))}
@@ -23,24 +23,24 @@ function SectionList({ title, items }: { title: string; items: string[] }) {
 export function AnalysisResultCard({ result }: { result: AnalysisResponse }) {
   return (
     <article className="frosted-panel animate-fade-up space-y-4 rounded-2xl p-5">
-      <h2 className="text-lg font-semibold text-slate-900">Analysis Results</h2>
+      <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Analysis Results</h2>
       <SectionList title="Extracted Signals" items={result.extracted_signals} />
       <SectionList title="Red Flags" items={result.red_flags} />
       <SectionList title="Likely Categories" items={result.likely_categories} />
       <section>
-        <h3 className="text-sm font-semibold text-slate-900">Risk Insights</h3>
+        <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">Risk Insights</h3>
         <div className="mt-2 grid gap-2 sm:grid-cols-2">
           {Object.entries(result.risk_insights).map(([label, insight]) => (
-            <div key={label} className="rounded-lg border border-slate-200 bg-slate-50 p-3">
-              <p className="text-xs uppercase tracking-wide text-slate-500">{label.replaceAll("_", " ")}</p>
-              <p className="mt-1 text-sm leading-6 text-slate-700">{insight}</p>
+            <div key={label} className="rounded-lg border border-slate-200 bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-900/60">
+              <p className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">{label.replaceAll("_", " ")}</p>
+              <p className="mt-1 text-sm leading-6 text-slate-700 dark:text-slate-300">{insight}</p>
             </div>
           ))}
         </div>
       </section>
-      <section className="rounded-lg border border-slate-100 bg-slate-50/70 p-4">
-        <h3 className="text-sm font-semibold text-slate-900">Reasoning</h3>
-        <p className="mt-1 text-sm leading-6 text-slate-700">{result.reasoning}</p>
+      <section className="rounded-lg border border-slate-100 bg-slate-50/70 p-4 dark:border-slate-700/80 dark:bg-slate-900/60">
+        <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">Reasoning</h3>
+        <p className="mt-1 text-sm leading-6 text-slate-700 dark:text-slate-300">{result.reasoning}</p>
       </section>
     </article>
   );
