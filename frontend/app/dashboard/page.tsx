@@ -34,41 +34,47 @@ const statCards = [
 export default function DashboardPage() {
   return (
     <RequireAuth>
-      <section className="space-y-6 rounded-3xl border border-slate-200 bg-slate-950 px-6 py-7 text-slate-100 shadow-2xl shadow-slate-400/25 md:px-8">
-        <div className="flex flex-wrap items-end justify-between gap-4 border-b border-slate-800 pb-4">
+      <section className="relative isolate space-y-6 overflow-hidden rounded-[2rem] border border-white/70 bg-white/75 px-6 py-7 shadow-2xl shadow-slate-300/30 backdrop-blur-sm md:px-8">
+        <div className="pointer-events-none absolute -top-20 right-0 h-52 w-52 rounded-full bg-brand-300/20 blur-3xl" />
+        <div className="pointer-events-none absolute -left-20 bottom-8 h-56 w-56 rounded-full bg-cyan-200/25 blur-3xl" />
+
+        <div className="relative flex flex-wrap items-end justify-between gap-4 border-b border-slate-200/80 pb-4">
           <div className="space-y-2">
-            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-cyan-300">Operations Dashboard</p>
-            <h1 className="text-2xl font-semibold tracking-tight text-white">Clinical workflow control panel</h1>
-            <p className="text-sm text-slate-400">Monitor active modules, jump into workflows, and keep report production moving.</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-brand-700">Operations Dashboard</p>
+            <h1 className="text-2xl font-semibold tracking-tight text-slate-900">Clinical workflow control panel</h1>
+            <p className="text-sm text-slate-600">Monitor active modules, jump into workflows, and keep report production moving.</p>
           </div>
           <Link
             href="/history"
-            className="rounded-lg border border-slate-700 bg-slate-900 px-4 py-2 text-sm font-medium text-slate-100 transition hover:-translate-y-0.5 hover:border-cyan-300 hover:text-cyan-200"
+            className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:-translate-y-0.5 hover:border-brand-300 hover:shadow-md"
           >
             Open Report Queue
           </Link>
         </div>
 
-        <div className="grid gap-4 md:grid-cols-3">
+        <div className="relative grid gap-4 md:grid-cols-3">
           {statCards.map((card) => (
-            <article key={card.label} className="rounded-2xl border border-slate-800 bg-slate-900/80 p-4 transition hover:border-cyan-400/70">
-              <p className="text-xs uppercase tracking-[0.16em] text-slate-400">{card.label}</p>
-              <p className="mt-2 text-2xl font-semibold text-white">{card.value}</p>
-              <p className="mt-1 text-xs text-slate-400">{card.context}</p>
+            <article
+              key={card.label}
+              className="rounded-2xl border border-slate-200/85 bg-white/90 p-4 shadow-md shadow-slate-200/60 transition duration-300 hover:-translate-y-1 hover:border-brand-200 hover:shadow-lg hover:shadow-brand-100/50"
+            >
+              <p className="text-xs uppercase tracking-[0.16em] text-slate-500">{card.label}</p>
+              <p className="mt-2 text-2xl font-semibold text-slate-900">{card.value}</p>
+              <p className="mt-1 text-xs text-slate-500">{card.context}</p>
             </article>
           ))}
         </div>
 
-        <div className="grid gap-4 md:grid-cols-2">
+        <div className="relative grid gap-4 md:grid-cols-2">
           {quickActions.map((item) => (
             <Link
               key={item.title}
               href={item.href}
-              className="group rounded-2xl border border-slate-800 bg-slate-900/90 p-5 transition duration-300 hover:-translate-y-1 hover:border-cyan-300 hover:shadow-lg hover:shadow-cyan-500/10"
+              className="group rounded-2xl border border-slate-200/85 bg-white/95 p-5 shadow-md shadow-slate-200/60 transition duration-300 hover:-translate-y-1 hover:border-brand-200 hover:shadow-xl hover:shadow-brand-100/50"
             >
-              <h2 className="text-lg font-semibold text-white">{item.title}</h2>
-              <p className="mt-2 text-sm text-slate-400">{item.description}</p>
-              <p className="mt-4 text-sm font-medium text-cyan-300 transition group-hover:translate-x-1">Open workflow →</p>
+              <h2 className="text-lg font-semibold text-slate-900">{item.title}</h2>
+              <p className="mt-2 text-sm text-slate-600">{item.description}</p>
+              <p className="mt-4 text-sm font-medium text-brand-700 transition group-hover:translate-x-1">Open workflow →</p>
             </Link>
           ))}
         </div>
