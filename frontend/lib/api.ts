@@ -149,6 +149,10 @@ export function login(payload: AuthLoginRequest) {
   return postJSON<AuthLoginRequest, AuthTokenResponse>("/api/auth/login", payload);
 }
 
+export function getCurrentUser() {
+  return getJSON<UserRead>("/api/auth/me");
+}
+
 export function analyzeSymptoms(payload: SymptomAnalyzeRequest) {
   return postJSON<SymptomAnalyzeRequest, AnalysisResponse>("/api/analyze/symptoms", payload);
 }

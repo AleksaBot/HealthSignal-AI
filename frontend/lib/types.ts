@@ -3,17 +3,22 @@ export type ApiErrorResponse = {
 };
 
 export type AuthSignupRequest = {
+  first_name: string;
   email: string;
   password: string;
 };
 
 export type UserRead = {
   id: number;
+  first_name: string;
   email: string;
   created_at: string;
 };
 
-export type AuthLoginRequest = AuthSignupRequest;
+export type AuthLoginRequest = {
+  email: string;
+  password: string;
+};
 
 export type AuthTokenResponse = {
   access_token: string;
