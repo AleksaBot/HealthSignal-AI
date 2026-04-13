@@ -82,9 +82,33 @@ export function AppShell({ children }: { children: ReactNode }) {
     applyTheme(nextTheme);
   }
 
+  const displayName = useMemo(() => {
+    const cleanedFirstName = firstName?.trim();
+    if (cleanedFirstName) {
+      return cleanedFirstName;
+    }
+
+    const cleanedEmail = email?.trim();
+    if (!cleanedEmail) {
+      return null;
+    }
+
+    const localPart = cleanedEmail.split("@")[0]?.replace(/[._-]+/g, " ").trim();
+    if (!localPart) {
+      return null;
+    }
+
+    const [firstToken] = localPart.split(/\s+/);
+    if (!firstToken) {
+      return null;
+    }
+
+    return firstToken.charAt(0).toUpperCase() + firstToken.slice(1);
+  }, [email, firstName]);
+
   const initials = useMemo(() => {
-    if (firstName?.trim()) {
-      return firstName.slice(0, 2).toUpperCase();
+    if (displayName?.trim()) {
+      return displayName.slice(0, 2).toUpperCase();
     }
 
     if (email?.trim()) {
@@ -92,9 +116,9 @@ export function AppShell({ children }: { children: ReactNode }) {
     }
 
     return "HS";
-  }, [email, firstName]);
+  }, [displayName, email]);
 
-  const profileLabel = firstName?.trim() ? firstName.trim() : "Profile";
+  const profileLabel = displayName ?? "Profile";
 
   return (
     <div className="site-backdrop">
@@ -144,7 +168,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                 {menuOpen ? (
                   <div className="animate-fade-in absolute right-0 mt-2 w-72 rounded-2xl border border-slate-200 bg-white/95 p-2 shadow-xl shadow-slate-900/10 backdrop-blur dark:border-slate-700 dark:bg-slate-900/95">
                     <div className="rounded-xl bg-slate-50 px-3 py-2 dark:bg-slate-800/70">
-                      <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">{firstName ?? "HealthSignal User"}</p>
+                      <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">{displayName ?? "HealthSignal User"}</p>
                       {email ? <p className="truncate text-xs text-slate-500 dark:text-slate-400">{email}</p> : null}
                     </div>
                     <div className="mt-2 space-y-1">
