@@ -20,19 +20,34 @@ body {
   }
 
   .frosted-panel {
-    @apply border border-white/80 bg-white/72 shadow-xl shadow-slate-300/20 backdrop-blur-md;
+    @apply border shadow-xl backdrop-blur-md;
+    border-color: rgb(255 255 255 / 0.8);
+    background-color: rgb(255 255 255 / 0.72);
+    --tw-shadow-color: rgb(203 213 225 / 0.2);
   }
 
   .premium-card {
-    @apply rounded-2xl border border-slate-200/85 bg-white/92 shadow-md shadow-slate-200/65 transition-all duration-300;
+    @apply rounded-2xl border shadow-md transition-all duration-300;
+    border-color: rgb(226 232 240 / 0.85);
+    background-color: rgb(255 255 255 / 0.92);
+    --tw-shadow-color: rgb(226 232 240 / 0.65);
   }
 
   .premium-card-interactive {
-    @apply hover:-translate-y-1 hover:border-brand-200 hover:shadow-xl hover:shadow-brand-100/60;
+    @apply hover:-translate-y-1;
+  }
+
+  .premium-card-interactive:hover {
+    border-color: rgb(191 219 254);
+    --tw-shadow-color: rgb(219 234 254 / 0.6);
   }
 
   .section-shell {
-    @apply relative isolate overflow-hidden rounded-[2rem] border border-white/75 bg-white/72 shadow-2xl shadow-slate-300/30 backdrop-blur-sm;
+    @apply relative isolate overflow-hidden border shadow-2xl backdrop-blur-sm;
+    border-radius: 2rem;
+    border-color: rgb(255 255 255 / 0.75);
+    background-color: rgb(255 255 255 / 0.72);
+    --tw-shadow-color: rgb(203 213 225 / 0.3);
   }
 
   .ambient-orb {
