@@ -46,9 +46,9 @@ export default function HomePage() {
   }, []);
 
   return (
-    <section className="relative isolate space-y-8 overflow-hidden rounded-[2rem] border border-white/70 bg-white/70 p-6 shadow-2xl shadow-slate-300/35 backdrop-blur-sm md:p-10">
-      <div className="pointer-events-none absolute -left-16 top-8 h-52 w-52 rounded-full bg-brand-500/20 blur-3xl" />
-      <div className="pointer-events-none absolute -right-20 bottom-0 h-64 w-64 rounded-full bg-cyan-200/35 blur-3xl" />
+    <section className="section-shell space-y-8 p-6 md:p-10">
+      <div className="ambient-orb -left-16 top-8 h-52 w-52 bg-brand-500/20" />
+      <div className="ambient-orb -right-20 bottom-0 h-64 w-64 bg-cyan-200/35" />
       <div className="pointer-events-none absolute inset-x-10 top-24 h-px bg-gradient-to-r from-transparent via-brand-300/70 to-transparent" />
 
       <div className="relative space-y-6">
@@ -102,7 +102,7 @@ export default function HomePage() {
             )}
           </div>
 
-          <div className="glass-panel animate-fade-in space-y-3 rounded-2xl p-5">
+          <div className="frosted-panel animate-fade-up space-y-3 rounded-2xl p-5 [--stagger:100ms]">
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Workspace Signal</p>
             <div className="space-y-2 text-sm text-slate-600">
               <p>• Educational support only, with transparent interpretation layers.</p>
@@ -116,11 +116,12 @@ export default function HomePage() {
       <DisclaimerBanner compact />
 
       <div className="grid gap-4 md:grid-cols-3">
-        {modules.map((card) => (
+        {modules.map((card, index) => (
           <Link
             key={card.title}
             href={card.href}
-            className="group rounded-2xl border border-slate-200/80 bg-white/90 p-5 shadow-lg shadow-slate-200/60 transition duration-300 hover:-translate-y-1 hover:border-brand-200 hover:shadow-xl hover:shadow-brand-100/50"
+            style={{ animationDelay: `${140 + index * 70}ms` }}
+            className="premium-card premium-card-interactive animate-fade-up group p-5"
           >
             <h2 className="text-lg font-semibold text-slate-900">{card.title}</h2>
             <p className="mt-2 text-sm leading-relaxed text-slate-600">{card.description}</p>
