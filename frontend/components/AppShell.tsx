@@ -94,6 +94,8 @@ export function AppShell({ children }: { children: ReactNode }) {
     return "HS";
   }, [email, firstName]);
 
+  const profileLabel = firstName?.trim() ? firstName.trim() : "Profile";
+
   return (
     <div className="site-backdrop">
       <header className="sticky top-0 z-30 border-b border-white/50 bg-white/70 backdrop-blur-xl dark:border-slate-700/60 dark:bg-slate-950/70">
@@ -135,7 +137,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                   type="button"
                   className="flex items-center gap-2 rounded-full border border-slate-300 bg-white px-2 py-1.5 text-slate-700 transition hover:-translate-y-0.5 hover:border-slate-400 hover:shadow-sm dark:border-slate-600 dark:bg-slate-900 dark:text-slate-200"
                 >
-                  <span className="hidden max-w-24 truncate text-xs font-medium sm:inline">{firstName ?? "Account"}</span>
+                  <span className="hidden max-w-24 truncate text-xs font-medium sm:inline">{profileLabel}</span>
                   <span className="flex h-7 w-7 items-center justify-center rounded-full bg-brand-700 text-xs font-semibold text-white">{initials}</span>
                 </button>
 

@@ -52,7 +52,7 @@ export default function HomePage() {
       <div className="pointer-events-none absolute inset-x-10 top-24 h-px bg-gradient-to-r from-transparent via-brand-300/70 to-transparent" />
 
       <div className="relative space-y-6">
-        <p className="inline-flex rounded-full border border-brand-200 bg-brand-50/90 px-3 py-1 text-xs font-medium uppercase tracking-[0.2em] text-brand-700 dark:border-brand-400/30 dark:bg-brand-500/15 dark:text-brand-200">
+        <p className="inline-flex rounded-full border border-brand-200 bg-brand-50/90 px-3 py-1 text-xs font-medium uppercase tracking-[0.2em] text-brand-700 dark:border-sky-400/20 dark:bg-sky-500/12 dark:text-sky-200">
           Clinical Command Center
         </p>
 
