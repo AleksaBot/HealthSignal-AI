@@ -52,22 +52,29 @@ export default function HistoryPage() {
 
   return (
     <RequireAuth>
-      <section className="space-y-5">
-        <header className="space-y-2">
-          <h1 className="text-2xl font-bold">Saved Reports</h1>
+      <section className="relative isolate space-y-5 overflow-hidden rounded-[2rem] border border-white/70 bg-white/75 p-6 shadow-2xl shadow-slate-300/30 backdrop-blur-sm md:p-8">
+        <div className="pointer-events-none absolute -right-12 top-2 h-48 w-48 rounded-full bg-brand-200/30 blur-3xl" />
+        <div className="pointer-events-none absolute -left-14 bottom-6 h-44 w-44 rounded-full bg-cyan-200/30 blur-3xl" />
+
+        <header className="relative space-y-2 border-b border-slate-200/80 pb-4">
+          <p className="text-xs font-semibold uppercase tracking-[0.22em] text-brand-700">Reports Workspace</p>
+          <h1 className="text-2xl font-semibold tracking-tight text-slate-900">Saved Reports</h1>
           <p className="text-sm text-slate-600">Review prior analyses and open a report to inspect stored input/output details.</p>
         </header>
-        <DisclaimerBanner />
+        <div className="relative">
+          <DisclaimerBanner compact />
+        </div>
 
-        {loading ? <p className="text-sm text-slate-600">Loading reports...</p> : null}
-        {error ? <p className="rounded-lg bg-rose-50 p-3 text-sm text-rose-700">{error}</p> : null}
+        {loading ? <p className="relative text-sm text-slate-600">Loading reports...</p> : null}
+        {error ? <p className="relative rounded-xl border border-rose-200 bg-rose-50/90 p-3 text-sm text-rose-700">{error}</p> : null}
 
         {!loading && reports.length === 0 ? (
-          <div className="rounded-xl border border-dashed border-slate-300 bg-white p-6 text-sm text-slate-500">
-            No reports yet. Completed analyses will appear here with report type and timestamp.
+          <div className="relative rounded-2xl border border-dashed border-slate-300 bg-white/90 p-8 text-center shadow-md shadow-slate-200/60">
+            <p className="text-sm font-medium text-slate-700">No reports yet</p>
+            <p className="mt-2 text-sm text-slate-500">Completed analyses will appear here with report type and timestamp.</p>
           </div>
         ) : (
-          <div className="space-y-3">
+          <div className="relative space-y-3">
             <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">Report list</h2>
             <ul className="space-y-2">
               {reports.map((report) => {
@@ -76,8 +83,8 @@ export default function HistoryPage() {
                 return (
                   <li
                     key={report.id}
-                    className={`rounded-xl border bg-white p-4 shadow-sm transition ${
-                      isActive ? "border-brand-300 ring-1 ring-brand-200" : "border-slate-200"
+                    className={`rounded-2xl border bg-white/95 p-4 shadow-md shadow-slate-200/60 transition duration-300 ${
+                      isActive ? "border-brand-300 ring-2 ring-brand-100" : "border-slate-200/90 hover:border-slate-300"
                     }`}
                   >
                     <div className="flex flex-wrap items-center justify-between gap-3">
@@ -91,7 +98,7 @@ export default function HistoryPage() {
                         </div>
                       </div>
                       <button
-                        className="rounded-md bg-brand-700 px-3 py-1.5 text-sm text-white disabled:opacity-60"
+                        className="rounded-lg bg-brand-700 px-3 py-1.5 text-sm font-medium text-white shadow-sm shadow-brand-700/20 transition hover:-translate-y-0.5 hover:bg-brand-600 disabled:opacity-60"
                         onClick={() => viewReport(report.id)}
                         disabled={loadingReportId === report.id}
                       >
@@ -106,7 +113,7 @@ export default function HistoryPage() {
         )}
 
         {selectedReport ? (
-          <article className="space-y-4 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+          <article className="relative space-y-4 rounded-2xl border border-slate-200/90 bg-white/95 p-5 shadow-xl shadow-slate-200/70">
             <header className="space-y-2 border-b border-slate-100 pb-3">
               <h2 className="text-lg font-semibold text-slate-900">Report details</h2>
               <div className="flex flex-wrap items-center gap-2 text-sm text-slate-600">
