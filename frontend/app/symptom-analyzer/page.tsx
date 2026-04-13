@@ -80,18 +80,18 @@ export default function SymptomAnalyzerPage() {
         <h1 className="text-2xl font-bold">Symptom Analyzer</h1>
         <DisclaimerBanner />
 
-        <div className="space-y-2 rounded-xl border border-slate-200 bg-white p-4">
-          <h2 className="text-sm font-semibold text-slate-900">Guided symptom intake</h2>
-          <p className="text-sm text-slate-600">
+        <div className="space-y-2 rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-900/75">
+          <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100">Guided symptom intake</h2>
+          <p className="text-sm text-slate-600 dark:text-slate-300">
             Share what you feel, where it hurts, when it started, and what makes it better or worse. Include duration and severity if known.
           </p>
         </div>
 
         <form className="space-y-4" onSubmit={onSubmit}>
-          <fieldset className="space-y-3 rounded-xl border border-slate-200 bg-white p-4">
-            <legend className="px-1 text-sm font-semibold text-slate-800">1) Describe your symptoms</legend>
+          <fieldset className="space-y-3 rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-900/75">
+            <legend className="px-1 text-sm font-semibold text-slate-800 dark:text-slate-200">1) Describe your symptoms</legend>
             <textarea
-              className="min-h-40 w-full rounded-xl border border-slate-300 bg-white p-3"
+              className="min-h-40 w-full rounded-xl border border-slate-300 bg-white p-3 text-slate-900 placeholder:text-slate-500 focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-500/30 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100 dark:placeholder:text-slate-400 dark:focus:border-brand-400"
               placeholder="Example: I've had chest tightness, shortness of breath, and dizziness for two days..."
               value={symptoms}
               onChange={(event) => setSymptoms(event.target.value)}
@@ -100,14 +100,14 @@ export default function SymptomAnalyzerPage() {
             />
 
             <div className="space-y-2">
-              <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Common symptoms</p>
+              <p className="text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">Common symptoms</p>
               <div className="flex flex-wrap gap-2">
                 {COMMON_SYMPTOMS.map((symptom) => (
                   <button
                     key={symptom}
                     type="button"
                     onClick={() => setSymptoms((current) => addSymptomText(current, symptom))}
-                    className="rounded-full border border-slate-300 bg-slate-50 px-3 py-1 text-sm text-slate-700 transition hover:border-slate-400 hover:bg-slate-100"
+                    className="rounded-full border border-slate-300 bg-slate-50 px-3 py-1 text-sm text-slate-700 transition hover:border-slate-400 hover:bg-slate-100 dark:border-slate-600 dark:bg-slate-800/80 dark:text-slate-200 dark:hover:border-slate-500 dark:hover:bg-slate-700/80"
                   >
                     {symptom}
                   </button>
@@ -116,13 +116,13 @@ export default function SymptomAnalyzerPage() {
             </div>
           </fieldset>
 
-          <fieldset className="space-y-3 rounded-xl border border-slate-200 bg-white p-4">
-            <legend className="px-1 text-sm font-semibold text-slate-800">2) Optional details</legend>
+          <fieldset className="space-y-3 rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-900/75">
+            <legend className="px-1 text-sm font-semibold text-slate-800 dark:text-slate-200">2) Optional details</legend>
             <div className="grid gap-3 md:grid-cols-2">
               <label className="space-y-1 text-sm">
-                <span className="text-slate-700">Duration</span>
+                <span className="text-slate-700 dark:text-slate-300">Duration</span>
                 <select
-                  className="w-full rounded-lg border border-slate-300 bg-white p-2"
+                  className="w-full rounded-lg border border-slate-300 bg-white p-2 text-slate-900 focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-500/30 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100 dark:focus:border-brand-400"
                   value={duration}
                   onChange={(event) => setDuration(event.target.value)}
                 >
@@ -136,9 +136,9 @@ export default function SymptomAnalyzerPage() {
               </label>
 
               <label className="space-y-1 text-sm">
-                <span className="text-slate-700">Severity</span>
+                <span className="text-slate-700 dark:text-slate-300">Severity</span>
                 <select
-                  className="w-full rounded-lg border border-slate-300 bg-white p-2"
+                  className="w-full rounded-lg border border-slate-300 bg-white p-2 text-slate-900 focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-500/30 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100 dark:focus:border-brand-400"
                   value={severity}
                   onChange={(event) => setSeverity(event.target.value)}
                 >
@@ -160,7 +160,7 @@ export default function SymptomAnalyzerPage() {
             <button
               type="button"
               disabled
-              className="cursor-not-allowed rounded-lg border border-slate-300 bg-slate-100 px-4 py-2 text-slate-500"
+              className="cursor-not-allowed rounded-lg border border-slate-300 bg-slate-100 px-4 py-2 text-slate-500 dark:border-slate-700 dark:bg-slate-800/90 dark:text-slate-400"
               aria-disabled="true"
             >
               Voice input coming soon
@@ -171,7 +171,7 @@ export default function SymptomAnalyzerPage() {
         {error ? <p className="rounded-lg bg-rose-50 p-3 text-sm text-rose-700">{error}</p> : null}
         {result ? (
           <div className="space-y-2">
-            <p className="text-sm text-slate-600">Review the findings below and seek urgent care for severe or worsening symptoms.</p>
+            <p className="text-sm text-slate-600 dark:text-slate-300">Review the findings below and seek urgent care for severe or worsening symptoms.</p>
             <AnalysisResultCard result={result} />
           </div>
         ) : null}

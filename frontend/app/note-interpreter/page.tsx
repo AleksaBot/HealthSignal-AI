@@ -64,39 +64,39 @@ export default function NoteInterpreterPage() {
         <h1 className="text-2xl font-bold">Note Interpreter</h1>
         <DisclaimerBanner />
 
-        <div className="space-y-3 rounded-xl border border-slate-200 bg-white p-4">
-          <p className="text-sm text-slate-700">Use one input method: upload a clinical note file or paste note text directly.</p>
-          <ul className="list-disc space-y-1 pl-5 text-xs text-slate-600">
+        <div className="space-y-3 rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-900/75">
+          <p className="text-sm text-slate-700 dark:text-slate-200">Use one input method: upload a clinical note file or paste note text directly.</p>
+          <ul className="list-disc space-y-1 pl-5 text-xs text-slate-600 dark:text-slate-300">
             <li>Upload supports PDF and image files and uses built-in file parsing/OCR when needed.</li>
             <li>Pasted text avoids extraction errors and is usually the clearest option for MVP interpretation quality.</li>
           </ul>
         </div>
 
         <form className="space-y-4" onSubmit={onSubmit}>
-          <fieldset className="space-y-3 rounded-xl border border-slate-200 bg-white p-4">
-            <legend className="px-1 text-sm font-semibold text-slate-800">Option A: Upload note file</legend>
+          <fieldset className="space-y-3 rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-900/75">
+            <legend className="px-1 text-sm font-semibold text-slate-800 dark:text-slate-200">Option A: Upload note file</legend>
             <label className="block">
               <span className="sr-only">Upload note image or PDF</span>
               <input
                 type="file"
                 onChange={onFileChange}
                 accept="image/*,.pdf,application/pdf"
-                className="block w-full cursor-pointer rounded-lg border border-slate-300 bg-white p-2 text-sm text-slate-700 file:mr-3 file:rounded-md file:border-0 file:bg-slate-100 file:px-3 file:py-2 file:text-sm file:font-medium file:text-slate-700"
+                className="block w-full cursor-pointer rounded-lg border border-slate-300 bg-white p-2 text-sm text-slate-700 file:mr-3 file:rounded-md file:border-0 file:bg-slate-100 file:px-3 file:py-2 file:text-sm file:font-medium file:text-slate-700 focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-500/30 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-200 dark:file:bg-slate-800 dark:file:text-slate-200 dark:focus:border-brand-400"
               />
             </label>
             {selectedFileName ? (
-              <p className="text-xs text-slate-600">
+              <p className="text-xs text-slate-600 dark:text-slate-300">
                 Selected file: <span className="font-medium">{selectedFileName}</span>
               </p>
             ) : (
-              <p className="text-xs text-slate-500">No file selected.</p>
+              <p className="text-xs text-slate-500 dark:text-slate-400">No file selected.</p>
             )}
           </fieldset>
 
-          <fieldset className="space-y-3 rounded-xl border border-slate-200 bg-white p-4">
-            <legend className="px-1 text-sm font-semibold text-slate-800">Option B: Paste note text</legend>
+          <fieldset className="space-y-3 rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-900/75">
+            <legend className="px-1 text-sm font-semibold text-slate-800 dark:text-slate-200">Option B: Paste note text</legend>
             <textarea
-              className="min-h-52 w-full rounded-xl border border-slate-300 bg-white p-3 text-sm leading-6 text-slate-800"
+              className="min-h-52 w-full rounded-xl border border-slate-300 bg-white p-3 text-sm leading-6 text-slate-800 placeholder:text-slate-500 focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-500/30 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100 dark:placeholder:text-slate-400 dark:focus:border-brand-400"
               placeholder="Paste doctor note text, discharge summary, or encounter highlights"
               value={noteText}
               onChange={(event) => setNoteText(event.target.value)}
@@ -113,21 +113,21 @@ export default function NoteInterpreterPage() {
         {result ? (
           <div className="space-y-3">
             {parsingMethod ? (
-              <p className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-700">
+              <p className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-700 dark:border-slate-700 dark:bg-slate-900/70 dark:text-slate-300">
                 Analysis source: <span className="font-medium capitalize">{parsingMethod.replaceAll("_", " ")}</span>
               </p>
             ) : null}
 
             {extractedText ? (
-              <div className="rounded-xl border border-slate-200 bg-white p-4">
-                <h2 className="text-sm font-semibold text-slate-800">Extracted text preview</h2>
-                <p className="mt-2 max-h-64 overflow-auto whitespace-pre-wrap rounded-lg bg-slate-50 p-3 text-sm leading-6 text-slate-700">
+              <div className="rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-900/75">
+                <h2 className="text-sm font-semibold text-slate-800 dark:text-slate-200">Extracted text preview</h2>
+                <p className="mt-2 max-h-64 overflow-auto whitespace-pre-wrap rounded-lg bg-slate-50 p-3 text-sm leading-6 text-slate-700 dark:bg-slate-900/80 dark:text-slate-300">
                   {extractedText.slice(0, 1200)}
                 </p>
               </div>
             ) : null}
 
-            <p className="text-sm text-slate-600">Interpretation is generated from the current input and should always be clinically reviewed.</p>
+            <p className="text-sm text-slate-600 dark:text-slate-300">Interpretation is generated from the current input and should always be clinically reviewed.</p>
             <AnalysisResultCard result={result} />
           </div>
         ) : null}
