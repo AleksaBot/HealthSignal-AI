@@ -9,6 +9,7 @@ export default function AuthPage() {
   const [mode, setMode] = useState<"login" | "signup">("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [firstName, setFirstName] = useState("");
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -30,8 +31,9 @@ export default function AuthPage() {
 
     try {
       if (mode === "signup") {
-        const user = await signup({ email, password });
+        const user = await signup({ first_name: firstName, email, password });
         setMessage(`Account created for ${user.email}. You can now log in.`);
+        setFirstName("");
         setMode("login");
       } else {
         const token = await login({ email, password });
@@ -71,6 +73,17 @@ export default function AuthPage() {
       </div>
 
       <form className="mt-5 space-y-3" onSubmit={onSubmit}>
+        {mode === "signup" ? (
+          <input
+            className="w-full rounded-lg border border-slate-300 p-2.5"
+            placeholder="First Name"
+            type="text"
+            value={firstName}
+            onChange={(event) => setFirstName(event.target.value)}
+            required
+            maxLength={80}
+          />
+        ) : null}
         <input
           className="w-full rounded-lg border border-slate-300 p-2.5"
           placeholder="Email"

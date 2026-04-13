@@ -3,20 +3,32 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { ReactNode, useEffect, useState } from "react";
-import { clearToken, isLoggedIn } from "@/lib/api";
+import { clearToken, getCurrentUser, isLoggedIn } from "@/lib/api";
 
 export function AppShell({ children }: { children: ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
   const [authenticated, setAuthenticated] = useState(false);
+  const [firstName, setFirstName] = useState<string | null>(null);
 
   useEffect(() => {
-    setAuthenticated(isLoggedIn());
+    const loggedIn = isLoggedIn();
+    setAuthenticated(loggedIn);
+
+    if (!loggedIn) {
+      setFirstName(null);
+      return;
+    }
+
+    getCurrentUser()
+      .then((user) => setFirstName(user.first_name))
+      .catch(() => setFirstName(null));
   }, [pathname]);
 
   function onLogout() {
     clearToken();
     setAuthenticated(false);
+    setFirstName(null);
     router.push("/");
   }
 
@@ -30,6 +42,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           <nav className="flex items-center gap-2 text-sm">
             {authenticated ? (
               <>
+                {firstName ? <span className="mr-1 text-slate-500">Hi, {firstName}</span> : null}
                 <Link href="/dashboard" className="rounded-md px-3 py-1.5 text-slate-700 hover:bg-slate-100 hover:text-brand-700">
                   Dashboard
                 </Link>

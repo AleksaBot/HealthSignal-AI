@@ -51,7 +51,7 @@ def client(db_session: Session) -> Generator[TestClient, None, None]:
 def auth_headers(client: TestClient) -> dict[str, str]:
     email = "test@example.com"
     password = "StrongPass123"
-    client.post("/api/auth/signup", json={"email": email, "password": password})
+    client.post("/api/auth/signup", json={"first_name": "Test", "email": email, "password": password})
     login = client.post("/api/auth/login", json={"email": email, "password": password})
     token = login.json()["access_token"]
     return {"Authorization": f"Bearer {token}"}

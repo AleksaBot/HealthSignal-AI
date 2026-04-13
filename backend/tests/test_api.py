@@ -13,9 +13,10 @@ def test_health_endpoint(client: TestClient):
 def test_auth_flow(client: TestClient):
     signup = client.post(
         "/api/auth/signup",
-        json={"email": "user1@example.com", "password": "MySecure123"},
+        json={"first_name": "User", "email": "user1@example.com", "password": "MySecure123"},
     )
     assert signup.status_code == 201
+    assert signup.json()["first_name"] == "User"
 
     login = client.post(
         "/api/auth/login",
@@ -25,12 +26,16 @@ def test_auth_flow(client: TestClient):
     assert login.json()["token_type"] == "bearer"
     assert login.json()["access_token"]
 
+    me = client.get("/api/auth/me", headers={"Authorization": f"Bearer {login.json()['access_token']}"})
+    assert me.status_code == 200
+    assert me.json()["first_name"] == "User"
+
 
 def test_signup_rejects_password_too_long(client: TestClient):
     long_password = "a" * 73
     signup = client.post(
         "/api/auth/signup",
-        json={"email": "long-password@example.com", "password": long_password},
+        json={"first_name": "Long", "email": "long-password@example.com", "password": long_password},
     )
 
     assert signup.status_code == 400
@@ -40,7 +45,7 @@ def test_signup_rejects_password_too_long(client: TestClient):
 def test_login_rejects_password_too_long_without_500(client: TestClient):
     client.post(
         "/api/auth/signup",
-        json={"email": "user2@example.com", "password": "MySecure123"},
+        json={"first_name": "User", "email": "user2@example.com", "password": "MySecure123"},
     )
 
     long_password = "b" * 73

@@ -54,7 +54,11 @@ def auth_signup(payload: AuthSignupRequest, db: Session = Depends(get_db)):
             detail="Unable to process signup request",
         ) from exc
 
-    user = User(email=payload.email.lower(), hashed_password=hashed_password)
+    user = User(
+        first_name=payload.first_name,
+        email=payload.email.lower(),
+        hashed_password=hashed_password,
+    )
     db.add(user)
     db.commit()
     db.refresh(user)
@@ -80,6 +84,11 @@ def auth_login(payload: AuthLoginRequest, db: Session = Depends(get_db)):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
 
     return AuthTokenResponse(access_token=create_access_token(str(user.id)))
+
+
+@router.get("/auth/me", response_model=UserRead)
+def auth_me(current_user: User = Depends(get_current_user)):
+    return current_user
 
 
 @router.post("/analyze/symptoms", response_model=AnalysisResponse)
