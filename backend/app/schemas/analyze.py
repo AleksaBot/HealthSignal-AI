@@ -11,6 +11,11 @@ class NoteInterpretRequest(BaseModel):
     note_text: str = Field(min_length=5, description="Doctor note or visit summary")
 
 
+class NoteFollowUpRequest(BaseModel):
+    interpreted_note: str = Field(min_length=10, description="Serialized interpreted note context")
+    question: str = Field(min_length=3, description="Patient follow-up question")
+
+
 class RiskInsightRequest(BaseModel):
     age: int = Field(ge=0, le=120)
     systolic_bp: int = Field(ge=70, le=260)
@@ -28,5 +33,28 @@ class AnalysisResponse(DisclaimerMixin):
     reasoning: str
 
 
-class NoteFileAnalysisResponse(AnalysisResponse):
+class TreatmentMention(BaseModel):
+    item: str
+    explanation: str
+
+
+class MedicalTermExplanation(BaseModel):
+    term: str
+    plain_english: str
+
+
+class NoteInterpretationResponse(DisclaimerMixin):
+    plain_english_summary: str
+    medicines_treatments: list[TreatmentMention]
+    medical_terms_explained: list[MedicalTermExplanation]
+    next_steps: list[str]
+    follow_up_questions: list[str]
+
+
+class NoteFileAnalysisResponse(NoteInterpretationResponse):
     extracted_text: str
+    file_parse_method: str | None = None
+
+
+class NoteFollowUpResponse(DisclaimerMixin):
+    answer: str

@@ -4,7 +4,10 @@ import {
   AuthTokenResponse,
   AuthSignupRequest,
   NoteFileAnalysisResponse,
+  NoteFollowUpRequest,
+  NoteFollowUpResponse,
   NoteInterpretRequest,
+  NoteInterpretationResponse,
   ReportRead,
   RiskInsightRequest,
   SymptomAnalyzeRequest,
@@ -158,7 +161,11 @@ export function analyzeSymptoms(payload: SymptomAnalyzeRequest) {
 }
 
 export function analyzeNotes(payload: NoteInterpretRequest) {
-  return postJSON<NoteInterpretRequest, AnalysisResponse>("/api/analyze/notes", payload);
+  return postJSON<NoteInterpretRequest, NoteInterpretationResponse>("/api/analyze/notes", payload);
+}
+
+export function analyzeNoteFollowUp(payload: NoteFollowUpRequest) {
+  return postJSON<NoteFollowUpRequest, NoteFollowUpResponse>("/api/analyze/note-follow-up", payload);
 }
 
 export function analyzeNoteFile(file: File) {
