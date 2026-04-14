@@ -80,7 +80,7 @@ Backend:
 - `DATABASE_URL` (defaults to `sqlite:///./healthsignal.db` for local use)
 - `SECRET_KEY` (set a strong random value in production)
 - `JWT_ALGORITHM` (defaults to `HS256`)
-- `FRONTEND_ORIGIN` or `ALLOWED_ORIGINS` for CORS (set to your deployed Vercel URL on Render; multiple origins can be comma-separated and local `localhost:3000` origins stay allowed for development)
+- `CORS_ORIGINS` (recommended; comma-separated list of explicit origins and optional wildcards like `https://*.vercel.app` for preview deploys; localhost origins remain allowed by default). `ALLOWED_ORIGINS` and `FRONTEND_ORIGIN` are still supported as legacy aliases.
 
 Frontend:
 - `NEXT_PUBLIC_API_URL` (the backend API base URL)
