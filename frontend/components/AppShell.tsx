@@ -47,10 +47,13 @@ export function AppShell({ children }: { children: ReactNode }) {
 
     getCurrentUser()
       .then((user) => {
+        setAuthenticated(true);
         setFirstName(user.first_name);
         setEmail(user.email);
       })
       .catch(() => {
+        setAuthenticated(false);
+        clearToken();
         setFirstName(null);
         setEmail(null);
       });

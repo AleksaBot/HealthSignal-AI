@@ -16,6 +16,33 @@ import {
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 const TOKEN_KEY = "healthsignal_access_token";
+const LEGACY_TOKEN_KEYS = ["access_token"];
+
+function readTokenFromStorage() {
+  if (typeof window === "undefined") {
+    return null;
+  }
+
+  try {
+    const token = localStorage.getItem(TOKEN_KEY);
+    if (token) {
+      return token;
+    }
+
+    for (const legacyKey of LEGACY_TOKEN_KEYS) {
+      const legacyToken = localStorage.getItem(legacyKey);
+      if (legacyToken) {
+        localStorage.setItem(TOKEN_KEY, legacyToken);
+        localStorage.removeItem(legacyKey);
+        return legacyToken;
+      }
+    }
+  } catch {
+    return null;
+  }
+
+  return null;
+}
 
 export class ApiError extends Error {
   status: number;
@@ -27,23 +54,25 @@ export class ApiError extends Error {
 }
 
 function getToken() {
-  if (typeof window === "undefined") {
-    return null;
-  }
-
-  try {
-    return localStorage.getItem(TOKEN_KEY);
-  } catch {
-    return null;
-  }
+  return readTokenFromStorage();
 }
 
 export function saveToken(token: string) {
+  if (typeof window === "undefined") {
+    return;
+  }
+  clearToken();
   localStorage.setItem(TOKEN_KEY, token);
 }
 
 export function clearToken() {
+  if (typeof window === "undefined") {
+    return;
+  }
   localStorage.removeItem(TOKEN_KEY);
+  for (const legacyKey of LEGACY_TOKEN_KEYS) {
+    localStorage.removeItem(legacyKey);
+  }
 }
 
 export function isLoggedIn() {
@@ -66,14 +95,33 @@ export function getUserErrorMessage(error: unknown, fallback = "Something went w
   return fallback;
 }
 
-async function request<TResponse>(path: string, init?: RequestInit): Promise<TResponse> {
+type RequestOptions = RequestInit & {
+  authRequired?: boolean;
+};
+
+function buildAuthHeaders(init?: RequestOptions) {
   const token = getToken();
   const headers = new Headers(init?.headers);
   headers.set("Content-Type", "application/json");
 
-  if (token) {
+  if (init?.authRequired && !token) {
+    throw new ApiError("Please log in to continue.", 401);
+  }
+
+  if (token && !headers.has("Authorization")) {
     headers.set("Authorization", `Bearer ${token}`);
   }
+  return headers;
+}
+
+function handleUnauthorized(status: number) {
+  if (status === 401) {
+    clearToken();
+  }
+}
+
+async function request<TResponse>(path: string, init?: RequestOptions): Promise<TResponse> {
+  const headers = buildAuthHeaders(init);
 
   const response = await fetch(`${API_BASE}${path}`, {
     ...init,
@@ -81,6 +129,7 @@ async function request<TResponse>(path: string, init?: RequestInit): Promise<TRe
   });
 
   if (!response.ok) {
+    handleUnauthorized(response.status);
     const fallback = userMessageForStatus(response.status, `Request failed with status ${response.status}`);
     let message = fallback;
 
@@ -99,10 +148,15 @@ async function request<TResponse>(path: string, init?: RequestInit): Promise<TRe
   return (await response.json()) as TResponse;
 }
 
-async function requestForm<TResponse>(path: string, formData: FormData): Promise<TResponse> {
+async function requestForm<TResponse>(path: string, formData: FormData, init?: RequestOptions): Promise<TResponse> {
   const token = getToken();
   const headers = new Headers();
-  if (token) {
+
+  if (init?.authRequired && !token) {
+    throw new ApiError("Please log in to continue.", 401);
+  }
+
+  if (token && !headers.has("Authorization")) {
     headers.set("Authorization", `Bearer ${token}`);
   }
 
@@ -113,6 +167,7 @@ async function requestForm<TResponse>(path: string, formData: FormData): Promise
   });
 
   if (!response.ok) {
+    handleUnauthorized(response.status);
     const fallback = userMessageForStatus(response.status, `Request failed with status ${response.status}`);
     let message = fallback;
 
@@ -138,9 +193,24 @@ export function postJSON<TRequest, TResponse>(path: string, body: TRequest) {
   });
 }
 
+export function postAuthJSON<TRequest, TResponse>(path: string, body: TRequest) {
+  return request<TResponse>(path, {
+    method: "POST",
+    body: JSON.stringify(body),
+    authRequired: true
+  });
+}
+
 export function getJSON<TResponse>(path: string) {
   return request<TResponse>(path, {
     method: "GET"
+  });
+}
+
+export function getAuthJSON<TResponse>(path: string) {
+  return request<TResponse>(path, {
+    method: "GET",
+    authRequired: true
   });
 }
 
@@ -153,35 +223,35 @@ export function login(payload: AuthLoginRequest) {
 }
 
 export function getCurrentUser() {
-  return getJSON<UserRead>("/api/auth/me");
+  return getAuthJSON<UserRead>("/api/auth/me");
 }
 
 export function analyzeSymptoms(payload: SymptomAnalyzeRequest) {
-  return postJSON<SymptomAnalyzeRequest, AnalysisResponse>("/api/analyze/symptoms", payload);
+  return postAuthJSON<SymptomAnalyzeRequest, AnalysisResponse>("/api/analyze/symptoms", payload);
 }
 
 export function analyzeNotes(payload: NoteInterpretRequest) {
-  return postJSON<NoteInterpretRequest, NoteInterpretationResponse>("/api/analyze/notes", payload);
+  return postAuthJSON<NoteInterpretRequest, NoteInterpretationResponse>("/api/analyze/notes", payload);
 }
 
 export function analyzeNoteFollowUp(payload: NoteFollowUpRequest) {
-  return postJSON<NoteFollowUpRequest, NoteFollowUpResponse>("/api/analyze/note-follow-up", payload);
+  return postAuthJSON<NoteFollowUpRequest, NoteFollowUpResponse>("/api/analyze/note-follow-up", payload);
 }
 
 export function analyzeNoteFile(file: File) {
   const formData = new FormData();
   formData.append("file", file);
-  return requestForm<NoteFileAnalysisResponse>("/api/analyze/note-file", formData);
+  return requestForm<NoteFileAnalysisResponse>("/api/analyze/note-file", formData, { authRequired: true });
 }
 
 export function analyzeRisk(payload: RiskInsightRequest) {
-  return postJSON<RiskInsightRequest, AnalysisResponse>("/api/analyze/risk", payload);
+  return postAuthJSON<RiskInsightRequest, AnalysisResponse>("/api/analyze/risk", payload);
 }
 
 export function listReports() {
-  return getJSON<ReportRead[]>("/api/reports");
+  return getAuthJSON<ReportRead[]>("/api/reports");
 }
 
 export function getReport(reportId: number) {
-  return getJSON<ReportRead>(`/api/reports/${reportId}`);
+  return getAuthJSON<ReportRead>(`/api/reports/${reportId}`);
 }
