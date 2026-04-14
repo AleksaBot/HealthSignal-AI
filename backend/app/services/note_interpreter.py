@@ -23,12 +23,30 @@ TERM_EXPLANATIONS: dict[str, str] = {
 }
 
 MEDICATION_HINTS: list[tuple[str, str]] = [
-    ("metformin", "commonly used to support blood sugar control"),
-    ("insulin", "used to lower blood sugar"),
-    ("lisinopril", "often used for blood pressure or kidney protection"),
-    ("losartan", "often used for blood pressure and heart/kidney support"),
-    ("atorvastatin", "used to lower cholesterol"),
-    ("amoxicillin", "an antibiotic for bacterial infection treatment"),
+    (
+        "metformin",
+        "Metformin is commonly used to lower blood sugar in diabetes or prediabetes. In this note it may be listed to improve glucose control. It is often taken with food (usually once or twice daily). Common side effects include stomach upset, nausea, or diarrhea.",
+    ),
+    (
+        "insulin",
+        "Insulin helps lower blood sugar when the body cannot control glucose well enough on its own. In this note it may be included to improve glucose control. How it is taken depends on the insulin type (injection timing varies). Common side effects include low blood sugar and possible weight gain.",
+    ),
+    (
+        "lisinopril",
+        "Lisinopril is commonly used to lower blood pressure and can also help protect kidney function. In this note it may have been prescribed because blood pressure or kidney-risk concerns were mentioned. It is usually taken once daily. Common side effects include dizziness or dry cough.",
+    ),
+    (
+        "losartan",
+        "Losartan is used to lower blood pressure and may help protect the heart and kidneys. In this note it may be listed for blood pressure control or organ protection. It is typically taken once daily. Common side effects include dizziness or mild fatigue.",
+    ),
+    (
+        "atorvastatin",
+        "Atorvastatin helps lower LDL cholesterol and reduce cardiovascular risk. In this note it may have been prescribed because cholesterol or heart-risk concerns were noted. It is usually taken once daily. Common side effects include muscle aches or mild digestive upset.",
+    ),
+    (
+        "amoxicillin",
+        "Amoxicillin is an antibiotic used to treat common bacterial infections. In this note it may have been prescribed for a suspected or confirmed bacterial illness. It is often taken in divided doses across the day for a set number of days. Common side effects include nausea, diarrhea, or rash.",
+    ),
 ]
 
 HEADER_LINE_PATTERNS = [
@@ -106,9 +124,9 @@ def _build_fallback_interpretation(cleaned_note: str, likely_template: bool) -> 
     if re.search(r"\blab|blood test|imaging|x-?ray|mri|ct\b", lowered):
         next_steps.append("Ask when ordered tests should be completed and when results will be discussed.")
     if re.search(r"\bstart|continue|take|dose\b", lowered):
-        next_steps.append("Review medication timing and warning side effects directly with your clinician.")
+        next_steps.append("Confirm how and when to take each medication, including common side effects to watch for.")
     if not next_steps:
-        next_steps.append("Review this note with your clinician to confirm personalized next steps.")
+        next_steps.append("Write down your top questions and confirm the plan at your next visit.")
 
     follow_up_questions = [
         "Can you confirm which parts of this note are most important for me right now?",
@@ -159,12 +177,17 @@ def interpret_note(note_text: str) -> NoteInterpretationResponse:
     provider = get_ai_provider()
 
     system_prompt = (
-        "You are a careful medical-note explainer for patient education only. "
+        "You are a patient-centered medical-note explainer. "
+        "Rewrite the note in natural, everyday language for a patient who may be anxious or unfamiliar with medical terms. "
         "Do not diagnose. Do not invent facts beyond the note. "
+        "Avoid robotic/legal phrasing and avoid repeating the note word-for-word. "
+        "Medication explanations must include: what it is for, why it may be listed in this note, typical use frequency if known/general, and common simple side effects. "
+        "Use concise, warm, practical language. "
         "Return valid JSON with keys: plain_english_summary, medicines_treatments, medical_terms_explained, next_steps, follow_up_questions."
     )
     user_prompt = (
         "Interpret this note using plain language and concise bullet-like outputs. "
+        "For plain_english_summary, translate the clinical meaning into a true patient-friendly explanation (not a copy of the note). "
         "If it appears templated/generic, clearly state that in plain_english_summary. "
         "Avoid header/address/company text.\n\n"
         f"Likely template: {likely_template}\n"
@@ -233,7 +256,10 @@ def answer_note_follow_up(original_note_text: str, interpreted_note: str, questi
     structured_context = json.dumps(parsed_interpretation or {"summary": interpreted_note}, ensure_ascii=False)
 
     system_prompt = (
-        "You are a patient-friendly medical note Q&A assistant for education only. "
+        "You are a conversational follow-up assistant answering patient questions about a medical note. "
+        "Lead with a direct, contextual answer grounded in the note. "
+        "If relevant, briefly explain the condition or medication in practical language. "
+        "Use minimal safety language; include a short caution only when needed for uncertainty/high-risk guidance. "
         "Ground every answer in the provided note/interpretation. "
         "If uncertain, say what is unclear. Never diagnose. Never create medication instructions that are not stated."
     )
@@ -242,7 +268,7 @@ def answer_note_follow_up(original_note_text: str, interpreted_note: str, questi
         f"Original note (cleaned): {_truncate(note_context)}\n\n"
         f"Structured interpretation: {_truncate(structured_context)}\n"
         f"Likely template note: {likely_template}\n"
-        "Answer in 3-5 sentences, plain English, patient-friendly."
+        "Answer in 3-5 sentences in plain, natural English. Start with the direct answer first."
     )
 
     ai_answer = provider.generate_text(system_prompt=system_prompt, user_prompt=user_prompt)
@@ -255,6 +281,6 @@ def answer_note_follow_up(original_note_text: str, interpreted_note: str, questi
         else ""
     )
     return (
-        f"Based on the note, I can help explain what is written, but I cannot confirm a diagnosis or change treatment instructions.{template_clause} "
-        f"For your question ('{concise_question}'), the safest next step is to confirm exact timing, medication details, and warning symptoms with your clinician."
+        f"From this note, I can explain the plan but I cannot verify details that are not written.{template_clause} "
+        f"For your question ('{concise_question}'), a practical next step is to confirm timing, medication details, and warning symptoms at your next clinical follow-up."
     )
