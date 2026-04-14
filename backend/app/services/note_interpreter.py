@@ -85,6 +85,11 @@ def _normalize_whitespace(text: str) -> str:
     return re.sub(r"\s+", " ", text).strip()
 
 
+def _remove_robotic_summary_prefix(text: str) -> str:
+    cleaned = _normalize_whitespace(text)
+    return re.sub(r"^(in plain (english|language)\s*:\s*)", "", cleaned, flags=re.IGNORECASE)
+
+
 def _expand_medical_abbreviations(text: str) -> str:
     expanded = text
     expanded = re.sub(r"\bx\s*(\d+)\s*d\b", r"for \1 days", expanded, flags=re.IGNORECASE)
@@ -128,7 +133,7 @@ def _build_fallback_interpretation(cleaned_note: str, likely_template: bool) -> 
     else:
         snippets = re.split(r"(?<=[.!?])\s+", cleaned_note)
         top = " ".join(snippets[:2]).strip()
-        summary = f"In plain language: {top}" if top else "The note has limited clinical detail."
+        summary = top if top else "The note has limited clinical detail."
 
     if likely_template:
         summary = f"{summary} It also looks like a generic template/example rather than a fully patient-specific note."
@@ -226,7 +231,9 @@ def interpret_note(note_text: str) -> NoteInterpretationResponse:
     if not ai_payload:
         return _build_fallback_interpretation(cleaned_note, likely_template)
 
-    summary = _normalize_whitespace(_expand_medical_abbreviations(str(ai_payload.get("plain_english_summary", ""))))
+    summary = _remove_robotic_summary_prefix(
+        _normalize_whitespace(_expand_medical_abbreviations(str(ai_payload.get("plain_english_summary", ""))))
+    )
     if likely_template and "template" not in summary.lower():
         summary = f"{summary} This document also appears to include template/example language."
 
@@ -318,15 +325,31 @@ def _build_contextual_follow_up_fallback(
     follow_up_context: dict[str, Any],
     likely_template: bool,
 ) -> str:
+    intent = _detect_follow_up_intent(question)
     details: list[str] = []
     symptom_bits = follow_up_context.get("extracted_symptoms") or []
     next_steps = follow_up_context.get("next_steps") or []
     treatment_bits = follow_up_context.get("treatments_medications") or []
 
-    if symptom_bits:
-        details.append(f"Based on this note, keep track of {', '.join(symptom_bits[:3])}.")
+    if intent == "actions_now":
+        if next_steps:
+            details.append(f"Right now, the most useful next action is to {next_steps[0][0].lower() + next_steps[0][1:]}")
+        else:
+            details.append("Right now, follow the documented plan, keep notes on symptom changes, and contact your care team if things are unclear.")
+    elif intent == "warning_signs":
+        if symptom_bits:
+            details.append(f"Warning signs to watch for include worsening or persistent {', '.join(symptom_bits[:3])}, especially if symptoms escalate quickly.")
+        else:
+            details.append("Warning signs include severe pain, trouble breathing, persistent vomiting, fainting, high fever, or bleeding.")
+    elif intent == "seriousness":
+        details.append("This note alone cannot confirm how serious the condition is, but it does provide clues about current risk and follow-up needs.")
+        if symptom_bits:
+            details.append(f"Pay attention to whether {', '.join(symptom_bits[:3])} are improving or getting worse over time.")
     else:
-        details.append("Based on this note, follow the documented plan closely and monitor how you feel day to day.")
+        if symptom_bits:
+            details.append(f"Based on this note, keep track of {', '.join(symptom_bits[:3])}.")
+        else:
+            details.append("Based on this note, follow the documented plan closely and monitor how you feel day to day.")
 
     if treatment_bits:
         details.append(f"Continue the treatments mentioned ({', '.join(treatment_bits[:3])}) exactly as documented.")
@@ -351,6 +374,17 @@ def _build_contextual_follow_up_fallback(
     return " ".join(details)
 
 
+def _detect_follow_up_intent(question: str) -> str:
+    lowered = question.lower()
+    if re.search(r"\b(right now|what should i do|what do i do|next step|immediately|today)\b", lowered):
+        return "actions_now"
+    if re.search(r"\b(worry|warning sign|red flag|emergency|danger)\b", lowered):
+        return "warning_signs"
+    if re.search(r"\b(serious|severity|how bad|dangerous|risk)\b", lowered):
+        return "seriousness"
+    return "general"
+
+
 def answer_note_follow_up(original_note_text: str, interpreted_note: str, question: str) -> str:
     provider = get_ai_provider()
     concise_question = _normalize_whitespace(question)
@@ -368,6 +402,7 @@ def answer_note_follow_up(original_note_text: str, interpreted_note: str, questi
         parsed_interpretation = None
 
     follow_up_context = _extract_follow_up_context(note_context, parsed_interpretation)
+    intent = _detect_follow_up_intent(concise_question)
     if parsed_interpretation:
         structured_context = json.dumps(_expand_context_values(parsed_interpretation), ensure_ascii=False)
     else:
@@ -378,14 +413,17 @@ def answer_note_follow_up(original_note_text: str, interpreted_note: str, questi
 
     system_prompt = (
         "You are a conversational follow-up assistant answering patient questions about a medical note. "
+        "The user question is the top priority: answer the exact question asked before adding general context. "
         "Lead with a direct, contextual answer grounded in the note. "
         "If relevant, briefly explain the condition or medication in practical language. "
         "Use minimal safety language; include a short caution only when needed for uncertainty/high-risk guidance. "
         "Ground every answer in the provided note/interpretation. "
-        "If uncertain, say what is unclear. Never diagnose. Never create medication instructions that are not stated."
+        "If uncertain, say what is unclear. Never diagnose. Never create medication instructions that are not stated. "
+        "Do not reuse a generic template response across different questions."
     )
     user_prompt = (
         f"User question: {concise_question}\n\n"
+        f"Detected question intent: {intent}\n"
         f"Original note (cleaned): {_truncate(note_context)}\n\n"
         f"Interpreted summary: {_truncate(str(follow_up_context.get('interpreted_summary', '')))}\n"
         f"Extracted symptoms: {_truncate(json.dumps(follow_up_context.get('extracted_symptoms', []), ensure_ascii=False), 500)}\n"
@@ -393,7 +431,8 @@ def answer_note_follow_up(original_note_text: str, interpreted_note: str, questi
         f"Next steps: {_truncate(json.dumps(follow_up_context.get('next_steps', []), ensure_ascii=False), 500)}\n"
         f"Structured interpretation: {_truncate(structured_context)}\n"
         f"Likely template note: {likely_template}\n"
-        "Answer in 3-5 sentences in plain, natural English. Start with the direct answer first."
+        "Answer in 3-5 sentences in plain, natural English. Start with the direct answer first. "
+        "Use the intent label to choose the angle of your response (actions, warning signs, seriousness, or general clarification)."
     )
 
     ai_answer = provider.generate_text(system_prompt=system_prompt, user_prompt=user_prompt)
