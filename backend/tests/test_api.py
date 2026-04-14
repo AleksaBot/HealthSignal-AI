@@ -73,6 +73,9 @@ def test_analyze_endpoints_create_reports(client: TestClient, auth_headers: dict
         headers=auth_headers,
     )
     assert notes.status_code == 200
+    notes_payload = notes.json()
+    assert notes_payload["plain_english_summary"]
+    assert "next_steps" in notes_payload
 
     risk = client.post(
         "/api/analyze/risk",
@@ -123,7 +126,8 @@ def test_note_file_analysis_success(client: TestClient, auth_headers: dict[str, 
     payload = response.json()
     assert "extracted_text" in payload
     assert payload["extracted_text"].startswith("Patient has dizziness")
-    assert payload["likely_categories"]
+    assert payload["plain_english_summary"]
+    assert isinstance(payload["medicines_treatments"], list)
 
 
 def test_note_file_analysis_rejects_unsupported_type(client: TestClient, auth_headers: dict[str, str]):
@@ -135,3 +139,19 @@ def test_note_file_analysis_rejects_unsupported_type(client: TestClient, auth_he
 
     assert response.status_code == 400
     assert response.json()["detail"] == "Unsupported file type. Please upload a PDF, PNG, JPG, or JPEG file."
+
+
+def test_note_follow_up_success(client: TestClient, auth_headers: dict[str, str]):
+    response = client.post(
+        "/api/analyze/note-follow-up",
+        json={
+            "interpreted_note": "Patient asked to continue metformin and follow up in two weeks.",
+            "question": "What should I clarify at follow-up?",
+        },
+        headers=auth_headers,
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert "answer" in payload
+    assert "follow" in payload["answer"].lower()

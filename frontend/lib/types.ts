@@ -34,7 +34,26 @@ export type AnalysisResponse = {
   disclaimer: string;
 };
 
-export type NoteFileAnalysisResponse = AnalysisResponse & {
+export type TreatmentMention = {
+  item: string;
+  explanation: string;
+};
+
+export type MedicalTermExplanation = {
+  term: string;
+  plain_english: string;
+};
+
+export type NoteInterpretationResponse = {
+  plain_english_summary: string;
+  medicines_treatments: TreatmentMention[];
+  medical_terms_explained: MedicalTermExplanation[];
+  next_steps: string[];
+  follow_up_questions: string[];
+  disclaimer: string;
+};
+
+export type NoteFileAnalysisResponse = NoteInterpretationResponse & {
   extracted_text: string;
   file_parse_method?: string;
 };
@@ -45,6 +64,16 @@ export type SymptomAnalyzeRequest = {
 
 export type NoteInterpretRequest = {
   note_text: string;
+};
+
+export type NoteFollowUpRequest = {
+  interpreted_note: string;
+  question: string;
+};
+
+export type NoteFollowUpResponse = {
+  answer: string;
+  disclaimer: string;
 };
 
 export type RiskInsightRequest = {

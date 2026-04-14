@@ -8,7 +8,10 @@ from app.models.user import User
 from app.schemas.analyze import (
     AnalysisResponse,
     NoteFileAnalysisResponse,
+    NoteFollowUpRequest,
+    NoteFollowUpResponse,
     NoteInterpretRequest,
+    NoteInterpretationResponse,
     RiskInsightRequest,
     SymptomAnalyzeRequest,
 )
@@ -16,7 +19,7 @@ from app.schemas.auth import AuthLoginRequest, AuthSignupRequest, AuthTokenRespo
 
 from app.schemas.report import ReportCreate, ReportRead
 from app.schemas.user import UserRead
-from app.services.note_interpreter import interpret_note
+from app.services.note_interpreter import answer_note_follow_up, interpret_note
 from app.services.note_file_parser import FileParsingError, extract_text_from_upload
 from app.services.report_service import create_report_for_analysis
 from app.services.risk_engine import analyze_structured_risk
@@ -108,7 +111,7 @@ def analyze_symptoms(
     return analysis
 
 
-@router.post("/analyze/notes", response_model=AnalysisResponse)
+@router.post("/analyze/notes", response_model=NoteInterpretationResponse)
 def analyze_notes(
     payload: NoteInterpretRequest,
     db: Session = Depends(get_db),
@@ -149,7 +152,15 @@ def analyze_note_file(
         input_payload={"filename": file.filename, "content_type": file.content_type},
         analysis=analysis,
     )
-    return NoteFileAnalysisResponse(extracted_text=extracted_text, **analysis.model_dump())
+    parse_method = "pdf_text_extraction" if (file.content_type or "").lower() == "application/pdf" else "image_ocr"
+    return NoteFileAnalysisResponse(extracted_text=extracted_text, file_parse_method=parse_method, **analysis.model_dump())
+
+
+@router.post("/analyze/note-follow-up", response_model=NoteFollowUpResponse)
+def analyze_note_follow_up(payload: NoteFollowUpRequest, current_user: User = Depends(get_current_user)):
+    del current_user
+    answer = answer_note_follow_up(payload.interpreted_note, payload.question)
+    return NoteFollowUpResponse(answer=answer)
 
 
 @router.post("/analyze/risk", response_model=AnalysisResponse)

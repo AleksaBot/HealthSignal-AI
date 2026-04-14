@@ -2,22 +2,26 @@
 
 import { ChangeEvent, FormEvent, useMemo, useState } from "react";
 import { DisclaimerBanner } from "@/components/DisclaimerBanner";
-import { AnalysisResultCard } from "@/components/AnalysisResultCard";
 import { RequireAuth } from "@/components/RequireAuth";
-import { analyzeNoteFile, analyzeNotes, getUserErrorMessage } from "@/lib/api";
-import { AnalysisResponse, NoteFileAnalysisResponse } from "@/lib/types";
+import { NoteInterpretationCard } from "@/components/NoteInterpretationCard";
+import { analyzeNoteFile, analyzeNoteFollowUp, analyzeNotes, getUserErrorMessage } from "@/lib/api";
+import { NoteFileAnalysisResponse, NoteInterpretationResponse } from "@/lib/types";
 
 export default function NoteInterpreterPage() {
   const [noteText, setNoteText] = useState("");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [selectedFileName, setSelectedFileName] = useState<string | null>(null);
-  const [result, setResult] = useState<AnalysisResponse | null>(null);
+  const [result, setResult] = useState<NoteInterpretationResponse | null>(null);
   const [extractedText, setExtractedText] = useState<string | null>(null);
   const [parsingMethod, setParsingMethod] = useState<string | null>(null);
+  const [followUpQuestion, setFollowUpQuestion] = useState("");
+  const [followUpAnswer, setFollowUpAnswer] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [followUpLoading, setFollowUpLoading] = useState(false);
 
   const canSubmit = useMemo(() => noteText.trim().length >= 5 || Boolean(selectedFileName), [noteText, selectedFileName]);
+  const canAskFollowUp = useMemo(() => Boolean(result) && followUpQuestion.trim().length >= 3, [result, followUpQuestion]);
 
   function onFileChange(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
@@ -30,6 +34,8 @@ export default function NoteInterpreterPage() {
     setLoading(true);
     setError(null);
     setResult(null);
+    setFollowUpQuestion("");
+    setFollowUpAnswer(null);
     setExtractedText(null);
     setParsingMethod(null);
 
@@ -58,6 +64,27 @@ export default function NoteInterpreterPage() {
     }
   }
 
+  async function onAskFollowUp(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!result || !followUpQuestion.trim()) return;
+
+    setFollowUpLoading(true);
+    setFollowUpAnswer(null);
+    setError(null);
+
+    try {
+      const response = await analyzeNoteFollowUp({
+        interpreted_note: JSON.stringify(result),
+        question: followUpQuestion.trim()
+      });
+      setFollowUpAnswer(response.answer);
+    } catch (err) {
+      setError(getUserErrorMessage(err, "Unable to answer your follow-up question right now."));
+    } finally {
+      setFollowUpLoading(false);
+    }
+  }
+
   return (
     <RequireAuth>
       <section className="space-y-4">
@@ -68,7 +95,7 @@ export default function NoteInterpreterPage() {
           <p className="text-sm text-slate-700 dark:text-slate-200">Use one input method: upload a clinical note file or paste note text directly.</p>
           <ul className="list-disc space-y-1 pl-5 text-xs text-slate-600 dark:text-slate-300">
             <li>Upload supports PDF and image files and uses built-in file parsing/OCR when needed.</li>
-            <li>Pasted text avoids extraction errors and is usually the clearest option for MVP interpretation quality.</li>
+            <li>Pasted text avoids extraction errors and is usually the clearest option.</li>
           </ul>
         </div>
 
@@ -111,7 +138,7 @@ export default function NoteInterpreterPage() {
 
         {error ? <p className="rounded-lg bg-rose-50 p-3 text-sm text-rose-700">{error}</p> : null}
         {result ? (
-          <div className="space-y-3">
+          <div className="space-y-4">
             {parsingMethod ? (
               <p className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-700 dark:border-slate-700 dark:bg-slate-900/70 dark:text-slate-300">
                 Analysis source: <span className="font-medium capitalize">{parsingMethod.replaceAll("_", " ")}</span>
@@ -127,8 +154,22 @@ export default function NoteInterpreterPage() {
               </div>
             ) : null}
 
-            <p className="text-sm text-slate-600 dark:text-slate-300">Interpretation is generated from the current input and should always be clinically reviewed.</p>
-            <AnalysisResultCard result={result} />
+            <NoteInterpretationCard result={result} />
+
+            <form onSubmit={onAskFollowUp} className="space-y-3 rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-900/75">
+              <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100">Ask a follow-up about this interpreted note</h2>
+              <textarea
+                value={followUpQuestion}
+                onChange={(event) => setFollowUpQuestion(event.target.value)}
+                minLength={3}
+                placeholder="Example: Should I ask when to repeat these blood tests?"
+                className="min-h-24 w-full rounded-lg border border-slate-300 bg-white p-3 text-sm text-slate-800 focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-500/30 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100"
+              />
+              <button type="submit" disabled={!canAskFollowUp || followUpLoading} className="rounded-lg bg-slate-900 px-4 py-2 text-sm text-white disabled:opacity-60 dark:bg-slate-200 dark:text-slate-900">
+                {followUpLoading ? "Answering..." : "Ask follow-up"}
+              </button>
+              {followUpAnswer ? <p className="rounded-lg bg-slate-50 p-3 text-sm text-slate-700 dark:bg-slate-900/70 dark:text-slate-300">{followUpAnswer}</p> : null}
+            </form>
           </div>
         ) : null}
       </section>
