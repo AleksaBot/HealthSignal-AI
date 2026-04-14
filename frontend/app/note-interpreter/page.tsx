@@ -74,6 +74,7 @@ export default function NoteInterpreterPage() {
 
     try {
       const response = await analyzeNoteFollowUp({
+        original_note_text: (extractedText ?? noteText).trim(),
         interpreted_note: JSON.stringify(result),
         question: followUpQuestion.trim()
       });

@@ -67,6 +67,7 @@ export type NoteInterpretRequest = {
 };
 
 export type NoteFollowUpRequest = {
+  original_note_text: string;
   interpreted_note: string;
   question: string;
 };

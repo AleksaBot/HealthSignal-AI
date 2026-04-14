@@ -1,25 +1,11 @@
 from __future__ import annotations
 
+import json
 import re
-from typing import Iterable
+from typing import Any
 
 from app.schemas.analyze import MedicalTermExplanation, NoteInterpretationResponse, TreatmentMention
-
-MEDICATION_GUIDANCE: dict[str, str] = {
-    "metformin": "often used to help lower blood sugar in diabetes",
-    "insulin": "used to control blood sugar",
-    "lisinopril": "commonly used for blood pressure or kidney protection",
-    "losartan": "commonly used for blood pressure and heart/kidney support",
-    "amlodipine": "used to treat high blood pressure",
-    "atorvastatin": "used to lower cholesterol and reduce heart risk",
-    "rosuvastatin": "used to lower cholesterol and reduce heart risk",
-    "aspirin": "can be used to reduce blood clot risk in selected patients",
-    "clopidogrel": "helps reduce blood clot risk",
-    "albuterol": "a rescue inhaler for breathing symptoms",
-    "levothyroxine": "used to replace thyroid hormone",
-    "omeprazole": "used to reduce stomach acid",
-    "amoxicillin": "an antibiotic used for bacterial infections",
-}
+from app.services.ai_provider import get_ai_provider
 
 TERM_EXPLANATIONS: dict[str, str] = {
     "hypertension": "high blood pressure",
@@ -36,11 +22,25 @@ TERM_EXPLANATIONS: dict[str, str] = {
     "follow-up": "a return visit or check-in after this appointment",
 }
 
-NEXT_STEP_PATTERNS: list[tuple[str, str]] = [
-    (r"\bfollow[- ]?up\b|\breturn\b|\brecheck\b", "Schedule or confirm the follow-up visit mentioned in the note."),
-    (r"\bstart\b|\bbegin\b|\bcontinue\b|\btake\b|\bdose\b", "Take medicines exactly as written and ask before making any changes."),
-    (r"\blab\b|\bblood test\b|\bimaging\b|\bx-?ray\b|\bmri\b|\bct\b", "Complete the ordered tests and review the results with your clinician."),
-    (r"\bmonitor\b|\bwatch\b|\btrack\b|\blog\b", "Track the symptoms or home readings requested in the note."),
+MEDICATION_HINTS: list[tuple[str, str]] = [
+    ("metformin", "commonly used to support blood sugar control"),
+    ("insulin", "used to lower blood sugar"),
+    ("lisinopril", "often used for blood pressure or kidney protection"),
+    ("losartan", "often used for blood pressure and heart/kidney support"),
+    ("atorvastatin", "used to lower cholesterol"),
+    ("amoxicillin", "an antibiotic for bacterial infection treatment"),
+]
+
+HEADER_LINE_PATTERNS = [
+    r"\b(phone|fax|tel|email|www\.|suite|ste\.?|avenue|street|road|blvd|zip)\b",
+    r"\b(medical center|hospital|clinic|health system|department of)\b",
+    r"\d{3}[-.\s]\d{3}[-.\s]\d{4}",
+]
+
+TEMPLATE_PATTERNS = [
+    r"\[[^\]]*(name|date|month|day|year|provider|company|address)[^\]]*\]",
+    r"\b(lorem ipsum|sample note|example note|template|insert .* here|your logo)\b",
+    r"\b(patient'?s name|doctor'?s name|clinic name|company name)\b",
 ]
 
 
@@ -48,113 +48,213 @@ def _normalize_whitespace(text: str) -> str:
     return re.sub(r"\s+", " ", text).strip()
 
 
-def _split_sentences(text: str) -> list[str]:
-    cleaned = _normalize_whitespace(text)
-    if not cleaned:
-        return []
-    return [s.strip() for s in re.split(r"(?<=[.!?])\s+", cleaned) if s.strip()]
+def _clean_note_text(note_text: str) -> tuple[str, bool]:
+    lines = [line.strip() for line in note_text.splitlines() if line.strip()]
+    filtered: list[str] = []
+
+    for index, line in enumerate(lines):
+        lowered = line.lower()
+        looks_like_header = any(re.search(pattern, lowered) for pattern in HEADER_LINE_PATTERNS)
+        if index < 8 and looks_like_header:
+            continue
+        filtered.append(line)
+
+    cleaned = "\n".join(filtered)
+    cleaned = re.sub(r"_{2,}|-{3,}|={3,}", " ", cleaned)
+
+    for pattern in TEMPLATE_PATTERNS:
+        cleaned = re.sub(pattern, " ", cleaned, flags=re.IGNORECASE)
+
+    cleaned = _normalize_whitespace(cleaned)
+
+    placeholder_hits = sum(
+        len(re.findall(pattern, note_text, flags=re.IGNORECASE)) for pattern in TEMPLATE_PATTERNS
+    )
+    bracket_ratio = len(re.findall(r"\[[^\]]+\]", note_text))
+    likely_template = placeholder_hits + bracket_ratio >= 2
+
+    return cleaned, likely_template
 
 
-def _detect_medicines(note_text: str) -> list[TreatmentMention]:
-    lowered = note_text.lower()
-    results: list[TreatmentMention] = []
+def _build_fallback_interpretation(cleaned_note: str, likely_template: bool) -> NoteInterpretationResponse:
+    if not cleaned_note:
+        summary = "This document appears to be mostly template or header text, so there is not enough patient-specific content to summarize."
+    else:
+        snippets = re.split(r"(?<=[.!?])\s+", cleaned_note)
+        top = " ".join(snippets[:2]).strip()
+        summary = f"In plain language: {top}" if top else "The note has limited clinical detail."
 
-    for med, explanation in MEDICATION_GUIDANCE.items():
-        if re.search(rf"\b{re.escape(med)}\b", lowered):
-            results.append(TreatmentMention(item=med.title(), explanation=explanation))
+    if likely_template:
+        summary = f"{summary} It also looks like a generic template/example rather than a fully patient-specific note."
 
-    instruction_patterns = {
-        "Physical therapy": r"\bphysical therapy\b|\bpt\b",
-        "Lifestyle changes": r"\bdiet\b|\bexercise\b|\blifestyle\b|\blow sodium\b",
-        "Home monitoring": r"\bmonitor\b|\bhome bp\b|\bblood sugar log\b|\blog\b",
-    }
-    for label, pattern in instruction_patterns.items():
-        if re.search(pattern, lowered):
-            results.append(TreatmentMention(item=label, explanation="mentioned as part of the care plan"))
+    lowered = cleaned_note.lower()
+    meds = [
+        TreatmentMention(item=name.title(), explanation=explanation)
+        for name, explanation in MEDICATION_HINTS
+        if re.search(rf"\b{re.escape(name)}\b", lowered)
+    ]
 
-    deduped: dict[str, TreatmentMention] = {item.item.lower(): item for item in results}
-    return list(deduped.values())
+    terms = [
+        MedicalTermExplanation(term=term, plain_english=meaning)
+        for term, meaning in TERM_EXPLANATIONS.items()
+        if re.search(rf"\b{re.escape(term)}\b", lowered)
+    ]
 
+    next_steps: list[str] = []
+    if re.search(r"\bfollow[- ]?up|return\b", lowered):
+        next_steps.append("Confirm the follow-up timing and what should be reviewed at that visit.")
+    if re.search(r"\blab|blood test|imaging|x-?ray|mri|ct\b", lowered):
+        next_steps.append("Ask when ordered tests should be completed and when results will be discussed.")
+    if re.search(r"\bstart|continue|take|dose\b", lowered):
+        next_steps.append("Review medication timing and warning side effects directly with your clinician.")
+    if not next_steps:
+        next_steps.append("Review this note with your clinician to confirm personalized next steps.")
 
-def _detect_terms(note_text: str) -> list[MedicalTermExplanation]:
-    lowered = note_text.lower()
-    terms: list[MedicalTermExplanation] = []
-    for term, meaning in TERM_EXPLANATIONS.items():
-        if re.search(rf"\b{re.escape(term)}\b", lowered):
-            terms.append(MedicalTermExplanation(term=term, plain_english=meaning))
-    return terms
+    follow_up_questions = [
+        "Can you confirm which parts of this note are most important for me right now?",
+        "What specific changes should make me call your office sooner?",
+    ]
+    if meds:
+        follow_up_questions.insert(0, f"Can you clarify how and when I should take {meds[0].item}?")
 
-
-def _build_summary(sentences: list[str]) -> str:
-    if not sentences:
-        return "The note text was too limited to summarize clearly."
-
-    top = " ".join(sentences[:2])
-    return (
-        f"This note says: {top} "
-        "It appears to describe current findings and the clinician's care plan, for education only."
+    return NoteInterpretationResponse(
+        plain_english_summary=summary,
+        medicines_treatments=meds,
+        medical_terms_explained=terms[:6],
+        next_steps=next_steps[:5],
+        follow_up_questions=follow_up_questions[:5],
     )
 
 
-def _infer_next_steps(note_text: str) -> list[str]:
-    lowered = note_text.lower()
-    actions: list[str] = []
-    for pattern, action in NEXT_STEP_PATTERNS:
-        if re.search(pattern, lowered):
-            actions.append(action)
+def _coerce_treatments(items: Any) -> list[TreatmentMention]:
+    if not isinstance(items, list):
+        return []
+    out: list[TreatmentMention] = []
+    for item in items:
+        if not isinstance(item, dict):
+            continue
+        name = _normalize_whitespace(str(item.get("item", "")))
+        explanation = _normalize_whitespace(str(item.get("explanation", "")))
+        if name and explanation:
+            out.append(TreatmentMention(item=name[:80], explanation=explanation[:240]))
+    return out[:8]
 
-    if not actions:
-        actions.append("Review this note with your clinician to confirm what to do next.")
 
-    return list(dict.fromkeys(actions))
-
-
-def _build_follow_up_questions(
-    medicines: Iterable[TreatmentMention],
-    terms: Iterable[MedicalTermExplanation],
-    next_steps: Iterable[str],
-) -> list[str]:
-    questions: list[str] = []
-
-    meds = list(medicines)
-    if meds:
-        questions.append(f"What side effects should I watch for with {meds[0].item}?")
-
-    terms_list = list(terms)
-    if terms_list:
-        questions.append(f"Can you explain what '{terms_list[0].term}' means for me specifically?")
-
-    if any("tests" in step.lower() for step in next_steps):
-        questions.append("When should I complete these tests and when will we review results?")
-
-    questions.append("What symptoms should make me call your office sooner?")
-    return questions[:4]
+def _coerce_terms(items: Any) -> list[MedicalTermExplanation]:
+    if not isinstance(items, list):
+        return []
+    out: list[MedicalTermExplanation] = []
+    for item in items:
+        if not isinstance(item, dict):
+            continue
+        term = _normalize_whitespace(str(item.get("term", "")))
+        plain = _normalize_whitespace(str(item.get("plain_english", "")))
+        if term and plain:
+            out.append(MedicalTermExplanation(term=term[:80], plain_english=plain[:240]))
+    return out[:8]
 
 
 def interpret_note(note_text: str) -> NoteInterpretationResponse:
-    normalized_note = _normalize_whitespace(note_text)
-    sentences = _split_sentences(normalized_note)
-    medicines = _detect_medicines(normalized_note)
-    terms = _detect_terms(normalized_note)
-    next_steps = _infer_next_steps(normalized_note)
+    cleaned_note, likely_template = _clean_note_text(note_text)
+    provider = get_ai_provider()
+
+    system_prompt = (
+        "You are a careful medical-note explainer for patient education only. "
+        "Do not diagnose. Do not invent facts beyond the note. "
+        "Return valid JSON with keys: plain_english_summary, medicines_treatments, medical_terms_explained, next_steps, follow_up_questions."
+    )
+    user_prompt = (
+        "Interpret this note using plain language and concise bullet-like outputs. "
+        "If it appears templated/generic, clearly state that in plain_english_summary. "
+        "Avoid header/address/company text.\n\n"
+        f"Likely template: {likely_template}\n"
+        f"Cleaned note text:\n{cleaned_note or '[EMPTY]'}"
+    )
+
+    ai_payload = provider.generate_json(system_prompt=system_prompt, user_prompt=user_prompt)
+    if not ai_payload:
+        return _build_fallback_interpretation(cleaned_note, likely_template)
+
+    summary = _normalize_whitespace(str(ai_payload.get("plain_english_summary", "")))
+    if likely_template and "template" not in summary.lower():
+        summary = f"{summary} This document also appears to include template/example language."
+
+    if not summary:
+        return _build_fallback_interpretation(cleaned_note, likely_template)
+
+    next_steps = [
+        _normalize_whitespace(str(step))
+        for step in ai_payload.get("next_steps", [])
+        if _normalize_whitespace(str(step))
+    ][:6]
+    follow_up_questions = [
+        _normalize_whitespace(str(q))
+        for q in ai_payload.get("follow_up_questions", [])
+        if _normalize_whitespace(str(q))
+    ][:6]
+
+    if not next_steps or not follow_up_questions:
+        fallback = _build_fallback_interpretation(cleaned_note, likely_template)
+        if not next_steps:
+            next_steps = fallback.next_steps
+        if not follow_up_questions:
+            follow_up_questions = fallback.follow_up_questions
 
     return NoteInterpretationResponse(
-        plain_english_summary=_build_summary(sentences),
-        medicines_treatments=medicines,
-        medical_terms_explained=terms,
+        plain_english_summary=summary,
+        medicines_treatments=_coerce_treatments(ai_payload.get("medicines_treatments")),
+        medical_terms_explained=_coerce_terms(ai_payload.get("medical_terms_explained")),
         next_steps=next_steps,
-        follow_up_questions=_build_follow_up_questions(medicines, terms, next_steps),
+        follow_up_questions=follow_up_questions,
     )
 
 
-def answer_note_follow_up(interpreted_note: str, question: str) -> str:
+def _truncate(text: str, limit: int = 2800) -> str:
+    compact = _normalize_whitespace(text)
+    return compact if len(compact) <= limit else compact[:limit]
+
+
+def answer_note_follow_up(original_note_text: str, interpreted_note: str, question: str) -> str:
+    provider = get_ai_provider()
     concise_question = _normalize_whitespace(question)
-    context = _normalize_whitespace(interpreted_note)
+    note_context, likely_template = _clean_note_text(original_note_text)
 
-    if len(context) < 20:
-        return "I need more note context to answer. Please re-run interpretation first."
+    if len(note_context) < 20:
+        return "I need more of the original note text to answer clearly. Please include the note and try again."
 
+    parsed_interpretation: dict[str, Any] | None = None
+    try:
+        candidate = json.loads(interpreted_note)
+        if isinstance(candidate, dict):
+            parsed_interpretation = candidate
+    except json.JSONDecodeError:
+        parsed_interpretation = None
+
+    structured_context = json.dumps(parsed_interpretation or {"summary": interpreted_note}, ensure_ascii=False)
+
+    system_prompt = (
+        "You are a patient-friendly medical note Q&A assistant for education only. "
+        "Ground every answer in the provided note/interpretation. "
+        "If uncertain, say what is unclear. Never diagnose. Never create medication instructions that are not stated."
+    )
+    user_prompt = (
+        f"User question: {concise_question}\n\n"
+        f"Original note (cleaned): {_truncate(note_context)}\n\n"
+        f"Structured interpretation: {_truncate(structured_context)}\n"
+        f"Likely template note: {likely_template}\n"
+        "Answer in 3-5 sentences, plain English, patient-friendly."
+    )
+
+    ai_answer = provider.generate_text(system_prompt=system_prompt, user_prompt=user_prompt)
+    if ai_answer:
+        return _truncate(ai_answer, 900)
+
+    template_clause = (
+        " This note also appears to include template/example language, so details may not be patient-specific."
+        if likely_template
+        else ""
+    )
     return (
-        "Based on the interpreted note, the safest next step is to confirm the exact plan directly with your clinician. "
-        f"For your question ('{concise_question}'), focus on timing, medication instructions, and warning symptoms listed in your note."
+        f"Based on the note, I can help explain what is written, but I cannot confirm a diagnosis or change treatment instructions.{template_clause} "
+        f"For your question ('{concise_question}'), the safest next step is to confirm exact timing, medication details, and warning symptoms with your clinician."
     )

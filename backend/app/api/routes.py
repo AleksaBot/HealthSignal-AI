@@ -159,7 +159,7 @@ def analyze_note_file(
 @router.post("/analyze/note-follow-up", response_model=NoteFollowUpResponse)
 def analyze_note_follow_up(payload: NoteFollowUpRequest, current_user: User = Depends(get_current_user)):
     del current_user
-    answer = answer_note_follow_up(payload.interpreted_note, payload.question)
+    answer = answer_note_follow_up(payload.original_note_text, payload.interpreted_note, payload.question)
     return NoteFollowUpResponse(answer=answer)
 
 
