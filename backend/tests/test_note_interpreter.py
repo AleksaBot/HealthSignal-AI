@@ -34,6 +34,37 @@ def test_interpret_note_expands_common_medical_abbreviations():
     assert "pt c/o abd pn" not in summary
 
 
+def test_interpret_note_fallback_summary_has_no_plain_english_prefix(monkeypatch):
+    class FakeProvider:
+        def generate_json(self, *, system_prompt: str, user_prompt: str):
+            del system_prompt, user_prompt
+            return None
+
+    monkeypatch.setattr("app.services.note_interpreter.get_ai_provider", lambda: FakeProvider())
+
+    result = interpret_note("Patient has abdominal pain and nausea for two days.")
+    assert not result.plain_english_summary.lower().startswith("in plain english:")
+    assert not result.plain_english_summary.lower().startswith("in plain language:")
+
+
+def test_interpret_note_ai_summary_has_no_plain_english_prefix(monkeypatch):
+    class FakeProvider:
+        def generate_json(self, *, system_prompt: str, user_prompt: str):
+            del system_prompt, user_prompt
+            return {
+                "plain_english_summary": "In plain English: Patient has abdominal pain and nausea.",
+                "medicines_treatments": [],
+                "medical_terms_explained": [],
+                "next_steps": ["Follow up in 2 days."],
+                "follow_up_questions": ["What should I watch for?"],
+            }
+
+    monkeypatch.setattr("app.services.note_interpreter.get_ai_provider", lambda: FakeProvider())
+
+    result = interpret_note("Patient has abdominal pain and nausea for two days.")
+    assert result.plain_english_summary.startswith("Patient has abdominal pain and nausea.")
+
+
 def test_follow_up_prompt_uses_expanded_note_context(monkeypatch):
     captured: dict[str, str] = {}
 
@@ -61,3 +92,27 @@ def test_follow_up_prompt_uses_expanded_note_context(monkeypatch):
     assert "no emesis" in prompt
     assert "right lower quadrant" in prompt
     assert "tenderness to palpation" in prompt
+
+
+def test_follow_up_fallback_varies_by_question_intent(monkeypatch):
+    class FakeProvider:
+        def generate_json(self, *, system_prompt: str, user_prompt: str):
+            del system_prompt, user_prompt
+            return None
+
+        def generate_text(self, *, system_prompt: str, user_prompt: str):
+            del system_prompt, user_prompt
+            return ""
+
+    monkeypatch.setattr("app.services.note_interpreter.get_ai_provider", lambda: FakeProvider())
+    note = "Patient complains of abdominal pain for 3 days with nausea. Continue metformin. Follow up in 2 days."
+
+    actions_answer = answer_note_follow_up(note, "{}", "What should I do right now?")
+    warning_answer = answer_note_follow_up(note, "{}", "What symptoms should worry me?")
+    serious_answer = answer_note_follow_up(note, "{}", "Could this be serious?")
+
+    assert actions_answer != warning_answer
+    assert warning_answer != serious_answer
+    assert "right now" in actions_answer.lower()
+    assert "warning signs" in warning_answer.lower()
+    assert "serious" in serious_answer.lower()
