@@ -2,6 +2,52 @@ from app.services.security import BCRYPT_PASSWORD_LENGTH_ERROR_MESSAGE
 from fastapi.testclient import TestClient
 
 
+def test_cors_preflight_signup_allows_localhost(client: TestClient):
+    response = client.options(
+        "/api/auth/signup",
+        headers={
+            "Origin": "http://localhost:3000",
+            "Access-Control-Request-Method": "POST",
+            "Access-Control-Request-Headers": "content-type",
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.headers["access-control-allow-origin"] == "http://localhost:3000"
+    assert response.headers["access-control-allow-credentials"] == "true"
+
+
+def test_cors_preflight_login_allows_vercel_preview_origin(client: TestClient):
+    preview_origin = "https://healthsignal-feature-123.vercel.app"
+    response = client.options(
+        "/api/auth/login",
+        headers={
+            "Origin": preview_origin,
+            "Access-Control-Request-Method": "POST",
+            "Access-Control-Request-Headers": "content-type",
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.headers["access-control-allow-origin"] == preview_origin
+    assert response.headers["access-control-allow-credentials"] == "true"
+
+
+def test_cors_preflight_auth_me_supports_authorization_header(client: TestClient):
+    response = client.options(
+        "/api/auth/me",
+        headers={
+            "Origin": "http://localhost:3000",
+            "Access-Control-Request-Method": "GET",
+            "Access-Control-Request-Headers": "authorization",
+        },
+    )
+
+    assert response.status_code == 200
+    allowed_headers = response.headers["access-control-allow-headers"].lower()
+    assert "authorization" in allowed_headers
+
+
 def test_health_endpoint(client: TestClient):
     response = client.get("/api/health")
     assert response.status_code == 200
