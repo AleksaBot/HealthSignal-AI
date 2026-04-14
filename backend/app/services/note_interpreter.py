@@ -61,13 +61,41 @@ TEMPLATE_PATTERNS = [
     r"\b(patient'?s name|doctor'?s name|clinic name|company name)\b",
 ]
 
+MEDICAL_ABBREVIATIONS: list[tuple[str, str]] = [
+    (r"\bpt\b", "Patient"),
+    (r"\bc/o\b", "complains of"),
+    (r"\babd\b", "abdominal"),
+    (r"\bpn\b", "pain"),
+    (r"\bw/\b", "with"),
+    (r"\bRLQ\b", "right lower quadrant"),
+    (r"\bLLQ\b", "left lower quadrant"),
+    (r"\bTTP\b", "tenderness to palpation"),
+    (r"\bSOB\b", "shortness of breath"),
+    (r"\bCP\b", "chest pain"),
+    (r"\bHTN\b", "hypertension"),
+    (r"\bDM\b", "diabetes mellitus"),
+    (r"\bPRN\b", "as needed"),
+    (r"\bBID\b", "twice daily"),
+    (r"\bQD\b", "once daily"),
+    (r"\bN/V\b", "nausea/vomiting"),
+]
+
 
 def _normalize_whitespace(text: str) -> str:
     return re.sub(r"\s+", " ", text).strip()
 
 
+def _expand_medical_abbreviations(text: str) -> str:
+    expanded = text
+    expanded = re.sub(r"\bx\s*(\d+)\s*d\b", r"for \1 days", expanded, flags=re.IGNORECASE)
+    for pattern, replacement in MEDICAL_ABBREVIATIONS:
+        expanded = re.sub(pattern, replacement, expanded, flags=re.IGNORECASE)
+    return expanded
+
+
 def _clean_note_text(note_text: str) -> tuple[str, bool]:
-    lines = [line.strip() for line in note_text.splitlines() if line.strip()]
+    expanded_text = _expand_medical_abbreviations(note_text)
+    lines = [line.strip() for line in expanded_text.splitlines() if line.strip()]
     filtered: list[str] = []
 
     for index, line in enumerate(lines):
@@ -86,9 +114,9 @@ def _clean_note_text(note_text: str) -> tuple[str, bool]:
     cleaned = _normalize_whitespace(cleaned)
 
     placeholder_hits = sum(
-        len(re.findall(pattern, note_text, flags=re.IGNORECASE)) for pattern in TEMPLATE_PATTERNS
+        len(re.findall(pattern, expanded_text, flags=re.IGNORECASE)) for pattern in TEMPLATE_PATTERNS
     )
-    bracket_ratio = len(re.findall(r"\[[^\]]+\]", note_text))
+    bracket_ratio = len(re.findall(r"\[[^\]]+\]", expanded_text))
     likely_template = placeholder_hits + bracket_ratio >= 2
 
     return cleaned, likely_template
@@ -198,7 +226,7 @@ def interpret_note(note_text: str) -> NoteInterpretationResponse:
     if not ai_payload:
         return _build_fallback_interpretation(cleaned_note, likely_template)
 
-    summary = _normalize_whitespace(str(ai_payload.get("plain_english_summary", "")))
+    summary = _normalize_whitespace(_expand_medical_abbreviations(str(ai_payload.get("plain_english_summary", ""))))
     if likely_template and "template" not in summary.lower():
         summary = f"{summary} This document also appears to include template/example language."
 
@@ -237,6 +265,16 @@ def _truncate(text: str, limit: int = 2800) -> str:
     return compact if len(compact) <= limit else compact[:limit]
 
 
+def _expand_context_values(value: Any) -> Any:
+    if isinstance(value, str):
+        return _expand_medical_abbreviations(value)
+    if isinstance(value, list):
+        return [_expand_context_values(item) for item in value]
+    if isinstance(value, dict):
+        return {key: _expand_context_values(item) for key, item in value.items()}
+    return value
+
+
 def answer_note_follow_up(original_note_text: str, interpreted_note: str, question: str) -> str:
     provider = get_ai_provider()
     concise_question = _normalize_whitespace(question)
@@ -253,7 +291,13 @@ def answer_note_follow_up(original_note_text: str, interpreted_note: str, questi
     except json.JSONDecodeError:
         parsed_interpretation = None
 
-    structured_context = json.dumps(parsed_interpretation or {"summary": interpreted_note}, ensure_ascii=False)
+    if parsed_interpretation:
+        structured_context = json.dumps(_expand_context_values(parsed_interpretation), ensure_ascii=False)
+    else:
+        structured_context = json.dumps(
+            {"summary": _expand_medical_abbreviations(interpreted_note)},
+            ensure_ascii=False,
+        )
 
     system_prompt = (
         "You are a conversational follow-up assistant answering patient questions about a medical note. "
