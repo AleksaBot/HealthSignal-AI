@@ -275,6 +275,82 @@ def _expand_context_values(value: Any) -> Any:
     return value
 
 
+def _extract_follow_up_context(note_context: str, interpreted_note: dict[str, Any] | None) -> dict[str, Any]:
+    extracted_symptoms: list[str] = []
+    treatments: list[str] = []
+    next_steps: list[str] = []
+    interpreted_summary = ""
+
+    if interpreted_note:
+        interpreted_summary = _normalize_whitespace(str(interpreted_note.get("plain_english_summary", "")))
+        treatments = [
+            _normalize_whitespace(str(item.get("item", "")))
+            for item in interpreted_note.get("medicines_treatments", [])
+            if isinstance(item, dict) and _normalize_whitespace(str(item.get("item", "")))
+        ][:5]
+        next_steps = [
+            _normalize_whitespace(str(step))
+            for step in interpreted_note.get("next_steps", [])
+            if _normalize_whitespace(str(step))
+        ][:5]
+
+    symptom_match = re.search(
+        r"(complains of|reports|with|for)\s+([^.;]+)",
+        note_context,
+        flags=re.IGNORECASE,
+    )
+    if symptom_match:
+        symptom_text = _normalize_whitespace(symptom_match.group(2))
+        extracted_symptoms = [fragment.strip() for fragment in re.split(r",| and ", symptom_text) if fragment.strip()][:6]
+
+    return {
+        "original_note_text": note_context,
+        "interpreted_summary": interpreted_summary,
+        "extracted_symptoms": extracted_symptoms,
+        "treatments_medications": treatments,
+        "next_steps": next_steps,
+    }
+
+
+def _build_contextual_follow_up_fallback(
+    *,
+    question: str,
+    follow_up_context: dict[str, Any],
+    likely_template: bool,
+) -> str:
+    details: list[str] = []
+    symptom_bits = follow_up_context.get("extracted_symptoms") or []
+    next_steps = follow_up_context.get("next_steps") or []
+    treatment_bits = follow_up_context.get("treatments_medications") or []
+
+    if symptom_bits:
+        details.append(f"Based on this note, keep track of {', '.join(symptom_bits[:3])}.")
+    else:
+        details.append("Based on this note, follow the documented plan closely and monitor how you feel day to day.")
+
+    if treatment_bits:
+        details.append(f"Continue the treatments mentioned ({', '.join(treatment_bits[:3])}) exactly as documented.")
+
+    if next_steps:
+        details.append(f"Practical next step: {next_steps[0]}")
+    else:
+        details.append("Practical next step: confirm timing of follow-up, tests, and what changes should trigger a call sooner.")
+
+    caution_needed = bool(
+        re.search(
+            r"\b(chest pain|shortness of breath|faint|severe|worsen|bleeding|high fever|vomiting)\b",
+            " ".join(symptom_bits + [question]),
+            flags=re.IGNORECASE,
+        )
+    )
+    if caution_needed:
+        details.append("If symptoms become severe, rapidly worsen, or new warning signs appear, seek urgent care right away.")
+    elif likely_template:
+        details.append("Some parts of the note look templated, so verify unclear details at your next clinical check-in.")
+
+    return " ".join(details)
+
+
 def answer_note_follow_up(original_note_text: str, interpreted_note: str, question: str) -> str:
     provider = get_ai_provider()
     concise_question = _normalize_whitespace(question)
@@ -291,6 +367,7 @@ def answer_note_follow_up(original_note_text: str, interpreted_note: str, questi
     except json.JSONDecodeError:
         parsed_interpretation = None
 
+    follow_up_context = _extract_follow_up_context(note_context, parsed_interpretation)
     if parsed_interpretation:
         structured_context = json.dumps(_expand_context_values(parsed_interpretation), ensure_ascii=False)
     else:
@@ -310,6 +387,10 @@ def answer_note_follow_up(original_note_text: str, interpreted_note: str, questi
     user_prompt = (
         f"User question: {concise_question}\n\n"
         f"Original note (cleaned): {_truncate(note_context)}\n\n"
+        f"Interpreted summary: {_truncate(str(follow_up_context.get('interpreted_summary', '')))}\n"
+        f"Extracted symptoms: {_truncate(json.dumps(follow_up_context.get('extracted_symptoms', []), ensure_ascii=False), 500)}\n"
+        f"Treatments/medications: {_truncate(json.dumps(follow_up_context.get('treatments_medications', []), ensure_ascii=False), 500)}\n"
+        f"Next steps: {_truncate(json.dumps(follow_up_context.get('next_steps', []), ensure_ascii=False), 500)}\n"
         f"Structured interpretation: {_truncate(structured_context)}\n"
         f"Likely template note: {likely_template}\n"
         "Answer in 3-5 sentences in plain, natural English. Start with the direct answer first."
@@ -319,12 +400,8 @@ def answer_note_follow_up(original_note_text: str, interpreted_note: str, questi
     if ai_answer:
         return _truncate(ai_answer, 900)
 
-    template_clause = (
-        " This note also appears to include template/example language, so details may not be patient-specific."
-        if likely_template
-        else ""
-    )
-    return (
-        f"From this note, I can explain the plan but I cannot verify details that are not written.{template_clause} "
-        f"For your question ('{concise_question}'), a practical next step is to confirm timing, medication details, and warning symptoms at your next clinical follow-up."
+    return _build_contextual_follow_up_fallback(
+        question=concise_question,
+        follow_up_context=follow_up_context,
+        likely_template=likely_template,
     )

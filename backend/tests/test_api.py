@@ -1,3 +1,5 @@
+import json
+
 from app.services.security import BCRYPT_PASSWORD_LENGTH_ERROR_MESSAGE
 from fastapi.testclient import TestClient
 
@@ -202,3 +204,28 @@ def test_note_follow_up_success(client: TestClient, auth_headers: dict[str, str]
     payload = response.json()
     assert "answer" in payload
     assert "follow" in payload["answer"].lower()
+
+
+def test_note_follow_up_fallback_is_contextual(client: TestClient, auth_headers: dict[str, str]):
+    response = client.post(
+        "/api/analyze/note-follow-up",
+        json={
+            "original_note_text": "Patient complains of abdominal pain for 3 days with nausea and no vomiting. Follow up in 2 days.",
+            "interpreted_note": json.dumps(
+                {
+                    "plain_english_summary": "Abdominal pain and nausea without vomiting.",
+                    "medicines_treatments": [],
+                    "next_steps": ["Monitor pain and hydration, and return if symptoms worsen."],
+                }
+            ),
+            "question": "What is best to do when I have these symptoms?",
+        },
+        headers=auth_headers,
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    answer = payload["answer"].lower()
+    assert "abdominal pain" in answer
+    assert "nausea" in answer
+    assert "monitor pain and hydration" in answer
