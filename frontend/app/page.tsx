@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { DisclaimerBanner } from "@/components/DisclaimerBanner";
-import { getCurrentUser, isLoggedIn } from "@/lib/api";
+import { clearToken, getCurrentUser, isLoggedIn } from "@/lib/api";
 
 const modules = [
   {
@@ -38,9 +38,12 @@ export default function HomePage() {
 
     getCurrentUser()
       .then((user) => {
+        setAuthenticated(true);
         setFirstName(user.first_name);
       })
       .catch(() => {
+        setAuthenticated(false);
+        clearToken();
         setFirstName(null);
       });
   }, []);

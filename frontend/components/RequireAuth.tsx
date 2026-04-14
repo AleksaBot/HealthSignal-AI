@@ -2,18 +2,30 @@
 
 import Link from "next/link";
 import { ReactNode, useEffect, useState } from "react";
-import { isLoggedIn } from "@/lib/api";
+import { clearToken, getCurrentUser, isLoggedIn } from "@/lib/api";
 
 export function RequireAuth({ children }: { children: ReactNode }) {
   const [ready, setReady] = useState(false);
   const [authenticated, setAuthenticated] = useState(false);
 
   useEffect(() => {
-    try {
-      setAuthenticated(isLoggedIn());
-    } finally {
+    if (!isLoggedIn()) {
+      setAuthenticated(false);
       setReady(true);
+      return;
     }
+
+    getCurrentUser()
+      .then(() => {
+        setAuthenticated(true);
+      })
+      .catch(() => {
+        clearToken();
+        setAuthenticated(false);
+      })
+      .finally(() => {
+        setReady(true);
+      });
   }, []);
 
   if (!ready) {
