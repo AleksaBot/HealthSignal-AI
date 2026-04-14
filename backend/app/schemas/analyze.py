@@ -12,6 +12,7 @@ class NoteInterpretRequest(BaseModel):
 
 
 class NoteFollowUpRequest(BaseModel):
+    original_note_text: str = Field(min_length=5, description="Original uploaded or pasted note text")
     interpreted_note: str = Field(min_length=10, description="Serialized interpreted note context")
     question: str = Field(min_length=3, description="Patient follow-up question")
 

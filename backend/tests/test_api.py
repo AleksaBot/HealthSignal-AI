@@ -145,6 +145,7 @@ def test_note_follow_up_success(client: TestClient, auth_headers: dict[str, str]
     response = client.post(
         "/api/analyze/note-follow-up",
         json={
+            "original_note_text": "Patient asked to continue metformin and follow up in two weeks.",
             "interpreted_note": "Patient asked to continue metformin and follow up in two weeks.",
             "question": "What should I clarify at follow-up?",
         },
