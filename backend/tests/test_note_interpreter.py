@@ -1,4 +1,4 @@
-from app.services.note_interpreter import answer_note_follow_up, interpret_note
+from app.services.note_interpreter import _classify_follow_up_intent, answer_note_follow_up, interpret_note
 
 
 def test_interpret_note_detects_template_language():
@@ -135,7 +135,7 @@ def test_follow_up_gates_missing_medication_category(monkeypatch):
 
     answer = answer_note_follow_up(note, interpreted, "What does this medicine do?")
 
-    assert "does not clearly mention a medication" in answer.lower()
+    assert "does not mention a medication or treatment" in answer.lower()
     assert "generic fallback" not in answer.lower()
 
 
@@ -160,7 +160,39 @@ def test_follow_up_answers_vary_for_required_questions(monkeypatch):
     serious_answer = answer_note_follow_up(note, interpreted, "Is this serious?")
 
     assert "warning signs" in symptoms_answer.lower()
-    assert "does not clearly mention a medication" in medication_answer.lower()
+    assert "does not mention a medication or treatment" in medication_answer.lower()
     assert "right now" in actions_answer.lower()
     assert "serious" in serious_answer.lower()
     assert len({symptoms_answer, medication_answer, actions_answer, serious_answer}) == 4
+
+
+def test_follow_up_intent_classification_required_categories():
+    assert _classify_follow_up_intent("What does this medicine do?") == "medication"
+    assert _classify_follow_up_intent("What symptoms should worry me?") == "warning_signs"
+    assert _classify_follow_up_intent("What matters most right now?") == "urgency"
+    assert _classify_follow_up_intent("Is this serious?") == "seriousness"
+    assert _classify_follow_up_intent("What tests were ordered?") == "tests"
+    assert _classify_follow_up_intent("What does this term mean?") == "definitions"
+    assert _classify_follow_up_intent("What should happen next?") == "next_steps"
+    assert _classify_follow_up_intent("Can you summarize this?") == "general"
+
+
+def test_follow_up_missing_tests_response_is_category_specific(monkeypatch):
+    class FakeProvider:
+        def generate_json(self, *, system_prompt: str, user_prompt: str):
+            del system_prompt, user_prompt
+            return None
+
+        def generate_text(self, *, system_prompt: str, user_prompt: str):
+            del system_prompt, user_prompt
+            return "generic fallback that should not be used"
+
+    monkeypatch.setattr("app.services.note_interpreter.get_ai_provider", lambda: FakeProvider())
+
+    note = "Patient reports abdominal pain and nausea for 3 days. Follow up in 2 days if not improving."
+    interpreted = '{"plain_english_summary":"Abdominal pain and nausea are being monitored.","medicines_treatments":[],"next_steps":["Follow up in 2 days if not improving"],"medical_terms_explained":[]}'
+
+    answer = answer_note_follow_up(note, interpreted, "Were any tests ordered?")
+
+    assert "does not mention any specific tests or ordered lab work" in answer.lower()
+    assert "generic fallback" not in answer.lower()
