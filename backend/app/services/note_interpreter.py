@@ -1,11 +1,14 @@
 from __future__ import annotations
 
 import json
+import logging
 import re
 from typing import Any
 
 from app.schemas.analyze import MedicalTermExplanation, NoteInterpretationResponse, TreatmentMention
 from app.services.ai_provider import get_ai_provider
+
+logger = logging.getLogger(__name__)
 
 TERM_EXPLANATIONS: dict[str, str] = {
     "hypertension": "high blood pressure",
@@ -339,7 +342,7 @@ def _build_contextual_follow_up_fallback(
     follow_up_context: dict[str, Any],
     likely_template: bool,
 ) -> str:
-    intent = _detect_follow_up_intent(question)
+    intent = _classify_follow_up_intent(question)
     details: list[str] = []
     symptom_bits = follow_up_context.get("extracted_symptoms") or []
     next_steps = follow_up_context.get("next_steps") or []
@@ -352,9 +355,9 @@ def _build_contextual_follow_up_fallback(
             )
         else:
             details.append(
-                "This note does not clearly mention a medication, so I cannot explain a medicine based on this document."
+                "This note does not mention a medication or treatment, so I cannot explain one based on this document."
             )
-    elif intent in {"actions_now", "next_steps"}:
+    elif intent in {"urgency", "next_steps"}:
         if next_steps:
             details.append(f"Right now, the most useful next action is to {next_steps[0][0].lower() + next_steps[0][1:]}")
         else:
@@ -374,10 +377,8 @@ def _build_contextual_follow_up_fallback(
         if symptom_bits:
             details.append(f"Pay attention to whether {', '.join(symptom_bits[:3])} are improving or getting worse over time.")
     elif intent == "tests":
-        details.append("The note does not clearly provide enough test detail to explain specific results or test purpose.")
-    elif intent == "diagnosis":
-        details.append("The note does not clearly document a specific diagnosis/condition that I can explain with confidence.")
-    elif intent == "definition":
+        details.append("This note does not mention any specific tests or ordered lab work.")
+    elif intent == "definitions":
         details.append("The note does not clearly define the specific term you asked about, so confirm the exact wording with your clinician.")
     else:
         if symptom_bits:
@@ -408,23 +409,22 @@ def _build_contextual_follow_up_fallback(
     return " ".join(details)
 
 
-def _detect_follow_up_intent(question: str) -> str:
+def _classify_follow_up_intent(question: str) -> str:
+    """Classify follow-up questions into a single intent bucket for strict backend routing."""
     lowered = question.lower()
-    if re.search(r"\b(medicine|medication|drug|treatment|prescription|pill)\b", lowered):
+    if re.search(r"\b(medicine|medication|drug|treatment|prescription|pill|rx)\b", lowered):
         return "medication"
-    if re.search(r"\b(worry|warning sign|red flag|emergency|danger)\b", lowered):
+    if re.search(r"\b(worry|warning sign|red flag|emergency|danger|what should worry)\b", lowered):
         return "warning_signs"
     if re.search(r"\b(symptom|symptoms|feel|pain|nausea|vomiting|dizzy|fatigue|fever)\b", lowered):
         return "symptoms"
     if re.search(r"\b(test|tests|lab|labs|blood work|blood test|scan|imaging|x-?ray|ct|mri|result)\b", lowered):
         return "tests"
-    if re.search(r"\b(diagnosis|diagnosed|condition|disease|disorder|what do i have|what is wrong)\b", lowered):
-        return "diagnosis"
-    if re.search(r"\b(what does .* mean|what is .*|define|definition|explain this term|meaning)\b", lowered):
-        return "definition"
-    if re.search(r"\b(right now|what should i do|what do i do|next step|immediately|today)\b", lowered):
-        return "actions_now"
-    if re.search(r"\b(next step|next steps|what should i do|plan)\b", lowered):
+    if re.search(r"\b(what does .* mean|what is .*|define|definition|explain this term|meaning|what does this mean)\b", lowered):
+        return "definitions"
+    if re.search(r"\b(right now|what should i do|what do i do|immediately|today|matters most)\b", lowered):
+        return "urgency"
+    if re.search(r"\b(next step|next steps|plan|what now|what should happen next)\b", lowered):
         return "next_steps"
     if re.search(r"\b(serious|severity|how bad|dangerous|risk)\b", lowered):
         return "seriousness"
@@ -500,23 +500,16 @@ def _build_missing_category_response(
     follow_up_context: dict[str, Any],
 ) -> str | None:
     if intent == "medication" and not availability["medications"]:
-        summary = _normalize_whitespace(str(follow_up_context.get("interpreted_summary", "")))
-        suffix = f" This note focuses on: {summary}" if summary else ""
-        return (
-            "This note does not clearly mention a medication, so I cannot explain a medicine based on this document."
-            f"{suffix}"
-        ).strip()
+        return "This note does not mention a medication or treatment, so I cannot explain one based on this document."
     if intent == "symptoms" and not availability["symptoms"]:
-        return "This note does not clearly list specific symptoms, so I cannot point to symptom-based concerns from this document."
+        return "This note does not describe detailed symptom concerns beyond what is summarized."
     if intent == "warning_signs" and not (availability["warning_signs"] or availability["symptoms"]):
         return "This note does not clearly describe warning signs or symptom progression, so I cannot identify specific red flags from this document."
-    if intent in {"actions_now", "next_steps"} and not availability["next_steps"]:
+    if intent in {"urgency", "next_steps"} and not availability["next_steps"]:
         return "This note does not clearly include immediate next-step instructions, so I cannot give a document-specific action list from it."
     if intent == "tests" and not availability["tests"]:
-        return "This note does not clearly mention tests or results, so I cannot explain test-related details from this document."
-    if intent == "diagnosis" and not availability["diagnoses"]:
-        return "This note does not clearly state a diagnosis or condition, so I cannot explain one based on this document."
-    if intent == "definition" and not availability["definitions"]:
+        return "This note does not mention any specific tests or ordered lab work."
+    if intent == "definitions" and not availability["definitions"]:
         return "This note does not clearly define that medical term, so I cannot give a document-specific definition from this text."
     if intent == "seriousness" and not (availability["diagnoses"] or availability["symptoms"]):
         return "This note does not provide enough condition detail to judge seriousness from the document alone."
@@ -540,7 +533,7 @@ def answer_note_follow_up(original_note_text: str, interpreted_note: str, questi
         parsed_interpretation = None
 
     follow_up_context = _extract_follow_up_context(note_context, parsed_interpretation)
-    intent = _detect_follow_up_intent(concise_question)
+    intent = _classify_follow_up_intent(concise_question)
     availability = _get_context_availability(
         note_context=note_context,
         interpreted_note=parsed_interpretation,
@@ -550,6 +543,12 @@ def answer_note_follow_up(original_note_text: str, interpreted_note: str, questi
         intent=intent,
         availability=availability,
         follow_up_context=follow_up_context,
+    )
+    logger.info(
+        "note_follow_up intent=%s availability=%s missing_response=%s",
+        intent,
+        availability,
+        bool(missing_category_response),
     )
     if missing_category_response:
         return missing_category_response
@@ -586,7 +585,7 @@ def answer_note_follow_up(original_note_text: str, interpreted_note: str, questi
         f"Structured interpretation: {_truncate(structured_context)}\n"
         f"Likely template note: {likely_template}\n"
         "Answer in 3-5 sentences in plain, natural English. Start with the direct answer first. "
-        "Use the intent label to choose the angle of your response (actions, warning signs, seriousness, or general clarification)."
+        "Use the intent label to choose the angle of your response (urgency/next steps, warning signs, seriousness, tests, definitions, or general clarification)."
     )
 
     ai_answer = provider.generate_text(system_prompt=system_prompt, user_prompt=user_prompt)
