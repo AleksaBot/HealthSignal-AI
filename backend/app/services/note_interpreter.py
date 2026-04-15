@@ -310,6 +310,20 @@ def _extract_follow_up_context(note_context: str, interpreted_note: dict[str, An
         symptom_text = _normalize_whitespace(symptom_match.group(2))
         extracted_symptoms = [fragment.strip() for fragment in re.split(r",| and ", symptom_text) if fragment.strip()][:6]
 
+    if not next_steps:
+        note_steps: list[str] = []
+        for pattern in [
+            r"\b(follow[- ]?up[^.]*\.)",
+            r"\b(return[^.]*\.)",
+            r"\b(continue[^.]*\.)",
+            r"\b(start[^.]*\.)",
+        ]:
+            for match in re.finditer(pattern, note_context, flags=re.IGNORECASE):
+                step = _normalize_whitespace(match.group(1))
+                if step and step not in note_steps:
+                    note_steps.append(step)
+        next_steps = note_steps[:5]
+
     return {
         "original_note_text": note_context,
         "interpreted_summary": interpreted_summary,
@@ -331,11 +345,25 @@ def _build_contextual_follow_up_fallback(
     next_steps = follow_up_context.get("next_steps") or []
     treatment_bits = follow_up_context.get("treatments_medications") or []
 
-    if intent == "actions_now":
+    if intent == "medication":
+        if treatment_bits:
+            details.append(
+                f"The note mentions {', '.join(treatment_bits[:2])}; ask your clinician to confirm the exact purpose, dose, and timing for your plan."
+            )
+        else:
+            details.append(
+                "This note does not clearly mention a medication, so I cannot explain a medicine based on this document."
+            )
+    elif intent in {"actions_now", "next_steps"}:
         if next_steps:
             details.append(f"Right now, the most useful next action is to {next_steps[0][0].lower() + next_steps[0][1:]}")
         else:
             details.append("Right now, follow the documented plan, keep notes on symptom changes, and contact your care team if things are unclear.")
+    elif intent == "symptoms":
+        if symptom_bits:
+            details.append(f"The note highlights symptoms such as {', '.join(symptom_bits[:3])}. Track whether these improve or worsen.")
+        else:
+            details.append("This note does not clearly list symptoms, so monitor any new or worsening changes and ask your care team for symptom-specific guidance.")
     elif intent == "warning_signs":
         if symptom_bits:
             details.append(f"Warning signs to watch for include worsening or persistent {', '.join(symptom_bits[:3])}, especially if symptoms escalate quickly.")
@@ -345,6 +373,12 @@ def _build_contextual_follow_up_fallback(
         details.append("This note alone cannot confirm how serious the condition is, but it does provide clues about current risk and follow-up needs.")
         if symptom_bits:
             details.append(f"Pay attention to whether {', '.join(symptom_bits[:3])} are improving or getting worse over time.")
+    elif intent == "tests":
+        details.append("The note does not clearly provide enough test detail to explain specific results or test purpose.")
+    elif intent == "diagnosis":
+        details.append("The note does not clearly document a specific diagnosis/condition that I can explain with confidence.")
+    elif intent == "definition":
+        details.append("The note does not clearly define the specific term you asked about, so confirm the exact wording with your clinician.")
     else:
         if symptom_bits:
             details.append(f"Based on this note, keep track of {', '.join(symptom_bits[:3])}.")
@@ -376,13 +410,117 @@ def _build_contextual_follow_up_fallback(
 
 def _detect_follow_up_intent(question: str) -> str:
     lowered = question.lower()
-    if re.search(r"\b(right now|what should i do|what do i do|next step|immediately|today)\b", lowered):
-        return "actions_now"
+    if re.search(r"\b(medicine|medication|drug|treatment|prescription|pill)\b", lowered):
+        return "medication"
     if re.search(r"\b(worry|warning sign|red flag|emergency|danger)\b", lowered):
         return "warning_signs"
+    if re.search(r"\b(symptom|symptoms|feel|pain|nausea|vomiting|dizzy|fatigue|fever)\b", lowered):
+        return "symptoms"
+    if re.search(r"\b(test|tests|lab|labs|blood work|blood test|scan|imaging|x-?ray|ct|mri|result)\b", lowered):
+        return "tests"
+    if re.search(r"\b(diagnosis|diagnosed|condition|disease|disorder|what do i have|what is wrong)\b", lowered):
+        return "diagnosis"
+    if re.search(r"\b(what does .* mean|what is .*|define|definition|explain this term|meaning)\b", lowered):
+        return "definition"
+    if re.search(r"\b(right now|what should i do|what do i do|next step|immediately|today)\b", lowered):
+        return "actions_now"
+    if re.search(r"\b(next step|next steps|what should i do|plan)\b", lowered):
+        return "next_steps"
     if re.search(r"\b(serious|severity|how bad|dangerous|risk)\b", lowered):
         return "seriousness"
     return "general"
+
+
+def _has_pattern(text: str, patterns: list[str]) -> bool:
+    return any(re.search(pattern, text, flags=re.IGNORECASE) for pattern in patterns)
+
+
+def _get_context_availability(
+    *,
+    note_context: str,
+    interpreted_note: dict[str, Any] | None,
+    follow_up_context: dict[str, Any],
+) -> dict[str, bool]:
+    lowered_note = note_context.lower()
+    treatments = follow_up_context.get("treatments_medications") or []
+    next_steps = follow_up_context.get("next_steps") or []
+    symptoms = follow_up_context.get("extracted_symptoms") or []
+    summary = _normalize_whitespace(str(follow_up_context.get("interpreted_summary", ""))).lower()
+
+    interpreted_terms: list[dict[str, Any]] = []
+    if interpreted_note:
+        raw_terms = interpreted_note.get("medical_terms_explained", [])
+        if isinstance(raw_terms, list):
+            interpreted_terms = [term for term in raw_terms if isinstance(term, dict)]
+
+    has_medications = bool(treatments)
+    has_symptoms = bool(symptoms) or _has_pattern(
+        lowered_note,
+        [
+            r"\bpain\b",
+            r"\bnausea\b",
+            r"\bvomit",
+            r"\bfever\b",
+            r"\bcough\b",
+            r"\bfatigue\b",
+            r"\bdizzy",
+            r"\bshortness of breath\b",
+            r"\bswelling\b",
+        ],
+    )
+    has_warning_signs = _has_pattern(
+        lowered_note,
+        [r"\bworsen", r"\bseek urgent", r"\bemergency", r"\bred flag", r"\bcall.*(office|doctor)", r"\bsevere"],
+    ) or _has_pattern(summary, [r"warning", r"red flag", r"urgent", r"seek care"])
+    has_tests = _has_pattern(
+        lowered_note,
+        [r"\blab", r"\bblood test", r"\bimaging", r"\bx-?ray", r"\bct\b", r"\bmri\b", r"\bultrasound", r"\bresults?"],
+    )
+    has_diagnoses = _has_pattern(
+        lowered_note,
+        [r"\bdiagnos", r"\bimpression", r"\bassessment", r"\bcondition", r"\bsyndrome", r"\bdisease"],
+    ) or bool(interpreted_terms)
+    has_terms = bool(interpreted_terms) or _has_pattern(summary, [r"\bmeans\b", r"\bcalled\b", r"\balso known as\b"])
+
+    return {
+        "medications": has_medications,
+        "symptoms": has_symptoms,
+        "next_steps": bool(next_steps),
+        "warning_signs": has_warning_signs,
+        "tests": has_tests,
+        "diagnoses": has_diagnoses,
+        "definitions": has_terms,
+    }
+
+
+def _build_missing_category_response(
+    *,
+    intent: str,
+    availability: dict[str, bool],
+    follow_up_context: dict[str, Any],
+) -> str | None:
+    if intent == "medication" and not availability["medications"]:
+        summary = _normalize_whitespace(str(follow_up_context.get("interpreted_summary", "")))
+        suffix = f" This note focuses on: {summary}" if summary else ""
+        return (
+            "This note does not clearly mention a medication, so I cannot explain a medicine based on this document."
+            f"{suffix}"
+        ).strip()
+    if intent == "symptoms" and not availability["symptoms"]:
+        return "This note does not clearly list specific symptoms, so I cannot point to symptom-based concerns from this document."
+    if intent == "warning_signs" and not (availability["warning_signs"] or availability["symptoms"]):
+        return "This note does not clearly describe warning signs or symptom progression, so I cannot identify specific red flags from this document."
+    if intent in {"actions_now", "next_steps"} and not availability["next_steps"]:
+        return "This note does not clearly include immediate next-step instructions, so I cannot give a document-specific action list from it."
+    if intent == "tests" and not availability["tests"]:
+        return "This note does not clearly mention tests or results, so I cannot explain test-related details from this document."
+    if intent == "diagnosis" and not availability["diagnoses"]:
+        return "This note does not clearly state a diagnosis or condition, so I cannot explain one based on this document."
+    if intent == "definition" and not availability["definitions"]:
+        return "This note does not clearly define that medical term, so I cannot give a document-specific definition from this text."
+    if intent == "seriousness" and not (availability["diagnoses"] or availability["symptoms"]):
+        return "This note does not provide enough condition detail to judge seriousness from the document alone."
+    return None
 
 
 def answer_note_follow_up(original_note_text: str, interpreted_note: str, question: str) -> str:
@@ -403,6 +541,19 @@ def answer_note_follow_up(original_note_text: str, interpreted_note: str, questi
 
     follow_up_context = _extract_follow_up_context(note_context, parsed_interpretation)
     intent = _detect_follow_up_intent(concise_question)
+    availability = _get_context_availability(
+        note_context=note_context,
+        interpreted_note=parsed_interpretation,
+        follow_up_context=follow_up_context,
+    )
+    missing_category_response = _build_missing_category_response(
+        intent=intent,
+        availability=availability,
+        follow_up_context=follow_up_context,
+    )
+    if missing_category_response:
+        return missing_category_response
+
     if parsed_interpretation:
         structured_context = json.dumps(_expand_context_values(parsed_interpretation), ensure_ascii=False)
     else:
@@ -414,6 +565,8 @@ def answer_note_follow_up(original_note_text: str, interpreted_note: str, questi
     system_prompt = (
         "You are a conversational follow-up assistant answering patient questions about a medical note. "
         "The user question is the top priority: answer the exact question asked before adding general context. "
+        "Do not switch topics. If the user asks about medicines, answer medicine-specific content only. "
+        "If the requested category is missing, state that clearly instead of guessing. "
         "Lead with a direct, contextual answer grounded in the note. "
         "If relevant, briefly explain the condition or medication in practical language. "
         "Use minimal safety language; include a short caution only when needed for uncertainty/high-risk guidance. "
@@ -424,6 +577,7 @@ def answer_note_follow_up(original_note_text: str, interpreted_note: str, questi
     user_prompt = (
         f"User question: {concise_question}\n\n"
         f"Detected question intent: {intent}\n"
+        f"Context availability flags: {json.dumps(availability, ensure_ascii=False)}\n"
         f"Original note (cleaned): {_truncate(note_context)}\n\n"
         f"Interpreted summary: {_truncate(str(follow_up_context.get('interpreted_summary', '')))}\n"
         f"Extracted symptoms: {_truncate(json.dumps(follow_up_context.get('extracted_symptoms', []), ensure_ascii=False), 500)}\n"

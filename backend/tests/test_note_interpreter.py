@@ -116,3 +116,51 @@ def test_follow_up_fallback_varies_by_question_intent(monkeypatch):
     assert "right now" in actions_answer.lower()
     assert "warning signs" in warning_answer.lower()
     assert "serious" in serious_answer.lower()
+
+
+def test_follow_up_gates_missing_medication_category(monkeypatch):
+    class FakeProvider:
+        def generate_json(self, *, system_prompt: str, user_prompt: str):
+            del system_prompt, user_prompt
+            return None
+
+        def generate_text(self, *, system_prompt: str, user_prompt: str):
+            del system_prompt, user_prompt
+            return "generic fallback that should not be used"
+
+    monkeypatch.setattr("app.services.note_interpreter.get_ai_provider", lambda: FakeProvider())
+
+    note = "Patient reports fatigue and mild headache for 2 days. Increase hydration and follow up in 48 hours."
+    interpreted = '{"plain_english_summary":"Fatigue and headache were noted with follow-up advised.","medicines_treatments":[],"next_steps":["Follow up in 48 hours"],"medical_terms_explained":[]}'
+
+    answer = answer_note_follow_up(note, interpreted, "What does this medicine do?")
+
+    assert "does not clearly mention a medication" in answer.lower()
+    assert "generic fallback" not in answer.lower()
+
+
+def test_follow_up_answers_vary_for_required_questions(monkeypatch):
+    class FakeProvider:
+        def generate_json(self, *, system_prompt: str, user_prompt: str):
+            del system_prompt, user_prompt
+            return None
+
+        def generate_text(self, *, system_prompt: str, user_prompt: str):
+            del system_prompt, user_prompt
+            return ""
+
+    monkeypatch.setattr("app.services.note_interpreter.get_ai_provider", lambda: FakeProvider())
+
+    note = "Patient reports abdominal pain and nausea for 3 days. Follow up in 2 days if not improving."
+    interpreted = '{"plain_english_summary":"Abdominal pain and nausea are being monitored.","medicines_treatments":[],"next_steps":["Follow up in 2 days if not improving"],"medical_terms_explained":[]}'
+
+    symptoms_answer = answer_note_follow_up(note, interpreted, "What symptoms should worry me?")
+    medication_answer = answer_note_follow_up(note, interpreted, "What does this medicine do?")
+    actions_answer = answer_note_follow_up(note, interpreted, "What should I do right now?")
+    serious_answer = answer_note_follow_up(note, interpreted, "Is this serious?")
+
+    assert "warning signs" in symptoms_answer.lower()
+    assert "does not clearly mention a medication" in medication_answer.lower()
+    assert "right now" in actions_answer.lower()
+    assert "serious" in serious_answer.lower()
+    assert len({symptoms_answer, medication_answer, actions_answer, serious_answer}) == 4
