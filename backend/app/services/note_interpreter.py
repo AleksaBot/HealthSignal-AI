@@ -7,6 +7,9 @@ from typing import Any
 
 from app.schemas.analyze import MedicalTermExplanation, NoteInterpretationResponse, TreatmentMention
 from app.services.ai_provider import get_ai_provider
+from app.services.answer_router import build_answer_plan
+from app.services.note_extractor import extract_note_intelligence
+from app.services.question_intent import classify_question_intent
 
 logger = logging.getLogger(__name__)
 
@@ -410,25 +413,8 @@ def _build_contextual_follow_up_fallback(
 
 
 def _classify_follow_up_intent(question: str) -> str:
-    """Classify follow-up questions into a single intent bucket for strict backend routing."""
-    lowered = question.lower()
-    if re.search(r"\b(medicine|medication|drug|treatment|prescription|pill|rx)\b", lowered):
-        return "medication"
-    if re.search(r"\b(worry|warning sign|red flag|emergency|danger|what should worry)\b", lowered):
-        return "warning_signs"
-    if re.search(r"\b(symptom|symptoms|feel|pain|nausea|vomiting|dizzy|fatigue|fever)\b", lowered):
-        return "symptoms"
-    if re.search(r"\b(test|tests|lab|labs|blood work|blood test|scan|imaging|x-?ray|ct|mri|result)\b", lowered):
-        return "tests"
-    if re.search(r"\b(what does .* mean|what is .*|define|definition|explain this term|meaning|what does this mean)\b", lowered):
-        return "definitions"
-    if re.search(r"\b(right now|what should i do|what do i do|immediately|today|matters most)\b", lowered):
-        return "urgency"
-    if re.search(r"\b(next step|next steps|plan|what now|what should happen next)\b", lowered):
-        return "next_steps"
-    if re.search(r"\b(serious|severity|how bad|dangerous|risk)\b", lowered):
-        return "seriousness"
-    return "general"
+    """Backward-compatible wrapper around the modular intent classifier."""
+    return classify_question_intent(question)
 
 
 def _has_pattern(text: str, patterns: list[str]) -> bool:
@@ -533,25 +519,21 @@ def answer_note_follow_up(original_note_text: str, interpreted_note: str, questi
         parsed_interpretation = None
 
     follow_up_context = _extract_follow_up_context(note_context, parsed_interpretation)
-    intent = _classify_follow_up_intent(concise_question)
-    availability = _get_context_availability(
-        note_context=note_context,
-        interpreted_note=parsed_interpretation,
-        follow_up_context=follow_up_context,
-    )
-    missing_category_response = _build_missing_category_response(
+    extracted_intelligence = extract_note_intelligence(note_context)
+    intent = classify_question_intent(concise_question)
+    answer_plan = build_answer_plan(
+        extracted=extracted_intelligence,
         intent=intent,
-        availability=availability,
-        follow_up_context=follow_up_context,
+        question=concise_question,
     )
     logger.info(
-        "note_follow_up intent=%s availability=%s missing_response=%s",
+        "note_follow_up intent=%s can_answer=%s",
         intent,
-        availability,
-        bool(missing_category_response),
+        answer_plan.can_answer_from_note,
     )
-    if missing_category_response:
-        return missing_category_response
+
+    if answer_plan.missing_message:
+        return answer_plan.missing_message
 
     if parsed_interpretation:
         structured_context = json.dumps(_expand_context_values(parsed_interpretation), ensure_ascii=False)
@@ -561,31 +543,34 @@ def answer_note_follow_up(original_note_text: str, interpreted_note: str, questi
             ensure_ascii=False,
         )
 
+    router_facts = json.dumps(answer_plan.facts, ensure_ascii=False)
+
     system_prompt = (
         "You are a conversational follow-up assistant answering patient questions about a medical note. "
         "The user question is the top priority: answer the exact question asked before adding general context. "
-        "Do not switch topics. If the user asks about medicines, answer medicine-specific content only. "
-        "If the requested category is missing, state that clearly instead of guessing. "
-        "Lead with a direct, contextual answer grounded in the note. "
+        "Use the provided answer plan as the factual backbone. "
+        "If the requested category is missing, say that clearly instead of guessing. "
+        "Lead with a direct, contextual answer grounded in the note extraction and answer plan. "
         "If relevant, briefly explain the condition or medication in practical language. "
         "Use minimal safety language; include a short caution only when needed for uncertainty/high-risk guidance. "
         "Ground every answer in the provided note/interpretation. "
-        "If uncertain, say what is unclear. Never diagnose. Never create medication instructions that are not stated. "
-        "Do not reuse a generic template response across different questions."
+        "If uncertain, say what is unclear. Never diagnose. Never create medication instructions that are not stated."
     )
     user_prompt = (
         f"User question: {concise_question}\n\n"
         f"Detected question intent: {intent}\n"
-        f"Context availability flags: {json.dumps(availability, ensure_ascii=False)}\n"
+        f"Answer plan focus: {answer_plan.response_focus}\n"
+        f"Answer plan facts: {router_facts}\n"
         f"Original note (cleaned): {_truncate(note_context)}\n\n"
         f"Interpreted summary: {_truncate(str(follow_up_context.get('interpreted_summary', '')))}\n"
         f"Extracted symptoms: {_truncate(json.dumps(follow_up_context.get('extracted_symptoms', []), ensure_ascii=False), 500)}\n"
         f"Treatments/medications: {_truncate(json.dumps(follow_up_context.get('treatments_medications', []), ensure_ascii=False), 500)}\n"
         f"Next steps: {_truncate(json.dumps(follow_up_context.get('next_steps', []), ensure_ascii=False), 500)}\n"
+        f"Structured extraction: {_truncate(json.dumps(extracted_intelligence.model_dump(), ensure_ascii=False), 1200)}\n"
         f"Structured interpretation: {_truncate(structured_context)}\n"
         f"Likely template note: {likely_template}\n"
         "Answer in 3-5 sentences in plain, natural English. Start with the direct answer first. "
-        "Use the intent label to choose the angle of your response (urgency/next steps, warning signs, seriousness, tests, definitions, or general clarification)."
+        "Use the intent label and answer plan focus for your response angle."
     )
 
     ai_answer = provider.generate_text(system_prompt=system_prompt, user_prompt=user_prompt)

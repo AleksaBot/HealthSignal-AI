@@ -42,6 +42,18 @@ uvicorn app.main:app --reload --port 8000
 
 Backend: `http://localhost:8000`
 
+#### Optional: train local ML intent-classifier artifact
+
+The intent-classifier artifact is intentionally **not committed** to git.  
+If you want to run ML intent comparison locally, generate it with:
+
+```bash
+cd backend
+python scripts/train_intent_classifier.py --output data/intent_classifier.joblib
+```
+
+The app will fall back to rule-based intent classification if this file is missing.
+
 ### 2) Frontend
 
 ```bash
