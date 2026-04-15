@@ -14,6 +14,8 @@ class Settings(BaseSettings):
     llm_api_key: str | None = Field(default=None, alias="OPENAI_API_KEY")
     llm_model: str = Field(default="gpt-4o-mini", alias="OPENAI_MODEL")
     llm_base_url: str = Field(default="https://api.openai.com/v1", alias="OPENAI_BASE_URL")
+    intent_classifier_backend: str = Field(default="rule", alias="INTENT_CLASSIFIER_BACKEND")
+    intent_classifier_model_path: str = Field(default="data/intent_classifier.joblib", alias="INTENT_CLASSIFIER_MODEL_PATH")
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
 

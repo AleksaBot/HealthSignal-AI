@@ -1,0 +1,491 @@
+{
+  "benchmark_name": "rule_vs_ml_baseline_v1",
+  "generated_at_utc": "2026-04-15T17:27:01.680469+00:00",
+  "dataset_size": 45,
+  "overall_pipeline_score": 0.8071,
+  "pass_count": 35,
+  "field_metrics": {
+    "symptoms": {
+      "precision": 0.9,
+      "recall": 0.6851851851851851,
+      "f1": 0.6222222222222222
+    },
+    "medications": {
+      "precision": 1.0,
+      "recall": 0.8222222222222222,
+      "f1": 0.8222222222222222
+    },
+    "tests_ordered": {
+      "precision": 1.0,
+      "recall": 0.4666666666666667,
+      "f1": 0.4814814814814815
+    },
+    "referrals": {
+      "precision": 1.0,
+      "recall": 0.8222222222222222,
+      "f1": 0.8222222222222222
+    },
+    "follow_up_actions": {
+      "precision": 0.4666666666666667,
+      "recall": 0.8888888888888888,
+      "f1": 0.4296296296296296
+    },
+    "warning_signs": {
+      "precision": 1.0,
+      "recall": 0.8888888888888888,
+      "f1": 0.8888888888888888
+    },
+    "diagnoses_or_conditions": {
+      "precision": 1.0,
+      "recall": 0.8888888888888888,
+      "f1": 0.8888888888888888
+    },
+    "duration_or_timing": {
+      "precision": 1.0,
+      "recall": 0.8111111111111111,
+      "f1": 0.8444444444444444
+    }
+  },
+  "intent_label_accuracy": {
+    "medication": {
+      "correct": 35,
+      "total": 36,
+      "accuracy": 0.9722
+    },
+    "next_steps": {
+      "correct": 26,
+      "total": 26,
+      "accuracy": 1.0
+    },
+    "referrals": {
+      "correct": 18,
+      "total": 18,
+      "accuracy": 1.0
+    },
+    "seriousness": {
+      "correct": 1,
+      "total": 1,
+      "accuracy": 1.0
+    },
+    "symptoms": {
+      "correct": 12,
+      "total": 12,
+      "accuracy": 1.0
+    },
+    "tests": {
+      "correct": 32,
+      "total": 32,
+      "accuracy": 1.0
+    },
+    "warning_signs": {
+      "correct": 10,
+      "total": 10,
+      "accuracy": 1.0
+    }
+  },
+  "intent_mismatches": [
+    "example=4 question=2 expected=medication predicted=general"
+  ],
+  "per_example": [
+    {
+      "example": 1,
+      "extract_f1": 0.75,
+      "intent_acc": 1.0,
+      "fact_score": 0.6667,
+      "passed": true
+    },
+    {
+      "example": 2,
+      "extract_f1": 0.8125,
+      "intent_acc": 1.0,
+      "fact_score": 0.6667,
+      "passed": true
+    },
+    {
+      "example": 3,
+      "extract_f1": 0.6458,
+      "intent_acc": 1.0,
+      "fact_score": 0.6667,
+      "passed": false
+    },
+    {
+      "example": 4,
+      "extract_f1": 0.9583,
+      "intent_acc": 0.6667,
+      "fact_score": 1.0,
+      "passed": false
+    },
+    {
+      "example": 5,
+      "extract_f1": 0.875,
+      "intent_acc": 1.0,
+      "fact_score": 0.6667,
+      "passed": true
+    },
+    {
+      "example": 6,
+      "extract_f1": 0.4583,
+      "intent_acc": 1.0,
+      "fact_score": 0.0,
+      "passed": false
+    },
+    {
+      "example": 7,
+      "extract_f1": 0.9583,
+      "intent_acc": 1.0,
+      "fact_score": 1.0,
+      "passed": true
+    },
+    {
+      "example": 8,
+      "extract_f1": 0.75,
+      "intent_acc": 1.0,
+      "fact_score": 0.6667,
+      "passed": true
+    },
+    {
+      "example": 9,
+      "extract_f1": 0.375,
+      "intent_acc": 1.0,
+      "fact_score": 0.6667,
+      "passed": false
+    },
+    {
+      "example": 10,
+      "extract_f1": 0.6875,
+      "intent_acc": 1.0,
+      "fact_score": 1.0,
+      "passed": true
+    },
+    {
+      "example": 11,
+      "extract_f1": 0.7083,
+      "intent_acc": 1.0,
+      "fact_score": 0.6667,
+      "passed": true
+    },
+    {
+      "example": 12,
+      "extract_f1": 0.7083,
+      "intent_acc": 1.0,
+      "fact_score": 0.6667,
+      "passed": true
+    },
+    {
+      "example": 13,
+      "extract_f1": 0.875,
+      "intent_acc": 1.0,
+      "fact_score": 1.0,
+      "passed": true
+    },
+    {
+      "example": 14,
+      "extract_f1": 0.7917,
+      "intent_acc": 1.0,
+      "fact_score": 0.6667,
+      "passed": true
+    },
+    {
+      "example": 15,
+      "extract_f1": 0.8333,
+      "intent_acc": 1.0,
+      "fact_score": 0.6667,
+      "passed": true
+    },
+    {
+      "example": 16,
+      "extract_f1": 0.4583,
+      "intent_acc": 1.0,
+      "fact_score": 0.0,
+      "passed": false
+    },
+    {
+      "example": 17,
+      "extract_f1": 0.9583,
+      "intent_acc": 1.0,
+      "fact_score": 1.0,
+      "passed": true
+    },
+    {
+      "example": 18,
+      "extract_f1": 0.75,
+      "intent_acc": 1.0,
+      "fact_score": 0.6667,
+      "passed": true
+    },
+    {
+      "example": 19,
+      "extract_f1": 0.375,
+      "intent_acc": 1.0,
+      "fact_score": 0.6667,
+      "passed": false
+    },
+    {
+      "example": 20,
+      "extract_f1": 0.6875,
+      "intent_acc": 1.0,
+      "fact_score": 1.0,
+      "passed": true
+    },
+    {
+      "example": 21,
+      "extract_f1": 0.7083,
+      "intent_acc": 1.0,
+      "fact_score": 0.6667,
+      "passed": true
+    },
+    {
+      "example": 22,
+      "extract_f1": 0.7083,
+      "intent_acc": 1.0,
+      "fact_score": 0.6667,
+      "passed": true
+    },
+    {
+      "example": 23,
+      "extract_f1": 0.875,
+      "intent_acc": 1.0,
+      "fact_score": 1.0,
+      "passed": true
+    },
+    {
+      "example": 24,
+      "extract_f1": 0.7917,
+      "intent_acc": 1.0,
+      "fact_score": 0.6667,
+      "passed": true
+    },
+    {
+      "example": 25,
+      "extract_f1": 0.8333,
+      "intent_acc": 1.0,
+      "fact_score": 0.6667,
+      "passed": true
+    },
+    {
+      "example": 26,
+      "extract_f1": 0.4583,
+      "intent_acc": 1.0,
+      "fact_score": 0.0,
+      "passed": false
+    },
+    {
+      "example": 27,
+      "extract_f1": 0.9583,
+      "intent_acc": 1.0,
+      "fact_score": 1.0,
+      "passed": true
+    },
+    {
+      "example": 28,
+      "extract_f1": 0.75,
+      "intent_acc": 1.0,
+      "fact_score": 0.6667,
+      "passed": true
+    },
+    {
+      "example": 29,
+      "extract_f1": 0.375,
+      "intent_acc": 1.0,
+      "fact_score": 0.6667,
+      "passed": false
+    },
+    {
+      "example": 30,
+      "extract_f1": 0.6875,
+      "intent_acc": 1.0,
+      "fact_score": 1.0,
+      "passed": true
+    },
+    {
+      "example": 31,
+      "extract_f1": 0.7083,
+      "intent_acc": 1.0,
+      "fact_score": 0.6667,
+      "passed": true
+    },
+    {
+      "example": 32,
+      "extract_f1": 0.7083,
+      "intent_acc": 1.0,
+      "fact_score": 0.6667,
+      "passed": true
+    },
+    {
+      "example": 33,
+      "extract_f1": 0.875,
+      "intent_acc": 1.0,
+      "fact_score": 1.0,
+      "passed": true
+    },
+    {
+      "example": 34,
+      "extract_f1": 0.7917,
+      "intent_acc": 1.0,
+      "fact_score": 0.6667,
+      "passed": true
+    },
+    {
+      "example": 35,
+      "extract_f1": 0.8333,
+      "intent_acc": 1.0,
+      "fact_score": 0.6667,
+      "passed": true
+    },
+    {
+      "example": 36,
+      "extract_f1": 0.4583,
+      "intent_acc": 1.0,
+      "fact_score": 0.0,
+      "passed": false
+    },
+    {
+      "example": 37,
+      "extract_f1": 0.9583,
+      "intent_acc": 1.0,
+      "fact_score": 1.0,
+      "passed": true
+    },
+    {
+      "example": 38,
+      "extract_f1": 0.75,
+      "intent_acc": 1.0,
+      "fact_score": 0.6667,
+      "passed": true
+    },
+    {
+      "example": 39,
+      "extract_f1": 0.375,
+      "intent_acc": 1.0,
+      "fact_score": 0.6667,
+      "passed": false
+    },
+    {
+      "example": 40,
+      "extract_f1": 0.6875,
+      "intent_acc": 1.0,
+      "fact_score": 1.0,
+      "passed": true
+    },
+    {
+      "example": 41,
+      "extract_f1": 0.7083,
+      "intent_acc": 1.0,
+      "fact_score": 0.6667,
+      "passed": true
+    },
+    {
+      "example": 42,
+      "extract_f1": 0.7083,
+      "intent_acc": 1.0,
+      "fact_score": 0.6667,
+      "passed": true
+    },
+    {
+      "example": 43,
+      "extract_f1": 0.875,
+      "intent_acc": 1.0,
+      "fact_score": 1.0,
+      "passed": true
+    },
+    {
+      "example": 44,
+      "extract_f1": 0.7917,
+      "intent_acc": 1.0,
+      "fact_score": 0.6667,
+      "passed": true
+    },
+    {
+      "example": 45,
+      "extract_f1": 0.8333,
+      "intent_acc": 1.0,
+      "fact_score": 0.6667,
+      "passed": true
+    }
+  ],
+  "intent_backend_comparison": {
+    "overall_rule_accuracy": 0.9926,
+    "overall_ml_accuracy": 0.9704,
+    "per_label_rule_accuracy": {
+      "medication": {
+        "correct": 35,
+        "total": 36,
+        "accuracy": 0.9722
+      },
+      "next_steps": {
+        "correct": 26,
+        "total": 26,
+        "accuracy": 1.0
+      },
+      "referrals": {
+        "correct": 18,
+        "total": 18,
+        "accuracy": 1.0
+      },
+      "seriousness": {
+        "correct": 1,
+        "total": 1,
+        "accuracy": 1.0
+      },
+      "symptoms": {
+        "correct": 12,
+        "total": 12,
+        "accuracy": 1.0
+      },
+      "tests": {
+        "correct": 32,
+        "total": 32,
+        "accuracy": 1.0
+      },
+      "warning_signs": {
+        "correct": 10,
+        "total": 10,
+        "accuracy": 1.0
+      }
+    },
+    "per_label_ml_accuracy": {
+      "medication": {
+        "correct": 34,
+        "total": 36,
+        "accuracy": 0.9444
+      },
+      "next_steps": {
+        "correct": 25,
+        "total": 26,
+        "accuracy": 0.9615
+      },
+      "referrals": {
+        "correct": 18,
+        "total": 18,
+        "accuracy": 1.0
+      },
+      "seriousness": {
+        "correct": 1,
+        "total": 1,
+        "accuracy": 1.0
+      },
+      "symptoms": {
+        "correct": 12,
+        "total": 12,
+        "accuracy": 1.0
+      },
+      "tests": {
+        "correct": 32,
+        "total": 32,
+        "accuracy": 1.0
+      },
+      "warning_signs": {
+        "correct": 9,
+        "total": 10,
+        "accuracy": 0.9
+      }
+    },
+    "rule_vs_ml_prediction_mismatches": [
+      "example=1 question=2 expected=warning_signs rule=warning_signs ml=next_steps",
+      "example=3 question=1 expected=next_steps rule=next_steps ml=medication",
+      "example=4 question=2 expected=medication rule=general ml=symptoms",
+      "example=5 question=3 expected=medication rule=medication ml=referrals"
+    ],
+    "recommended_backend_on_current_dataset": "rule"
+  }
+}

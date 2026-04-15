@@ -11,6 +11,7 @@ out/
 # Local env and DB
 .env
 *.db
+*.joblib
 backend/healthsignal.db
 .env.local
 frontend/.env.local

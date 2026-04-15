@@ -169,7 +169,7 @@ def test_follow_up_answers_vary_for_required_questions(monkeypatch):
 def test_follow_up_intent_classification_required_categories():
     assert _classify_follow_up_intent("What does this medicine do?") == "medication"
     assert _classify_follow_up_intent("What symptoms should worry me?") == "warning_signs"
-    assert _classify_follow_up_intent("What matters most right now?") == "urgency"
+    assert _classify_follow_up_intent("What matters most right now?") == "next_steps"
     assert _classify_follow_up_intent("Is this serious?") == "seriousness"
     assert _classify_follow_up_intent("What tests were ordered?") == "tests"
     assert _classify_follow_up_intent("What does this term mean?") == "definitions"
