@@ -33,6 +33,7 @@ export default function NoteInterpreterPage() {
   const [loading, setLoading] = useState(false);
   const [followUpLoading, setFollowUpLoading] = useState(false);
   const chatEndRef = useRef<HTMLDivElement | null>(null);
+  const followUpInputRef = useRef<HTMLTextAreaElement | null>(null);
 
   const canSubmit = useMemo(() => noteText.trim().length >= 5 || Boolean(selectedFileName), [noteText, selectedFileName]);
   const canAskFollowUp = useMemo(() => Boolean(result) && followUpQuestion.trim().length >= 3, [result, followUpQuestion]);
@@ -191,6 +192,9 @@ export default function NoteInterpreterPage() {
           <button className="rounded-lg bg-brand-700 px-4 py-2 text-white disabled:opacity-60" disabled={loading || !canSubmit}>
             {loading ? "Interpreting..." : "Interpret Note"}
           </button>
+          <p className="text-xs text-slate-500 dark:text-slate-400">
+            Starting a new interpretation will clear this note&apos;s current follow-up conversation.
+          </p>
         </form>
 
         {error ? <p className="rounded-lg bg-rose-50 p-3 text-sm text-rose-700 dark:bg-rose-950/30 dark:text-rose-200">{error}</p> : null}
@@ -225,7 +229,10 @@ export default function NoteInterpreterPage() {
                   <button
                     key={question}
                     type="button"
-                    onClick={() => void askFollowUp(question)}
+                    onClick={() => {
+                      setFollowUpQuestion(question);
+                      followUpInputRef.current?.focus();
+                    }}
                     disabled={followUpLoading}
                     className="rounded-full border border-slate-300 bg-white px-3 py-1.5 text-sm text-slate-700 transition hover:border-brand-300 hover:text-brand-700 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-200 dark:hover:border-brand-400 dark:hover:text-brand-300"
                   >
@@ -253,7 +260,7 @@ export default function NoteInterpreterPage() {
                         className={`max-w-[85%] rounded-2xl px-4 py-3 text-sm leading-6 shadow-sm ${
                           message.role === "user"
                             ? "rounded-br-md bg-brand-700 text-white"
-                            : "rounded-bl-md border border-slate-200 bg-white text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
+                            : "rounded-bl-md border border-slate-300 bg-slate-100 text-slate-700 dark:border-slate-600 dark:bg-slate-800/90 dark:text-slate-200"
                         }`}
                       >
                         {message.content}
@@ -277,6 +284,7 @@ export default function NoteInterpreterPage() {
 
               <form onSubmit={onAskFollowUp} className="space-y-3">
                 <textarea
+                  ref={followUpInputRef}
                   value={followUpQuestion}
                   onChange={(event) => setFollowUpQuestion(event.target.value)}
                   minLength={3}
