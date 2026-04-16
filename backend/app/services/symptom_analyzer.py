@@ -1,23 +1,34 @@
+from __future__ import annotations
+
 from app.schemas.analyze import AnalysisResponse
-from app.services.red_flags import evaluate_red_flags
+from app.schemas.symptom_intelligence import SymptomInput
+from app.services.symptom_intelligence_pipeline import build_symptom_answer_plan
 
 
 def analyze_symptoms_text(symptoms: str) -> AnalysisResponse:
+    plan, intelligence = build_symptom_answer_plan(SymptomInput(symptom_text=symptoms))
+    extracted = intelligence["extracted"]
+    risk = intelligence["risk"]
+
+    extracted_signals = [
+        f"Primary symptoms: {', '.join(extracted.primary_symptoms) or 'none detected'}.",
+        f"Duration: {extracted.duration or 'not clearly specified'}.",
+        f"Severity: {extracted.severity or 'not clearly specified'}.",
+        f"Body area: {extracted.location_body_area or 'not clearly specified'}.",
+    ]
+
     return AnalysisResponse(
-        extracted_signals=[
-            "Symptom chronology cues extracted",
-            "Symptom severity and duration language identified",
-            "Possible body-system groupings mapped",
-        ],
-        red_flags=evaluate_red_flags(symptoms),
-        likely_categories=["Cardiovascular", "Neurologic", "General Medicine"],
+        extracted_signals=extracted_signals,
+        red_flags=extracted.red_flags or ["No explicit red-flag term detected in this rule-based pass."],
+        likely_categories=plan.categories,
         risk_insights={
-            "stroke": "Educational pattern review suggests clinician follow-up when focal neurologic signals appear.",
-            "diabetes": "Insufficient structured glucose context from free-text symptom input alone.",
-            "cardiovascular": "Symptom clusters can be associated with cardio-pulmonary conditions and warrant medical review.",
+            "overall_risk": risk.risk_level,
+            "triage": plan.triage_recommendation,
+            "rationale": " ".join(risk.rationale),
+            "follow_up_questions": " | ".join(question.prompt_text for question in plan.follow_up_questions),
         },
         reasoning=(
-            "Outputs are generated from transparent educational heuristics over symptom language and are not diagnostic. "
-            "A licensed clinician must confirm diagnosis and treatment decisions."
+            "Outputs are generated from deterministic extraction, rules-based risk classification, condition-category matching, "
+            "and guided follow-up question generation. This educational pipeline is non-diagnostic and requires clinician confirmation."
         ),
     )
