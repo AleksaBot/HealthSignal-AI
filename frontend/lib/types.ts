@@ -154,3 +154,13 @@ export type ReportRead = {
   output_summary: string;
   created_at: string;
 };
+
+export type ReportSavePayload = {
+  report_type: string;
+  original_input_text: string;
+  structured_data: Record<string, unknown>;
+  follow_up_qa: Array<{ question: string; answer: string }>;
+  outputs: Record<string, unknown>;
+  source_metadata?: Record<string, unknown>;
+  completed_at?: string;
+};

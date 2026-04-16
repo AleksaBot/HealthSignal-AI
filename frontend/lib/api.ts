@@ -9,6 +9,7 @@ import {
   NoteInterpretRequest,
   NoteInterpretationResponse,
   ReportRead,
+  ReportSavePayload,
   RiskInsightRequest,
   SymptomAnalyzeRequest,
   SymptomIntakeInitialResponse,
@@ -264,4 +265,8 @@ export function listReports() {
 
 export function getReport(reportId: number) {
   return getAuthJSON<ReportRead>(`/api/reports/${reportId}`);
+}
+
+export function saveReport(payload: ReportSavePayload) {
+  return postAuthJSON<ReportSavePayload, ReportRead>("/api/reports/save", payload);
 }

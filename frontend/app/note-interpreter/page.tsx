@@ -1,10 +1,11 @@
 "use client";
 
+import Link from "next/link";
 import { ChangeEvent, FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { DisclaimerBanner } from "@/components/DisclaimerBanner";
 import { RequireAuth } from "@/components/RequireAuth";
 import { NoteInterpretationCard } from "@/components/NoteInterpretationCard";
-import { analyzeNoteFile, analyzeNoteFollowUp, analyzeNotes, getUserErrorMessage } from "@/lib/api";
+import { analyzeNoteFile, analyzeNoteFollowUp, analyzeNotes, getUserErrorMessage, saveReport } from "@/lib/api";
 import { NoteFileAnalysisResponse, NoteInterpretationResponse } from "@/lib/types";
 
 type ChatMessage = {
@@ -30,8 +31,11 @@ export default function NoteInterpreterPage() {
   const [followUpQuestion, setFollowUpQuestion] = useState("");
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [saveSuccess, setSaveSuccess] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [followUpLoading, setFollowUpLoading] = useState(false);
+  const [savingReport, setSavingReport] = useState(false);
+  const [savedReportId, setSavedReportId] = useState<number | null>(null);
   const chatEndRef = useRef<HTMLDivElement | null>(null);
   const followUpInputRef = useRef<HTMLTextAreaElement | null>(null);
 
@@ -58,6 +62,8 @@ export default function NoteInterpreterPage() {
     setLoading(true);
     setError(null);
     setResult(null);
+    setSaveSuccess(null);
+    setSavedReportId(null);
     setFollowUpQuestion("");
     setChatMessages([]);
     setExtractedText(null);
@@ -135,6 +141,40 @@ export default function NoteInterpreterPage() {
     await askFollowUp(followUpQuestion);
   }
 
+  async function onSaveReport() {
+    if (!result || savingReport || savedReportId) return;
+    setSavingReport(true);
+    setError(null);
+    setSaveSuccess(null);
+    try {
+      const response = await saveReport({
+        report_type: selectedFile ? "note-interpreter-file" : "note-interpreter-text",
+        original_input_text: (extractedText ?? noteText).trim(),
+        structured_data: {
+          interpretation: result,
+          file_parse_method: parsingMethod
+        },
+        follow_up_qa: chatMessages
+          .filter((message) => message.role === "user")
+          .map((message) => {
+            const answer = chatMessages.find((candidate) => candidate.id === `${message.id}-assistant`);
+            return { question: message.content, answer: answer?.content ?? "" };
+          })
+          .filter((item) => item.answer.trim().length > 0),
+        outputs: {
+          category: "note_interpretation",
+          suggested_follow_up_questions: result.follow_up_questions
+        }
+      });
+      setSavedReportId(response.id);
+      setSaveSuccess(`Saved report #${response.id} to history.`);
+    } catch (err) {
+      setError(getUserErrorMessage(err, "Unable to save this note interpretation right now."));
+    } finally {
+      setSavingReport(false);
+    }
+  }
+
   return (
     <RequireAuth>
       <section className="space-y-6">
@@ -202,13 +242,32 @@ export default function NoteInterpreterPage() {
         {result ? (
           <>
             <section className="space-y-4">
-              <div className="flex flex-wrap gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 {parsingMethod ? (
                   <p className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs text-slate-700 dark:border-slate-700 dark:bg-slate-900/70 dark:text-slate-300">
                     Source: <span className="font-medium capitalize">{parsingMethod.replaceAll("_", " ")}</span>
                   </p>
                 ) : null}
+                <button
+                  type="button"
+                  onClick={onSaveReport}
+                  disabled={savingReport || savedReportId !== null}
+                  className="rounded-lg bg-brand-700 px-3 py-1.5 text-xs font-medium text-white transition hover:bg-brand-600 disabled:opacity-60"
+                >
+                  {savedReportId ? "Report Saved" : savingReport ? "Saving Report..." : "Save Report"}
+                </button>
+                <Link
+                  href="/history"
+                  className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 transition hover:border-brand-300 hover:text-brand-700 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-200 dark:hover:border-brand-400 dark:hover:text-brand-300"
+                >
+                  View Saved Reports
+                </Link>
               </div>
+              {saveSuccess ? (
+                <p className="rounded-lg bg-emerald-50 p-3 text-sm text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-200">
+                  {saveSuccess}
+                </p>
+              ) : null}
 
               {extractedText ? (
                 <div className="rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-900/75">

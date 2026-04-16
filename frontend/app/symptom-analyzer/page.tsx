@@ -1,9 +1,10 @@
 "use client";
 
+import Link from "next/link";
 import { FormEvent, useMemo, useRef, useState } from "react";
 import { DisclaimerBanner } from "@/components/DisclaimerBanner";
 import { RequireAuth } from "@/components/RequireAuth";
-import { getUserErrorMessage, startSymptomIntake, updateSymptomIntake } from "@/lib/api";
+import { getUserErrorMessage, saveReport, startSymptomIntake, updateSymptomIntake } from "@/lib/api";
 import { FollowUpQuestion, SymptomIntakeSession, SymptomRiskLevel } from "@/lib/types";
 
 const COMMON_SYMPTOMS = [
@@ -52,8 +53,11 @@ export default function SymptomAnalyzerPage() {
   const [summaryPoints, setSummaryPoints] = useState<string[]>([]);
   const [categories, setCategories] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [saveSuccess, setSaveSuccess] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [updating, setUpdating] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [savedReportId, setSavedReportId] = useState<number | null>(null);
   const finalSummaryRef = useRef<HTMLElement | null>(null);
 
   const started = Boolean(session);
@@ -136,10 +140,43 @@ export default function SymptomAnalyzerPage() {
     setSummaryPoints([]);
     setCategories([]);
     setError(null);
+    setSaveSuccess(null);
+    setSavedReportId(null);
   }
 
   function viewFinalSummary() {
     finalSummaryRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
+  async function onSaveReport() {
+    if (!session || !isComplete || saving) return;
+    setSaving(true);
+    setError(null);
+    setSaveSuccess(null);
+
+    try {
+      const response = await saveReport({
+        report_type: "symptom-intake-guided",
+        original_input_text: symptoms.trim() || session.input.symptom_text,
+        structured_data: {
+          extracted: session.extracted,
+          categories
+        },
+        follow_up_qa: session.answers.map((item) => ({ question: item.prompt_text, answer: item.answer_text })),
+        outputs: {
+          risk_assessment: session.risk_assessment,
+          triage_recommendation: triageRecommendation,
+          summary_points: summaryPoints,
+          completion_reason: session.completion_reason
+        }
+      });
+      setSavedReportId(response.id);
+      setSaveSuccess(`Saved report #${response.id} to history.`);
+    } catch (err) {
+      setError(getUserErrorMessage(err, "Unable to save this intake report right now."));
+    } finally {
+      setSaving(false);
+    }
   }
 
   const riskLevel = session?.risk_assessment.risk_level;
@@ -273,6 +310,20 @@ export default function SymptomAnalyzerPage() {
                       <div className="flex flex-wrap gap-2">
                         <button
                           type="button"
+                          onClick={onSaveReport}
+                          disabled={saving || savedReportId !== null}
+                          className="rounded-lg bg-brand-700 px-3 py-2 text-sm font-medium text-white transition hover:bg-brand-600 disabled:opacity-60"
+                        >
+                          {savedReportId ? "Report Saved" : saving ? "Saving Report..." : "Save Report"}
+                        </button>
+                        <Link
+                          href="/history"
+                          className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 transition hover:border-brand-300 hover:text-brand-700 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-200 dark:hover:border-brand-400 dark:hover:text-brand-300"
+                        >
+                          View Saved Reports
+                        </Link>
+                        <button
+                          type="button"
                           onClick={startNewIntake}
                           className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 transition hover:border-brand-300 hover:text-brand-700 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-200 dark:hover:border-brand-400 dark:hover:text-brand-300"
                         >
@@ -317,6 +368,11 @@ export default function SymptomAnalyzerPage() {
             {error ? (
               <p className="rounded-lg bg-rose-50 p-3 text-sm text-rose-700 dark:bg-rose-950/30 dark:text-rose-200">
                 {error}
+              </p>
+            ) : null}
+            {saveSuccess ? (
+              <p className="rounded-lg bg-emerald-50 p-3 text-sm text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-200">
+                {saveSuccess}
               </p>
             ) : null}
           </div>

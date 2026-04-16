@@ -14,12 +14,22 @@ function formatReportType(reportType: string) {
     .join(" ");
 }
 
+function parseJson(value: string) {
+  try {
+    return JSON.parse(value) as Record<string, unknown>;
+  } catch {
+    return null;
+  }
+}
+
 export default function HistoryPage() {
   const [reports, setReports] = useState<ReportRead[]>([]);
   const [selectedReport, setSelectedReport] = useState<ReportRead | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadingReportId, setLoadingReportId] = useState<number | null>(null);
+  const parsedInput = selectedReport ? parseJson(selectedReport.input_payload) : null;
+  const parsedOutput = selectedReport ? parseJson(selectedReport.output_summary) : null;
 
   useEffect(() => {
     async function loadReports() {
@@ -149,13 +159,17 @@ export default function HistoryPage() {
             </header>
 
             <section className="space-y-2">
-              <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">Input payload</h3>
-              <pre className="overflow-auto rounded-lg bg-slate-50 p-3 text-xs leading-5 text-slate-700 dark:bg-slate-900/75 dark:text-slate-300">{selectedReport.input_payload}</pre>
+              <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">Original input & metadata</h3>
+              <pre className="overflow-auto rounded-lg bg-slate-50 p-3 text-xs leading-5 text-slate-700 dark:bg-slate-900/75 dark:text-slate-300">
+                {JSON.stringify(parsedInput ?? selectedReport.input_payload, null, 2)}
+              </pre>
             </section>
 
             <section className="space-y-2">
-              <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">Output summary</h3>
-              <pre className="overflow-auto rounded-lg bg-slate-50 p-3 text-xs leading-5 text-slate-700 dark:bg-slate-900/75 dark:text-slate-300">{selectedReport.output_summary}</pre>
+              <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">Structured outputs</h3>
+              <pre className="overflow-auto rounded-lg bg-slate-50 p-3 text-xs leading-5 text-slate-700 dark:bg-slate-900/75 dark:text-slate-300">
+                {JSON.stringify(parsedOutput ?? selectedReport.output_summary, null, 2)}
+              </pre>
             </section>
           </article>
         ) : null}
