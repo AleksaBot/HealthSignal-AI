@@ -34,6 +34,66 @@ export type AnalysisResponse = {
   disclaimer: string;
 };
 
+export type SymptomRiskLevel = "low" | "moderate" | "high" | "emergency";
+
+export type FollowUpQuestion = {
+  prompt_text: string;
+  question_category: string;
+  priority: number;
+  symptom_focus: string | null;
+};
+
+export type SymptomIntakeAnswer = {
+  prompt_text: string;
+  answer_text: string;
+  question_category?: string | null;
+};
+
+export type ExtractedSymptomIntelligence = {
+  primary_symptoms: string[];
+  duration: string | null;
+  severity: string | null;
+  location_body_area: string | null;
+  associated_symptoms: string[];
+  red_flags: string[];
+};
+
+export type SymptomIntakeSession = {
+  input: {
+    symptom_text: string;
+  };
+  extracted: ExtractedSymptomIntelligence;
+  risk_assessment: {
+    risk_level: SymptomRiskLevel;
+    rationale: string[];
+  };
+  categories: string[];
+  follow_up_questions: FollowUpQuestion[];
+  asked_questions: string[];
+  answers: SymptomIntakeAnswer[];
+  current_depth: number;
+  max_depth: number;
+  is_complete: boolean;
+  completion_reason: string | null;
+};
+
+export type SymptomAnswerPlan = {
+  categories: string[];
+  triage_recommendation: string;
+  summary_points: string[];
+  follow_up_questions: FollowUpQuestion[];
+};
+
+export type SymptomIntakeInitialResponse = {
+  session: SymptomIntakeSession;
+  answer_plan: SymptomAnswerPlan;
+};
+
+export type SymptomIntakeUpdateRequest = {
+  session: SymptomIntakeSession;
+  new_answers: SymptomIntakeAnswer[];
+};
+
 export type TreatmentMention = {
   item: string;
   explanation: string;

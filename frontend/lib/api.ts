@@ -11,6 +11,8 @@ import {
   ReportRead,
   RiskInsightRequest,
   SymptomAnalyzeRequest,
+  SymptomIntakeInitialResponse,
+  SymptomIntakeUpdateRequest,
   UserRead
 } from "@/lib/types";
 
@@ -228,6 +230,14 @@ export function getCurrentUser() {
 
 export function analyzeSymptoms(payload: SymptomAnalyzeRequest) {
   return postAuthJSON<SymptomAnalyzeRequest, AnalysisResponse>("/api/analyze/symptoms", payload);
+}
+
+export function startSymptomIntake(payload: SymptomAnalyzeRequest) {
+  return postAuthJSON<SymptomAnalyzeRequest, SymptomIntakeInitialResponse>("/api/analyze/symptoms/intake", payload);
+}
+
+export function updateSymptomIntake(payload: SymptomIntakeUpdateRequest) {
+  return postAuthJSON<SymptomIntakeUpdateRequest, SymptomIntakeInitialResponse>("/api/analyze/symptoms/intake/update", payload);
 }
 
 export function analyzeNotes(payload: NoteInterpretRequest) {
