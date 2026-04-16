@@ -106,7 +106,7 @@ def test_login_rejects_password_too_long_without_500(client: TestClient):
     assert login.json() == {"detail": BCRYPT_PASSWORD_LENGTH_ERROR_MESSAGE}
 
 
-def test_analyze_endpoints_create_reports(client: TestClient, auth_headers: dict[str, str]):
+def test_analyze_endpoints_and_manual_report_save(client: TestClient, auth_headers: dict[str, str]):
     symptoms = client.post(
         "/api/analyze/symptoms",
         json={"symptoms": "Chest pain with shortness of breath"},
@@ -139,11 +139,31 @@ def test_analyze_endpoints_create_reports(client: TestClient, auth_headers: dict
     )
     assert risk.status_code == 200
 
+    save_report = client.post(
+        "/api/reports/save",
+        json={
+            "report_type": "note-interpreter-text",
+            "original_input_text": "Patient has slurred speech and weakness since morning.",
+            "structured_data": {"plain_english_summary": notes_payload["plain_english_summary"]},
+            "follow_up_qa": [{"question": "What should I ask my doctor?", "answer": "Ask about warning signs."}],
+            "outputs": {"follow_up_questions": notes_payload["follow_up_questions"]},
+        },
+        headers=auth_headers,
+    )
+    assert save_report.status_code == 201
+    assert save_report.json()["report_type"] == "note-interpreter-text"
+
 
 def test_report_listing_and_retrieval(client: TestClient, auth_headers: dict[str, str]):
     client.post(
-        "/api/analyze/symptoms",
-        json={"symptoms": "Severe headache and confusion for 2 hours"},
+        "/api/reports/save",
+        json={
+            "report_type": "symptom-intake-guided",
+            "original_input_text": "Severe headache and confusion for 2 hours",
+            "structured_data": {"red_flags": ["confusion"]},
+            "follow_up_qa": [{"question": "When did this start?", "answer": "2 hours ago"}],
+            "outputs": {"risk_level": "high"},
+        },
         headers=auth_headers,
     )
 
