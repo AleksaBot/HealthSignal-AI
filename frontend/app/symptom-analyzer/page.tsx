@@ -26,6 +26,10 @@ const RISK_STYLES: Record<SymptomRiskLevel, string> = {
   emergency: "border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-500/40 dark:bg-rose-950/40 dark:text-rose-300"
 };
 
+const ASSISTANT_BUBBLE_BASE_CLASS =
+  "max-w-[86%] rounded-2xl rounded-bl-md border border-slate-300 bg-white px-4 py-3 text-sm text-slate-700 shadow-sm dark:border-slate-600 dark:bg-slate-800/90 dark:text-slate-200";
+const ACTIVE_PROMPT_CLASS = `${ASSISTANT_BUBBLE_BASE_CLASS} font-medium ring-1 ring-brand-300/70 dark:ring-brand-400/60`;
+
 function addSymptomText(currentValue: string, symptom: string) {
   const normalized = currentValue.trim();
   const lower = normalized.toLowerCase();
@@ -214,7 +218,7 @@ export default function SymptomAnalyzerPage() {
 
                 <div className="max-h-[28rem] space-y-3 overflow-y-auto rounded-xl border border-slate-200/80 bg-slate-50/70 p-4 dark:border-slate-700 dark:bg-slate-950/40">
                   <div className="flex justify-start">
-                    <div className="max-w-[86%] rounded-2xl rounded-bl-md border border-slate-300 bg-white px-4 py-3 text-sm leading-6 text-slate-700 shadow-sm dark:border-slate-600 dark:bg-slate-800/90 dark:text-slate-200">
+                    <div className={`${ASSISTANT_BUBBLE_BASE_CLASS} leading-6`}>
                       Thanks for sharing. I&apos;ll guide your intake and summarize your triage level.
                     </div>
                   </div>
@@ -222,7 +226,7 @@ export default function SymptomAnalyzerPage() {
                   {session?.answers.map((item, index) => (
                     <div key={`${item.prompt_text}-${index}`} className="space-y-2">
                       <div className="flex justify-start">
-                        <div className="max-w-[86%] rounded-2xl rounded-bl-md border border-slate-300 bg-white px-4 py-3 text-sm text-slate-700 shadow-sm dark:border-slate-600 dark:bg-slate-800/90 dark:text-slate-200">
+                        <div className={ASSISTANT_BUBBLE_BASE_CLASS}>
                           {item.prompt_text}
                         </div>
                       </div>
@@ -234,7 +238,7 @@ export default function SymptomAnalyzerPage() {
 
                   {!isComplete && activeQuestion ? (
                     <div className="flex justify-start">
-                      <div className="max-w-[86%] rounded-2xl rounded-bl-md border border-slate-300 bg-white px-4 py-3 text-sm font-medium text-slate-700 shadow-sm ring-1 ring-brand-300/70 dark:border-slate-600 dark:bg-slate-800/90 dark:text-slate-200 dark:ring-brand-400/60">
+                      <div className={ACTIVE_PROMPT_CLASS}>
                         {activeQuestion.prompt_text}
                       </div>
                     </div>
