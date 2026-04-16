@@ -26,6 +26,7 @@ const RISK_STYLES: Record<SymptomRiskLevel, string> = {
   emergency: "border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-500/40 dark:bg-rose-950/40 dark:text-rose-300"
 };
 
+// Shared assistant bubble classes keep prompt contrast consistent across states.
 const ASSISTANT_BUBBLE_BASE_CLASS =
   "max-w-[86%] rounded-2xl rounded-bl-md border border-slate-300 bg-white px-4 py-3 text-sm text-slate-700 shadow-sm dark:border-slate-600 dark:bg-slate-800/90 dark:text-slate-200";
 const ACTIVE_PROMPT_CLASS = `${ASSISTANT_BUBBLE_BASE_CLASS} font-medium ring-1 ring-brand-300/70 dark:ring-brand-400/60`;
