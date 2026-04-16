@@ -16,6 +16,7 @@ from app.schemas.analyze import (
     SymptomAnalyzeRequest,
 )
 from app.schemas.auth import AuthLoginRequest, AuthSignupRequest, AuthTokenResponse
+from app.schemas.symptom_intelligence import SymptomInput, SymptomIntakeUpdateRequest, SymptomIntakeUpdateResult
 
 from app.schemas.report import ReportCreate, ReportRead
 from app.schemas.user import UserRead
@@ -32,6 +33,8 @@ from app.services.security import (
     verify_password,
 )
 from app.services.symptom_analyzer import analyze_symptoms_text
+from app.services.symptom_intake_session import update_symptom_intake_session
+from app.services.symptom_intelligence_pipeline import build_symptom_answer_plan
 
 router = APIRouter(prefix="/api", tags=["healthsignal"])
 
@@ -109,6 +112,19 @@ def analyze_symptoms(
         analysis=analysis,
     )
     return analysis
+
+
+@router.post("/analyze/symptoms/intake", response_model=SymptomIntakeUpdateResult)
+def start_symptom_intake(payload: SymptomAnalyzeRequest, current_user: User = Depends(get_current_user)):
+    del current_user
+    answer_plan, intelligence = build_symptom_answer_plan(SymptomInput(symptom_text=payload.symptoms))
+    return SymptomIntakeUpdateResult(session=intelligence["intake_session"], answer_plan=answer_plan)
+
+
+@router.post("/analyze/symptoms/intake/update", response_model=SymptomIntakeUpdateResult)
+def update_symptom_intake(payload: SymptomIntakeUpdateRequest, current_user: User = Depends(get_current_user)):
+    del current_user
+    return update_symptom_intake_session(payload)
 
 
 @router.post("/analyze/notes", response_model=NoteInterpretationResponse)
