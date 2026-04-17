@@ -74,6 +74,11 @@ export default function SymptomAnalyzerPage() {
 
   const canStart = symptoms.trim().length >= 3 && !loading;
   const canSubmitAnswer = Boolean(session && activeQuestion && answer.trim().length > 0 && !updating && !isComplete);
+  const progressFillWidth = useMemo(() => {
+    if (progress <= 0) return "0%";
+    if (progress >= 100) return "100%";
+    return `max(${asPercent(progress)}, 0.5rem)`;
+  }, [progress]);
 
   async function onStartIntake(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -221,8 +226,12 @@ export default function SymptomAnalyzerPage() {
             </h2>
             <span className="text-xs font-medium text-slate-600 dark:text-slate-300">{progress}% complete</span>
           </div>
-          <div className="h-2 rounded-full bg-slate-200 dark:bg-slate-700">
-            <div className="h-2 rounded-full bg-brand-600 transition-all" style={{ width: asPercent(progress) }} />
+          <div className="h-3 overflow-hidden rounded-full border border-slate-200 bg-slate-100 shadow-inner dark:border-slate-700 dark:bg-slate-800">
+            <div
+              className="h-full rounded-full bg-gradient-to-r from-brand-500 via-brand-600 to-cyan-500 shadow-[0_0_14px_rgba(14,116,144,0.45)] transition-[width] duration-500 ease-out"
+              style={{ width: progressFillWidth }}
+              aria-hidden="true"
+            />
           </div>
           {session ? (
             <p className="text-xs text-slate-600 dark:text-slate-300">

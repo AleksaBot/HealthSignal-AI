@@ -22,6 +22,65 @@ function parseJson(value: string) {
   }
 }
 
+function asObject(value: unknown): Record<string, unknown> | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  return value as Record<string, unknown>;
+}
+
+function asStringArray(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return value.filter((item): item is string => typeof item === "string" && item.trim().length > 0);
+}
+
+function asFollowUpRows(value: unknown): Array<{ question: string; answer: string }> {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((item) => asObject(item))
+    .filter((item): item is Record<string, unknown> => Boolean(item))
+    .map((item) => ({
+      question: typeof item.question === "string" ? item.question : "",
+      answer: typeof item.answer === "string" ? item.answer : ""
+    }))
+    .filter((item) => item.question.trim().length > 0 || item.answer.trim().length > 0);
+}
+
+function stringValue(value: unknown) {
+  return typeof value === "string" && value.trim().length > 0 ? value : null;
+}
+
+function formatDate(value: string | null | undefined) {
+  if (!value) return null;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  return date.toLocaleString();
+}
+
+function ReportDataRow({ label, value }: { label: string; value: string | null }) {
+  if (!value) return null;
+  return (
+    <div className="rounded-lg border border-slate-200/90 bg-white/90 px-3 py-2 dark:border-slate-700 dark:bg-slate-900/70">
+      <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">{label}</p>
+      <p className="mt-1 text-sm text-slate-800 dark:text-slate-200">{value}</p>
+    </div>
+  );
+}
+
+function ReportChipList({ items }: { items: string[] }) {
+  if (items.length === 0) return null;
+  return (
+    <div className="mt-2 flex flex-wrap gap-2">
+      {items.map((item) => (
+        <span
+          key={item}
+          className="rounded-full border border-slate-300 bg-white px-3 py-1 text-xs text-slate-700 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-200"
+        >
+          {item}
+        </span>
+      ))}
+    </div>
+  );
+}
+
 export default function HistoryPage() {
   const [reports, setReports] = useState<ReportRead[]>([]);
   const [selectedReport, setSelectedReport] = useState<ReportRead | null>(null);
@@ -30,6 +89,8 @@ export default function HistoryPage() {
   const [loadingReportId, setLoadingReportId] = useState<number | null>(null);
   const parsedInput = selectedReport ? parseJson(selectedReport.input_payload) : null;
   const parsedOutput = selectedReport ? parseJson(selectedReport.output_summary) : null;
+  const isSymptomGuided = selectedReport?.report_type === "symptom-intake-guided";
+  const isNoteInterpreter = selectedReport?.report_type === "note-interpreter-text" || selectedReport?.report_type === "note-interpreter-file";
 
   useEffect(() => {
     async function loadReports() {
@@ -60,6 +121,13 @@ export default function HistoryPage() {
       setLoadingReportId(null);
     }
   }
+
+  const structuredData = asObject(parsedOutput?.structured_data);
+  const outputs = asObject(parsedOutput?.outputs);
+  const extracted = asObject(structuredData?.extracted);
+  const interpretation = asObject(structuredData?.interpretation);
+  const symptomFollowUps = asFollowUpRows(parsedOutput?.follow_up_qa);
+  const noteFollowUps = asFollowUpRows(parsedOutput?.follow_up_qa);
 
   return (
     <RequireAuth>
@@ -158,19 +226,170 @@ export default function HistoryPage() {
               </div>
             </header>
 
-            <section className="space-y-2">
-              <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">Original input & metadata</h3>
-              <pre className="overflow-auto rounded-lg bg-slate-50 p-3 text-xs leading-5 text-slate-700 dark:bg-slate-900/75 dark:text-slate-300">
-                {JSON.stringify(parsedInput ?? selectedReport.input_payload, null, 2)}
-              </pre>
-            </section>
+            {isSymptomGuided ? (
+              <div className="space-y-4">
+                <section className="space-y-3">
+                  <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">Original symptom input</h3>
+                  <p className="rounded-lg border border-slate-200/80 bg-white/90 p-3 text-sm text-slate-700 dark:border-slate-700 dark:bg-slate-900/70 dark:text-slate-200">
+                    {stringValue(parsedInput?.original_input_text) ?? "Not available."}
+                  </p>
+                  <div className="grid gap-2 md:grid-cols-2">
+                    <ReportDataRow label="Saved timestamp" value={formatDate(parsedInput?.completed_at as string) ?? formatDate(selectedReport.created_at)} />
+                    <ReportDataRow label="Risk level" value={stringValue(asObject(outputs?.risk_assessment)?.risk_level)} />
+                  </div>
+                </section>
 
-            <section className="space-y-2">
-              <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">Structured outputs</h3>
-              <pre className="overflow-auto rounded-lg bg-slate-50 p-3 text-xs leading-5 text-slate-700 dark:bg-slate-900/75 dark:text-slate-300">
-                {JSON.stringify(parsedOutput ?? selectedReport.output_summary, null, 2)}
-              </pre>
-            </section>
+                <section className="space-y-2">
+                  <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">Extracted symptoms</h3>
+                  <ReportChipList items={asStringArray(extracted?.primary_symptoms)} />
+                  <div className="grid gap-2 md:grid-cols-3">
+                    <ReportDataRow label="Duration" value={stringValue(extracted?.duration)} />
+                    <ReportDataRow label="Severity" value={stringValue(extracted?.severity)} />
+                    <ReportDataRow label="Location" value={stringValue(extracted?.location_body_area)} />
+                  </div>
+                </section>
+
+                <section className="space-y-2">
+                  <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">Triage recommendation</h3>
+                  <p className="rounded-lg border border-slate-200/80 bg-white/90 p-3 text-sm text-slate-700 dark:border-slate-700 dark:bg-slate-900/70 dark:text-slate-200">
+                    {stringValue(outputs?.triage_recommendation) ?? "Not available."}
+                  </p>
+                  <h4 className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Likely categories</h4>
+                  <ReportChipList items={asStringArray(structuredData?.categories)} />
+                </section>
+
+                <section className="space-y-2">
+                  <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">Follow-up Q&A</h3>
+                  {symptomFollowUps.length > 0 ? (
+                    <div className="space-y-2">
+                      {symptomFollowUps.map((item, index) => (
+                        <div key={`${item.question}-${index}`} className="rounded-xl border border-slate-200/80 bg-white/90 p-3 dark:border-slate-700 dark:bg-slate-900/70">
+                          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Question</p>
+                          <p className="mt-1 text-sm text-slate-800 dark:text-slate-100">{item.question || "Not provided."}</p>
+                          <p className="mt-3 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Answer</p>
+                          <p className="mt-1 text-sm text-slate-700 dark:text-slate-200">{item.answer || "Not provided."}</p>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="rounded-lg border border-slate-200/80 bg-white/80 p-3 text-sm text-slate-600 dark:border-slate-700 dark:bg-slate-900/60 dark:text-slate-300">
+                      No follow-up Q&A saved for this report.
+                    </p>
+                  )}
+                </section>
+              </div>
+            ) : null}
+
+            {isNoteInterpreter ? (
+              <div className="space-y-4">
+                <section className="space-y-3">
+                  <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">Original note input</h3>
+                  <p className="whitespace-pre-wrap rounded-lg border border-slate-200/80 bg-white/90 p-3 text-sm text-slate-700 dark:border-slate-700 dark:bg-slate-900/70 dark:text-slate-200">
+                    {stringValue(parsedInput?.original_input_text) ?? "Not available."}
+                  </p>
+                </section>
+
+                <section className="space-y-2">
+                  <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">Summary</h3>
+                  <p className="rounded-lg border border-slate-200/80 bg-white/90 p-3 text-sm text-slate-700 dark:border-slate-700 dark:bg-slate-900/70 dark:text-slate-200">
+                    {stringValue(interpretation?.plain_english_summary) ?? "Not available."}
+                  </p>
+                </section>
+
+                <section className="grid gap-3 lg:grid-cols-2">
+                  <div className="space-y-2">
+                    <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">Medications / treatments</h3>
+                    {Array.isArray(interpretation?.medicines_treatments) && interpretation?.medicines_treatments.length ? (
+                      <ul className="space-y-2">
+                        {(interpretation?.medicines_treatments as Array<Record<string, unknown>>).map((entry, idx) => (
+                          <li key={`${String(entry.item)}-${idx}`} className="rounded-lg border border-slate-200/80 bg-white/90 p-3 text-sm text-slate-700 dark:border-slate-700 dark:bg-slate-900/70 dark:text-slate-200">
+                            <p className="font-medium text-slate-900 dark:text-slate-100">{stringValue(entry.item) ?? "Treatment"}</p>
+                            <p className="mt-1">{stringValue(entry.explanation) ?? "No explanation provided."}</p>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <p className="rounded-lg border border-slate-200/80 bg-white/80 p-3 text-sm text-slate-600 dark:border-slate-700 dark:bg-slate-900/60 dark:text-slate-300">
+                        No medications or treatments captured.
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="space-y-2">
+                    <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">Terms explained</h3>
+                    {Array.isArray(interpretation?.medical_terms_explained) && interpretation?.medical_terms_explained.length ? (
+                      <ul className="space-y-2">
+                        {(interpretation?.medical_terms_explained as Array<Record<string, unknown>>).map((entry, idx) => (
+                          <li key={`${String(entry.term)}-${idx}`} className="rounded-lg border border-slate-200/80 bg-white/90 p-3 text-sm text-slate-700 dark:border-slate-700 dark:bg-slate-900/70 dark:text-slate-200">
+                            <p className="font-medium text-slate-900 dark:text-slate-100">{stringValue(entry.term) ?? "Medical term"}</p>
+                            <p className="mt-1">{stringValue(entry.plain_english) ?? "No explanation provided."}</p>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <p className="rounded-lg border border-slate-200/80 bg-white/80 p-3 text-sm text-slate-600 dark:border-slate-700 dark:bg-slate-900/60 dark:text-slate-300">
+                        No terms explained in this report.
+                      </p>
+                    )}
+                  </div>
+                </section>
+
+                <section className="space-y-2">
+                  <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">Suggested next steps</h3>
+                  {asStringArray(interpretation?.next_steps).length ? (
+                    <ul className="space-y-2">
+                      {asStringArray(interpretation?.next_steps).map((step) => (
+                        <li key={step} className="rounded-lg border border-slate-200/80 bg-white/90 px-3 py-2 text-sm text-slate-700 dark:border-slate-700 dark:bg-slate-900/70 dark:text-slate-200">
+                          {step}
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="rounded-lg border border-slate-200/80 bg-white/80 p-3 text-sm text-slate-600 dark:border-slate-700 dark:bg-slate-900/60 dark:text-slate-300">
+                      No next-step guidance saved for this report.
+                    </p>
+                  )}
+                </section>
+
+                <section className="space-y-2">
+                  <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">Follow-up chat Q&A</h3>
+                  {noteFollowUps.length > 0 ? (
+                    <div className="space-y-2">
+                      {noteFollowUps.map((item, index) => (
+                        <div key={`${item.question}-${index}`} className="rounded-xl border border-slate-200/80 bg-white/90 p-3 dark:border-slate-700 dark:bg-slate-900/70">
+                          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Question</p>
+                          <p className="mt-1 text-sm text-slate-800 dark:text-slate-100">{item.question || "Not provided."}</p>
+                          <p className="mt-3 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Answer</p>
+                          <p className="mt-1 text-sm text-slate-700 dark:text-slate-200">{item.answer || "Not provided."}</p>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="rounded-lg border border-slate-200/80 bg-white/80 p-3 text-sm text-slate-600 dark:border-slate-700 dark:bg-slate-900/60 dark:text-slate-300">
+                      No follow-up chat transcript saved for this report.
+                    </p>
+                  )}
+                </section>
+              </div>
+            ) : null}
+
+            {!isSymptomGuided && !isNoteInterpreter ? (
+              <>
+                <section className="space-y-2">
+                  <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">Original input & metadata</h3>
+                  <pre className="overflow-auto rounded-lg bg-slate-50 p-3 text-xs leading-5 text-slate-700 dark:bg-slate-900/75 dark:text-slate-300">
+                    {JSON.stringify(parsedInput ?? selectedReport.input_payload, null, 2)}
+                  </pre>
+                </section>
+
+                <section className="space-y-2">
+                  <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">Structured outputs</h3>
+                  <pre className="overflow-auto rounded-lg bg-slate-50 p-3 text-xs leading-5 text-slate-700 dark:bg-slate-900/75 dark:text-slate-300">
+                    {JSON.stringify(parsedOutput ?? selectedReport.output_summary, null, 2)}
+                  </pre>
+                </section>
+              </>
+            ) : null}
           </article>
         ) : null}
       </section>
