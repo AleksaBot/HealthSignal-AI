@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { FormEvent, useMemo, useRef, useState } from "react";
+import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { DisclaimerBanner } from "@/components/DisclaimerBanner";
 import { RequireAuth } from "@/components/RequireAuth";
 import { getUserErrorMessage, saveReport, startSymptomIntake, updateSymptomIntake } from "@/lib/api";
@@ -58,6 +58,7 @@ export default function SymptomAnalyzerPage() {
   const [updating, setUpdating] = useState(false);
   const [saving, setSaving] = useState(false);
   const [savedReportId, setSavedReportId] = useState<number | null>(null);
+  const [summaryFocused, setSummaryFocused] = useState(false);
   const finalSummaryRef = useRef<HTMLElement | null>(null);
 
   const started = Boolean(session);
@@ -65,13 +66,19 @@ export default function SymptomAnalyzerPage() {
 
   const progress = useMemo(() => {
     if (!session) return 0;
-    if (session.is_complete) return 100;
-    const stepShare = session.max_depth > 0 ? session.current_depth / session.max_depth : 0;
-    return Math.round(Math.max(0.1, stepShare) * 100);
+    if (session.is_complete || session.current_depth >= session.max_depth) return 100;
+    if (session.max_depth <= 0) return 0;
+    const stepShare = session.current_depth / session.max_depth;
+    return Math.round(Math.max(0, Math.min(1, stepShare)) * 100);
   }, [session]);
 
   const canStart = symptoms.trim().length >= 3 && !loading;
   const canSubmitAnswer = Boolean(session && activeQuestion && answer.trim().length > 0 && !updating && !isComplete);
+  const progressFillWidth = useMemo(() => {
+    if (progress <= 0) return "0%";
+    if (progress >= 100) return "100%";
+    return `max(${asPercent(progress)}, 0.5rem)`;
+  }, [progress]);
 
   async function onStartIntake(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -145,8 +152,23 @@ export default function SymptomAnalyzerPage() {
   }
 
   function viewFinalSummary() {
-    finalSummaryRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    const summaryEl = finalSummaryRef.current;
+    if (!summaryEl) return;
+
+    const rect = summaryEl.getBoundingClientRect();
+    const isVisible = rect.top >= 0 && rect.bottom <= window.innerHeight;
+
+    summaryEl.scrollIntoView({ behavior: "smooth", block: "start" });
+    if (isVisible) {
+      setSummaryFocused(true);
+    }
   }
+
+  useEffect(() => {
+    if (!summaryFocused) return;
+    const timeout = window.setTimeout(() => setSummaryFocused(false), 1100);
+    return () => window.clearTimeout(timeout);
+  }, [summaryFocused]);
 
   async function onSaveReport() {
     if (!session || !isComplete || saving) return;
@@ -204,8 +226,12 @@ export default function SymptomAnalyzerPage() {
             </h2>
             <span className="text-xs font-medium text-slate-600 dark:text-slate-300">{progress}% complete</span>
           </div>
-          <div className="h-2 rounded-full bg-slate-200 dark:bg-slate-700">
-            <div className="h-2 rounded-full bg-brand-600 transition-all" style={{ width: asPercent(progress) }} />
+          <div className="h-3 overflow-hidden rounded-full border border-slate-200 bg-slate-100 shadow-inner dark:border-slate-700 dark:bg-slate-800">
+            <div
+              className="h-full rounded-full bg-gradient-to-r from-brand-500 via-brand-600 to-cyan-500 shadow-[0_0_14px_rgba(14,116,144,0.45)] transition-[width] duration-500 ease-out"
+              style={{ width: progressFillWidth }}
+              aria-hidden="true"
+            />
           </div>
           {session ? (
             <p className="text-xs text-slate-600 dark:text-slate-300">
@@ -303,7 +329,7 @@ export default function SymptomAnalyzerPage() {
                   ) : null}
 
                   {isComplete ? (
-                    <div className="space-y-3">
+                    <div className="space-y-3 rounded-xl border border-emerald-200/80 bg-gradient-to-r from-emerald-50 to-brand-50 p-4 dark:border-emerald-500/40 dark:from-emerald-950/40 dark:to-brand-950/30">
                       <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800 dark:border-emerald-500/40 dark:bg-emerald-950/40 dark:text-emerald-200">
                         Guided intake complete. Final structured analysis is ready below.
                       </div>
@@ -337,6 +363,19 @@ export default function SymptomAnalyzerPage() {
                           View Final Summary
                         </button>
                       </div>
+                      <p className="text-xs text-slate-600 dark:text-slate-300">
+                        Save your completed report for future review or start a fresh guided intake.
+                      </p>
+                      {error ? (
+                        <p className="rounded-lg bg-rose-50 p-3 text-sm text-rose-700 dark:bg-rose-950/30 dark:text-rose-200">
+                          {error}
+                        </p>
+                      ) : null}
+                      {saveSuccess ? (
+                        <p className="rounded-lg bg-emerald-50 p-3 text-sm text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-200">
+                          {saveSuccess}
+                        </p>
+                      ) : null}
                     </div>
                   ) : null}
                 </div>
@@ -365,12 +404,12 @@ export default function SymptomAnalyzerPage() {
               </section>
             )}
 
-            {error ? (
+            {error && !isComplete ? (
               <p className="rounded-lg bg-rose-50 p-3 text-sm text-rose-700 dark:bg-rose-950/30 dark:text-rose-200">
                 {error}
               </p>
             ) : null}
-            {saveSuccess ? (
+            {saveSuccess && !isComplete ? (
               <p className="rounded-lg bg-emerald-50 p-3 text-sm text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-200">
                 {saveSuccess}
               </p>
@@ -400,7 +439,12 @@ export default function SymptomAnalyzerPage() {
               )}
             </section>
 
-            <section ref={finalSummaryRef} className="premium-card p-5">
+            <section
+              ref={finalSummaryRef}
+              className={`premium-card p-5 transition-all duration-300 ${
+                summaryFocused ? "ring-2 ring-brand-400/80 ring-offset-2 ring-offset-white dark:ring-brand-300/70 dark:ring-offset-slate-900" : ""
+              }`}
+            >
               <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
                 Structured Summary
               </h2>
