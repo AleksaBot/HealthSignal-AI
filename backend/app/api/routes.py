@@ -178,7 +178,14 @@ def analyze_risk(
 
 
 @router.post("/reports", response_model=ReportRead, status_code=status.HTTP_201_CREATED)
-def create_report(payload: ReportCreate, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+def create_report(
+    payload: ReportCreate | ReportSaveRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    if isinstance(payload, ReportSaveRequest):
+        return create_report_from_saved_analysis(db=db, user_id=current_user.id, payload=payload)
+
     report = create_report_entry(
         db=db,
         user_id=current_user.id,
