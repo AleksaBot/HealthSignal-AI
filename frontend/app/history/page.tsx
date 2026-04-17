@@ -468,7 +468,7 @@ function ReportChipList({ items }: { items: string[] }) {
 
 function SectionCard({ title, icon, children }: { title: string; icon?: ReactNode; children: ReactNode }) {
   return (
-    <section className="animate-fade-up space-y-3 rounded-2xl border border-slate-200/80 bg-white/85 p-4 transition duration-300 dark:border-slate-700/80 dark:bg-slate-900/65">
+    <section className="animate-fade-up flex h-full flex-col space-y-2.5 rounded-2xl border border-slate-200/80 bg-white/85 p-3.5 transition duration-300 sm:p-4 dark:border-slate-700/80 dark:bg-slate-900/65">
       <h3 className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300">
         {icon}
         {title}
@@ -560,14 +560,14 @@ export default function HistoryPage() {
 
   return (
     <RequireAuth>
-      <section className="section-shell space-y-6 p-6 md:p-8">
+      <section className="section-shell space-y-5 p-4 sm:p-5 md:space-y-6 md:p-7">
         <div className="ambient-orb -right-12 top-2 h-48 w-48 bg-brand-200/30" />
         <div className="ambient-orb -left-14 bottom-6 h-44 w-44 bg-cyan-200/30" />
 
-        <header className="relative space-y-3 border-b border-slate-200/80 pb-5 dark:border-slate-700/70">
+        <header className="relative space-y-2.5 border-b border-slate-200/80 pb-4 md:pb-5 dark:border-slate-700/70">
           <p className="text-xs font-semibold uppercase tracking-[0.22em] text-brand-700">Reports Workspace</p>
-          <h1 className="text-3xl font-semibold tracking-tight text-slate-900 dark:text-slate-100 md:text-[2.1rem]">Saved Reports</h1>
-          <p className="max-w-2xl text-sm leading-relaxed text-slate-600 dark:text-slate-300 md:text-base">
+          <h1 className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-100 sm:text-3xl md:text-[2.1rem]">Saved Reports</h1>
+          <p className="max-w-2xl text-sm leading-relaxed text-slate-600 dark:text-slate-300">
             Review prior analyses, reopen key findings, and inspect clinically shareable summaries.
           </p>
         </header>
@@ -603,8 +603,16 @@ export default function HistoryPage() {
             </div>
           </div>
         ) : (
-          <div className="relative space-y-3">
-            <h2 className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">Report list</h2>
+          <div className="relative space-y-2.5">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <h2 className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">Report list</h2>
+              <Link
+                href="/symptom-analyzer"
+                className="inline-flex items-center justify-center rounded-lg border border-brand-300/70 bg-brand-50 px-3 py-1.5 text-xs font-semibold text-brand-800 transition hover:-translate-y-0.5 hover:bg-brand-100 dark:border-brand-400/45 dark:bg-brand-950/40 dark:text-brand-200 dark:hover:bg-brand-900/55"
+              >
+                Start New Check
+              </Link>
+            </div>
             <ul className="space-y-3">
               {reports.map((report, index) => {
                 const isActive = selectedReport?.id === report.id;
@@ -620,7 +628,7 @@ export default function HistoryPage() {
                   <li
                     key={report.id}
                     style={{ animationDelay: `${index * 50}ms` }}
-                    className={`premium-card premium-card-interactive animate-fade-up p-4 transition-all duration-300 hover:-translate-y-1 hover:shadow-lg hover:shadow-brand-900/10 ${
+                    className={`premium-card premium-card-interactive animate-fade-up p-3.5 sm:p-4 transition-all duration-300 hover:-translate-y-1 hover:shadow-lg hover:shadow-brand-900/10 ${
                       isActive ? "border-brand-300 ring-2 ring-brand-100 hover:border-brand-300 dark:border-brand-400/70 dark:ring-brand-500/20" : "border-slate-200/90"
                     }`}
                   >
@@ -642,7 +650,7 @@ export default function HistoryPage() {
                         {report.report_type === "symptom-intake-guided" ? <UrgencyMeter report={report} context={context} compact /> : null}
                       </div>
                       <button
-                        className="rounded-lg bg-brand-700 px-3 py-1.5 text-sm font-medium text-white shadow-sm shadow-brand-700/20 transition hover:-translate-y-0.5 hover:bg-brand-600 disabled:opacity-60"
+                        className="w-full rounded-lg bg-brand-700 px-3 py-1.5 text-sm font-medium text-white shadow-sm shadow-brand-700/20 transition hover:-translate-y-0.5 hover:bg-brand-600 disabled:opacity-60 sm:w-auto"
                         onClick={() => viewReport(report.id)}
                         disabled={loadingReportId === report.id}
                       >
@@ -657,8 +665,8 @@ export default function HistoryPage() {
         )}
 
         {selectedReport && selectedContext && selectedTitle ? (
-          <article className="frosted-panel animate-fade-up relative space-y-4 rounded-2xl p-5 [--stagger:120ms]">
-            <header className="space-y-3 rounded-2xl border border-brand-200/70 bg-gradient-to-br from-white/95 via-white/90 to-brand-50/80 p-4 shadow-sm shadow-brand-200/25 dark:border-brand-500/30 dark:from-slate-900/80 dark:via-slate-900/70 dark:to-brand-950/30 dark:shadow-brand-900/20">
+          <article className="frosted-panel animate-fade-up relative space-y-3.5 rounded-2xl p-4 sm:p-5 [--stagger:120ms]">
+            <header className="space-y-2.5 rounded-2xl border border-brand-200/70 bg-gradient-to-br from-white/95 via-white/90 to-brand-50/80 p-3.5 shadow-sm shadow-brand-200/25 sm:p-4 dark:border-brand-500/30 dark:from-slate-900/80 dark:via-slate-900/70 dark:to-brand-950/30 dark:shadow-brand-900/20">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div className="space-y-1.5">
                   <p className="text-xs font-semibold uppercase tracking-[0.2em] text-brand-700 dark:text-brand-300">Report detail</p>
@@ -671,12 +679,12 @@ export default function HistoryPage() {
                 </div>
               </div>
               <p className="text-sm text-slate-600 dark:text-slate-300">{selectedHeaderSummary}</p>
-              <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-200/70 pt-3 text-xs text-slate-500 dark:border-slate-700/70 dark:text-slate-400">
+              <div className="flex flex-wrap items-center justify-between gap-2.5 border-t border-slate-200/70 pt-2.5 text-xs text-slate-500 dark:border-slate-700/70 dark:text-slate-400">
                 <span>
                   Completed: {formatRelativeDate(stringValue(selectedContext.parsedInput?.completed_at) ?? selectedReport.created_at) ?? "Recently"} •{" "}
                   {formatDate(stringValue(selectedContext.parsedInput?.completed_at) ?? selectedReport.created_at) ?? "Unknown"}
                 </span>
-                <div className="flex flex-wrap gap-2">
+                <div className="flex w-full flex-wrap gap-2 sm:w-auto">
                   <button
                     className="rounded-lg border border-brand-300/70 bg-white/90 px-3 py-1.5 text-xs font-medium text-brand-700 transition hover:-translate-y-0.5 hover:border-brand-400 hover:bg-brand-50 dark:border-brand-400/50 dark:bg-slate-900/70 dark:text-brand-200 dark:hover:border-brand-300"
                     onClick={copySummary}
@@ -696,6 +704,12 @@ export default function HistoryPage() {
                   >
                     <span className="inline-flex items-center gap-1.5"><span aria-hidden>💬</span>Share with Doctor</span>
                   </button>
+                  <Link
+                    href="/symptom-analyzer"
+                    className="rounded-lg bg-brand-700 px-3 py-1.5 text-xs font-semibold text-white shadow-sm shadow-brand-700/20 transition hover:-translate-y-0.5 hover:bg-brand-600"
+                  >
+                    Start New Check
+                  </Link>
                 </div>
               </div>
               {copyStatus === "success" ? <p className="text-xs font-medium text-emerald-600 dark:text-emerald-300">Summary copied to clipboard.</p> : null}
@@ -703,14 +717,17 @@ export default function HistoryPage() {
             </header>
 
             {isSymptomGuided ? (
-              <div className="grid gap-3 lg:grid-cols-2">
+              <div className="grid gap-2.5 md:gap-3 lg:grid-cols-2">
                 <SectionCard title="Risk & Triage" icon={<span aria-hidden>🩺</span>}>
                   <div className="space-y-2">
-                    <div className="flex flex-wrap gap-2">
+                    <div className="grid gap-2 sm:grid-cols-3">
                       <ReportDataRow label="Risk level" value={selectedRisk} />
                       <ReportDataRow label="Urgency score" value={selectedUrgency ? `${selectedUrgency.score} / 100` : null} />
                       <ReportDataRow label="Confidence" value={selectedConfidence} />
                     </div>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">
+                      Confidence reflects how complete the captured symptom context is and should be validated with clinical evaluation.
+                    </p>
                     <UrgencyMeter report={selectedReport} context={selectedContext} />
                     <p className="rounded-lg border border-slate-200/80 bg-white/90 p-3 text-sm text-slate-700 dark:border-slate-700 dark:bg-slate-900/70 dark:text-slate-200">
                       {stringValue(selectedContext.outputs?.triage_recommendation) ?? "Not available."}
@@ -793,9 +810,9 @@ export default function HistoryPage() {
                 </SectionCard>
 
                 <SectionCard title="Doctor Visit Prep" icon={<span aria-hidden>🗂️</span>}>
-                  <ul className="space-y-2">
+                  <ul className="space-y-1.5">
                     {selectedVisitPrep.map((item) => (
-                      <li key={item} className="rounded-lg border border-slate-200/80 bg-white/95 px-3 py-2 text-sm text-slate-700 dark:border-slate-700 dark:bg-slate-900/70 dark:text-slate-200">
+                      <li key={item} className="rounded-lg border border-slate-200/80 bg-white/95 px-2.5 py-1.5 text-sm text-slate-700 dark:border-slate-700 dark:bg-slate-900/70 dark:text-slate-200">
                         {item}
                       </li>
                     ))}
