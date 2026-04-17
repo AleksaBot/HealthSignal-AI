@@ -268,5 +268,5 @@ export function getReport(reportId: number) {
 }
 
 export function saveReport(payload: ReportSavePayload) {
-  return postAuthJSON<ReportSavePayload, ReportRead>("/api/reports/save", payload);
+  return postAuthJSON<ReportSavePayload, ReportRead>("/api/reports", payload);
 }
