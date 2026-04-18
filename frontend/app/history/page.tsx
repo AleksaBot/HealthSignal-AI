@@ -103,13 +103,18 @@ function formatReportType(reportType: string) {
   const dictionary: Record<string, string> = {
     "symptom-intake-guided": "Symptom-Guided",
     "note-interpreter-text": "Note Interpreter",
-    "note-interpreter-file": "Note Interpreter (Upload)"
+    "note-interpreter-file": "Note Interpreter (Upload)",
+    "health-profile-risk-insights-v1": "Health Profile Insights Snapshot"
   };
   if (dictionary[reportType]) return dictionary[reportType];
   return reportType
     .split(/[-_]/)
     .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
     .join(" ");
+}
+
+function isHealthProfileInsightsReport(reportType: string) {
+  return reportType === "health-profile-risk-insights-v1";
 }
 
 function parseReportContext(report: ReportRead): ParsedReportContext {
@@ -168,6 +173,16 @@ function getReportDisplayTitle(report: ReportRead, context: ParsedReportContext)
     return "Doctor Note Interpretation";
   }
 
+  if (isHealthProfileInsightsReport(report.report_type)) {
+    const titleOptions = [
+      "Health Profile Risk Snapshot",
+      "Prevention Focus Summary",
+      "Personal Health Risk Snapshot",
+      "Wellness Risk Snapshot"
+    ];
+    return titleOptions[report.id % titleOptions.length];
+  }
+
   return `Report #${report.id}`;
 }
 
@@ -186,6 +201,10 @@ function getHeaderSummary(report: ReportRead, context: ParsedReportContext, repo
     return report.report_type === "note-interpreter-file"
       ? "Doctor note summary generated from uploaded document input."
       : "Doctor note summary with key findings and follow-up guidance.";
+  }
+
+  if (isHealthProfileInsightsReport(report.report_type)) {
+    return "Profile-driven health snapshot highlighting lifestyle and prevention focus.";
   }
 
   return `${reportTitle} saved for longitudinal review.`;
@@ -437,6 +456,37 @@ function buildCopySummary(report: ReportRead, context: ParsedReportContext, repo
     ].join("\n");
   }
 
+  if (isHealthProfileInsightsReport(report.report_type)) {
+    const overall = stringValue(context.outputs?.overall_health_snapshot) ?? "Not specified";
+    const cardiovascularSummary = stringValue(asObject(context.outputs?.cardiovascular_caution)?.summary) ?? "Not specified";
+    const metabolicSummary = stringValue(asObject(context.outputs?.metabolic_weight_caution)?.summary) ?? "Not specified";
+    const lifestyleRisks = asStringArray(context.outputs?.lifestyle_risk_factors);
+    const positiveHabits = asStringArray(context.outputs?.positive_habits);
+    const priorities = asStringArray(context.outputs?.top_priorities_for_improvement);
+    const nextSteps = asStringArray(context.outputs?.suggested_next_steps);
+    return [
+      "HealthSignal AI Profile Insight Summary",
+      `Title: ${reportTitle}`,
+      `Saved: ${savedAt} (${savedRelative})`,
+      "",
+      `Overall Snapshot: ${overall}`,
+      `Cardiovascular Caution: ${cardiovascularSummary}`,
+      `Metabolic / Weight-related Caution: ${metabolicSummary}`,
+      "",
+      "Lifestyle Risk Factors:",
+      ...(lifestyleRisks.length ? lifestyleRisks.map((item) => `- ${item}`) : ["- Not specified"]),
+      "",
+      "Positive Habits:",
+      ...(positiveHabits.length ? positiveHabits.map((item) => `- ${item}`) : ["- Not specified"]),
+      "",
+      "Top Priorities:",
+      ...(priorities.length ? priorities.map((item) => `- ${item}`) : ["- Not specified"]),
+      "",
+      "Suggested Next Steps:",
+      ...(nextSteps.length ? nextSteps.map((item) => `- ${item}`) : ["- Not specified"])
+    ].join("\n");
+  }
+
   return `HealthSignal AI Saved Report\nTitle: ${reportTitle}\nSaved: ${savedAt} (${savedRelative})`;
 }
 
@@ -520,6 +570,7 @@ export default function HistoryPage() {
   const selectedContext = useMemo(() => (selectedReport ? parseReportContext(selectedReport) : null), [selectedReport]);
   const isSymptomGuided = selectedReport?.report_type === "symptom-intake-guided";
   const isNoteInterpreter = selectedReport?.report_type === "note-interpreter-text" || selectedReport?.report_type === "note-interpreter-file";
+  const isHealthProfileInsights = selectedReport ? isHealthProfileInsightsReport(selectedReport.report_type) : false;
 
   const selectedTitle = selectedReport && selectedContext ? getReportDisplayTitle(selectedReport, selectedContext) : null;
   const selectedRisk = selectedContext ? getRiskLevel(selectedContext) : null;
@@ -528,6 +579,7 @@ export default function HistoryPage() {
   const selectedConfidence = selectedContext ? getConfidenceLabel(selectedContext) : null;
   const selectedImmediateCare = selectedContext ? deriveImmediateCareGuidance(selectedContext) : [];
   const selectedVisitPrep = selectedContext ? buildDoctorVisitPrep(selectedContext) : [];
+  const selectedProfileSnapshot = selectedContext ? asObject(selectedContext.structuredData?.profile_snapshot) : null;
 
   const symptomNextSteps = selectedContext ? deriveSymptomNextSteps(selectedContext) : [];
 
@@ -635,7 +687,7 @@ export default function HistoryPage() {
                     <div className="flex flex-wrap items-start justify-between gap-3">
                       <div className="space-y-2">
                         <p className="flex items-center gap-2 text-base font-semibold tracking-tight text-slate-900 dark:text-slate-100">
-                          <span aria-hidden>{report.report_type === "note-interpreter-file" ? "📥" : "📄"}</span>
+                          <span aria-hidden>{report.report_type === "note-interpreter-file" ? "📥" : isHealthProfileInsightsReport(report.report_type) ? "🧬" : "📄"}</span>
                           {title}
                         </p>
                         <p className="text-sm text-slate-600 dark:text-slate-300">{summary}</p>
@@ -705,10 +757,10 @@ export default function HistoryPage() {
                     <span className="inline-flex items-center gap-1.5"><span aria-hidden>💬</span>Share with Doctor</span>
                   </button>
                   <Link
-                    href="/symptom-analyzer"
+                    href={isHealthProfileInsights ? "/profile" : "/symptom-analyzer"}
                     className="rounded-lg bg-brand-700 px-3 py-1.5 text-xs font-semibold text-white shadow-sm shadow-brand-700/20 transition hover:-translate-y-0.5 hover:bg-brand-600"
                   >
-                    Start New Check
+                    {isHealthProfileInsights ? "Open Profile" : "Start New Check"}
                   </Link>
                 </div>
               </div>
@@ -910,7 +962,87 @@ export default function HistoryPage() {
               </div>
             ) : null}
 
-            {!isSymptomGuided && !isNoteInterpreter ? (
+            {isHealthProfileInsights ? (
+              <div className="grid gap-3 lg:grid-cols-2">
+                <SectionCard title="Health Profile Snapshot" icon={<span aria-hidden>🧬</span>}>
+                  <div className="grid gap-2 md:grid-cols-2">
+                    <ReportDataRow label="Age" value={String(selectedProfileSnapshot?.age ?? "") || null} />
+                    <ReportDataRow label="Sex" value={stringValue(selectedProfileSnapshot?.sex)} />
+                    <ReportDataRow label="Activity level" value={stringValue(selectedProfileSnapshot?.activity_level)} />
+                    <ReportDataRow label="Stress level" value={stringValue(selectedProfileSnapshot?.stress_level)} />
+                  </div>
+                </SectionCard>
+
+                <SectionCard title="Overall Health Snapshot" icon={<span aria-hidden>📌</span>}>
+                  <p className="text-sm text-slate-700 dark:text-slate-200">
+                    {stringValue(selectedContext.outputs?.overall_health_snapshot) ?? "Not available."}
+                  </p>
+                </SectionCard>
+
+                <SectionCard title="Cardiovascular Caution" icon={<span aria-hidden>❤️</span>}>
+                  <p className="text-sm text-slate-700 dark:text-slate-200">
+                    {stringValue(asObject(selectedContext.outputs?.cardiovascular_caution)?.summary) ?? "Not available."}
+                  </p>
+                  <ReportChipList items={asStringArray(asObject(selectedContext.outputs?.cardiovascular_caution)?.factors)} />
+                </SectionCard>
+
+                <SectionCard title="Metabolic / Weight-related Caution" icon={<span aria-hidden>⚖️</span>}>
+                  <p className="text-sm text-slate-700 dark:text-slate-200">
+                    {stringValue(asObject(selectedContext.outputs?.metabolic_weight_caution)?.summary) ?? "Not available."}
+                  </p>
+                  <ReportChipList items={asStringArray(asObject(selectedContext.outputs?.metabolic_weight_caution)?.factors)} />
+                </SectionCard>
+
+                <SectionCard title="Lifestyle Risk Factors" icon={<span aria-hidden>🌙</span>}>
+                  <ul className="space-y-2">
+                    {asStringArray(selectedContext.outputs?.lifestyle_risk_factors).map((item) => (
+                      <li key={item} className="rounded-lg border border-slate-200/80 bg-white/90 px-3 py-2 text-sm text-slate-700 dark:border-slate-700 dark:bg-slate-900/70 dark:text-slate-200">
+                        {item}
+                      </li>
+                    ))}
+                  </ul>
+                </SectionCard>
+
+                <SectionCard title="Positive Habits" icon={<span aria-hidden>✅</span>}>
+                  <ul className="space-y-2">
+                    {asStringArray(selectedContext.outputs?.positive_habits).map((item) => (
+                      <li key={item} className="rounded-lg border border-slate-200/80 bg-white/90 px-3 py-2 text-sm text-slate-700 dark:border-slate-700 dark:bg-slate-900/70 dark:text-slate-200">
+                        {item}
+                      </li>
+                    ))}
+                  </ul>
+                </SectionCard>
+
+                <SectionCard title="Top Priorities for Improvement" icon={<span aria-hidden>🎯</span>}>
+                  <ul className="space-y-2">
+                    {asStringArray(selectedContext.outputs?.top_priorities_for_improvement).map((item) => (
+                      <li key={item} className="rounded-lg border border-slate-200/80 bg-white/90 px-3 py-2 text-sm text-slate-700 dark:border-slate-700 dark:bg-slate-900/70 dark:text-slate-200">
+                        {item}
+                      </li>
+                    ))}
+                  </ul>
+                </SectionCard>
+
+                <SectionCard title="Suggested Next Steps" icon={<span aria-hidden>🪜</span>}>
+                  <ul className="space-y-2">
+                    {asStringArray(selectedContext.outputs?.suggested_next_steps).map((item) => (
+                      <li key={item} className="rounded-lg border border-slate-200/80 bg-white/90 px-3 py-2 text-sm text-slate-700 dark:border-slate-700 dark:bg-slate-900/70 dark:text-slate-200">
+                        {item}
+                      </li>
+                    ))}
+                  </ul>
+                </SectionCard>
+
+                <SectionCard title="Saved Timestamp / Metadata" icon={<span aria-hidden>📅</span>}>
+                  <div className="grid gap-2 md:grid-cols-2">
+                    <ReportDataRow label="Saved timestamp" value={formatDate(stringValue(selectedContext.parsedInput?.completed_at) ?? selectedReport.created_at)} />
+                    <ReportDataRow label="Report type" value={formatReportType(selectedReport.report_type)} />
+                  </div>
+                </SectionCard>
+              </div>
+            ) : null}
+
+            {!isSymptomGuided && !isNoteInterpreter && !isHealthProfileInsights ? (
               <>
                 <section className="space-y-2">
                   <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">Original input & metadata</h3>

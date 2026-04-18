@@ -69,6 +69,7 @@ export default function ProfilePage() {
   const [generating, setGenerating] = useState(false);
   const [savingReport, setSavingReport] = useState(false);
   const [savedReportId, setSavedReportId] = useState<number | null>(null);
+  const [copyStatus, setCopyStatus] = useState<"idle" | "success" | "error">("idle");
 
   const completion = useMemo(() => profileCompletion(profile), [profile]);
 
@@ -119,6 +120,39 @@ export default function ProfilePage() {
       setError(getUserErrorMessage(err, "Unable to generate insights yet. Make sure age, height, and weight are saved."));
     } finally {
       setGenerating(false);
+    }
+  }
+
+  async function onCopySummary() {
+    if (!insights) return;
+    const savedAt = insights.generated_at ? new Date(insights.generated_at).toLocaleString() : "Unknown";
+    const summary = [
+      "HealthSignal AI Profile Insight Summary",
+      `Saved: ${savedAt}`,
+      `Overall Snapshot: ${insights.overall_health_snapshot}`,
+      `Cardiovascular Caution: ${insights.cardiovascular_caution.summary}`,
+      `Metabolic / Weight-related Caution: ${insights.metabolic_weight_caution.summary}`,
+      "",
+      "Lifestyle Risk Factors:",
+      ...(insights.lifestyle_risk_factors.length ? insights.lifestyle_risk_factors.map((item) => `- ${item}`) : ["- None noted"]),
+      "",
+      "Positive Habits:",
+      ...(insights.positive_habits.length ? insights.positive_habits.map((item) => `- ${item}`) : ["- None noted"]),
+      "",
+      "Top Priorities:",
+      ...(insights.top_priorities_for_improvement.length ? insights.top_priorities_for_improvement.map((item) => `- ${item}`) : ["- None noted"]),
+      "",
+      "Suggested Next Steps:",
+      ...(insights.suggested_next_steps.length ? insights.suggested_next_steps.map((item) => `- ${item}`) : ["- None noted"])
+    ].join("\n");
+
+    try {
+      await navigator.clipboard.writeText(summary);
+      setCopyStatus("success");
+      window.setTimeout(() => setCopyStatus("idle"), 2500);
+    } catch {
+      setCopyStatus("error");
+      window.setTimeout(() => setCopyStatus("idle"), 2500);
     }
   }
 
@@ -179,8 +213,10 @@ export default function ProfilePage() {
 
         <div className="relative space-y-3 border-b border-slate-200/80 pb-5 dark:border-slate-700/70">
           <p className="text-xs font-semibold uppercase tracking-[0.22em] text-brand-700">Health Profile</p>
-          <h1 className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">Personal baseline + risk insights</h1>
-          <p className="max-w-3xl text-sm text-slate-600 dark:text-slate-300">Keep a simple health baseline, then generate practical educational insights. No diagnosis, no complex clinical calculator feel.</p>
+          <h1 className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">Your Health Profile Dashboard</h1>
+          <p className="max-w-3xl text-sm text-slate-600 dark:text-slate-300">
+            Keep your profile up to date as a living baseline. Risk Insights are refreshed from your saved profile, and reports are optional archived snapshots.
+          </p>
         </div>
 
         <div className="grid gap-4 md:grid-cols-3">
@@ -241,10 +277,8 @@ export default function ProfilePage() {
 
         <div className="flex flex-wrap gap-3">
           <button className="rounded-lg bg-brand-700 px-4 py-2 text-sm font-medium text-white disabled:opacity-60" onClick={onSaveProfile} disabled={saving}>{saving ? "Saving..." : "Save Profile"}</button>
-          <button className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 disabled:opacity-60 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-200" onClick={onGenerateInsights} disabled={generating}>{generating ? "Generating..." : "Generate Risk Insights"}</button>
-          {savedReportId ? (
-            <Link href="/history" className="rounded-lg border border-brand-300 bg-brand-50 px-4 py-2 text-sm font-medium text-brand-800 dark:border-brand-700 dark:bg-brand-950/40 dark:text-brand-200">View Saved Reports</Link>
-          ) : null}
+          <button className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 disabled:opacity-60 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-200" onClick={onGenerateInsights} disabled={generating}>{generating ? "Refreshing..." : "Refresh Insights"}</button>
+          <Link href="/history" className="rounded-lg border border-brand-300/80 bg-brand-50/90 px-4 py-2 text-sm font-medium text-brand-800 transition hover:-translate-y-0.5 hover:bg-brand-100 dark:border-brand-400/50 dark:bg-brand-950/30 dark:text-brand-200 dark:hover:bg-brand-900/45">View Reports</Link>
         </div>
 
         {saveMessage ? <p className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800 dark:border-emerald-900 dark:bg-emerald-950/20 dark:text-emerald-200">{saveMessage}</p> : null}
@@ -257,9 +291,26 @@ export default function ProfilePage() {
                 <p className="text-xs font-semibold uppercase tracking-[0.18em] text-brand-700">Risk Insights</p>
                 <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100">Overall Health Snapshot</h2>
                 <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">{insights.overall_health_snapshot}</p>
+                <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">These insights are generated from your latest saved Health Profile baseline.</p>
               </div>
-              <button className="rounded-lg bg-brand-700 px-4 py-2 text-sm font-medium text-white disabled:opacity-60" onClick={onSaveReport} disabled={savingReport || savedReportId !== null}>{savedReportId ? "Report Saved" : savingReport ? "Saving Report..." : "Save as Report"}</button>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  className="rounded-lg border border-brand-300/80 bg-brand-50/90 px-4 py-2 text-sm font-medium text-brand-800 transition hover:-translate-y-0.5 hover:bg-brand-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-brand-400/50 dark:bg-brand-950/30 dark:text-brand-200 dark:hover:bg-brand-900/45"
+                  onClick={onCopySummary}
+                >
+                  Copy Summary
+                </button>
+                <button
+                  className="rounded-lg bg-brand-700 px-4 py-2 text-sm font-medium text-white shadow-sm shadow-brand-700/25 transition hover:-translate-y-0.5 hover:bg-brand-600 disabled:cursor-not-allowed disabled:opacity-60"
+                  onClick={onSaveReport}
+                  disabled={savingReport || savedReportId !== null}
+                >
+                  {savedReportId ? "Snapshot Saved" : savingReport ? "Saving Snapshot..." : "Save Snapshot to Reports"}
+                </button>
+              </div>
             </div>
+            {copyStatus === "success" ? <p className="text-xs font-medium text-emerald-600 dark:text-emerald-300">Summary copied to clipboard.</p> : null}
+            {copyStatus === "error" ? <p className="text-xs font-medium text-rose-600 dark:text-rose-300">Unable to copy summary right now.</p> : null}
 
             <div className="grid gap-4 md:grid-cols-2">
               <article className={`rounded-xl border p-4 ${levelClasses(insights.cardiovascular_caution.level)}`}>
