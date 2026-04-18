@@ -14,9 +14,9 @@ const quickActions = [
     href: "/note-interpreter"
   },
   {
-    title: "Risk Form",
-    description: "Run focused risk estimation workflows from structured health measurements.",
-    href: "/risk-form"
+    title: "Health Profile + Risk Insights",
+    description: "Save your baseline profile and generate practical educational risk insights.",
+    href: "/profile"
   },
   {
     title: "Report History",
@@ -26,7 +26,7 @@ const quickActions = [
 ] as const;
 
 const statCards = [
-  { label: "Active Workflows", value: "3", context: "Analyzer, Notes, Risk" },
+  { label: "Active Workflows", value: "3", context: "Analyzer, Notes, Profile Insights" },
   { label: "Shortcuts", value: "4", context: "Operational modules" },
   { label: "Workspace Mode", value: "Operational", context: "Control panel enabled" }
 ] as const;

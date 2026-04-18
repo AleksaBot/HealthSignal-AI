@@ -146,6 +146,44 @@ export type RiskInsightRequest = {
   ldl_cholesterol: number;
 };
 
+export type HealthProfile = {
+  age: number | null;
+  sex: "female" | "male" | "non_binary" | "other" | "prefer_not_to_say" | null;
+  height_cm: number | null;
+  weight_kg: number | null;
+  activity_level: "low" | "moderate" | "active" | "very_active" | null;
+  smoking_vaping_status: "none" | "former" | "occasional" | "daily" | null;
+  alcohol_frequency: "never" | "monthly" | "weekly" | "several_times_weekly" | "daily" | null;
+  sleep_average_hours: number | null;
+  stress_level: "low" | "moderate" | "high" | "very_high" | null;
+  known_conditions: string[];
+  current_medications: string[];
+  family_history: string[];
+  systolic_bp: number | null;
+  diastolic_bp: number | null;
+  total_cholesterol: number | null;
+  updated_at?: string | null;
+};
+
+export type HealthRiskSection = {
+  level: "positive" | "watch" | "caution";
+  summary: string;
+  factors: string[];
+};
+
+export type HealthRiskInsightsResponse = {
+  generated_at: string;
+  profile_snapshot: HealthProfile;
+  overall_health_snapshot: string;
+  cardiovascular_caution: HealthRiskSection;
+  metabolic_weight_caution: HealthRiskSection;
+  lifestyle_risk_factors: string[];
+  positive_habits: string[];
+  top_priorities_for_improvement: string[];
+  suggested_next_steps: string[];
+  disclaimer: string;
+};
+
 export type ReportRead = {
   id: number;
   user_id: number;

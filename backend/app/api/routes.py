@@ -16,10 +16,13 @@ from app.schemas.analyze import (
     SymptomAnalyzeRequest,
 )
 from app.schemas.auth import AuthLoginRequest, AuthSignupRequest, AuthTokenResponse
+from app.schemas.health_profile import HealthProfileRead, HealthProfileUpdateRequest, HealthRiskInsightsResponse
 from app.schemas.symptom_intelligence import SymptomInput, SymptomIntakeUpdateRequest, SymptomIntakeUpdateResult
 
 from app.schemas.report import ReportCreate, ReportRead, ReportSaveRequest
 from app.schemas.user import UserRead
+from app.services.health_profile_service import get_health_profile_for_user, update_health_profile_for_user
+from app.services.health_risk_insights import build_health_risk_insights
 from app.services.note_interpreter import answer_note_follow_up, interpret_note
 from app.services.note_file_parser import FileParsingError, extract_text_from_upload
 from app.services.report_service import (
@@ -99,6 +102,33 @@ def auth_login(payload: AuthLoginRequest, db: Session = Depends(get_db)):
 @router.get("/auth/me", response_model=UserRead)
 def auth_me(current_user: User = Depends(get_current_user)):
     return current_user
+
+
+
+
+@router.get("/profile/health", response_model=HealthProfileRead)
+def get_health_profile(current_user: User = Depends(get_current_user)):
+    return get_health_profile_for_user(current_user)
+
+
+@router.put("/profile/health", response_model=HealthProfileRead)
+def update_health_profile(
+    payload: HealthProfileUpdateRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    return update_health_profile_for_user(db=db, user=current_user, payload=payload)
+
+
+@router.post("/profile/health/insights", response_model=HealthRiskInsightsResponse)
+def generate_health_profile_insights(current_user: User = Depends(get_current_user)):
+    profile = get_health_profile_for_user(current_user)
+    if not profile.age or not profile.height_cm or not profile.weight_kg:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Complete age, height, and weight in your Health Profile before generating insights.",
+        )
+    return build_health_risk_insights(profile)
 
 
 @router.post("/analyze/symptoms", response_model=AnalysisResponse)
