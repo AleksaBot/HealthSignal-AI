@@ -78,7 +78,7 @@ export default function HealthTrendsPage() {
             <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100">No trend history yet</h2>
             <p className="text-sm text-slate-600 dark:text-slate-300">Save your first profile insight snapshot to start tracking changes over time.</p>
             <div className="flex flex-wrap gap-3">
-              <Link href="/profile" className="rounded-lg bg-brand-700 px-4 py-2 text-sm font-medium text-white">Open My Health Profile</Link>
+              <Link href="/profile" className="rounded-lg bg-brand-700 px-4 py-2 text-sm font-medium text-white">Open My Health</Link>
               <Link href="/profile" className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100">Refresh Risk Insights</Link>
               <Link href="/symptom-analyzer" className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100">Start Symptom Check</Link>
               <Link href="/history" className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100">Review Reports</Link>
@@ -135,7 +135,7 @@ export default function HealthTrendsPage() {
                 <article className="premium-card p-5">
                   <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Suggested actions</h2>
                   <div className="mt-3 grid gap-2">
-                    <Link href="/profile" className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100">Update My Health Profile</Link>
+                    <Link href="/profile" className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100">Update My Health Baseline</Link>
                     <Link href="/profile" className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100">Refresh Risk Insights</Link>
                     <Link href="/history" className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100">Review Reports</Link>
                     <Link href="/symptom-analyzer" className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100">Run Symptom Analyzer</Link>

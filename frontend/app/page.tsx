@@ -7,22 +7,28 @@ import { clearToken, getCurrentUser, isLoggedIn } from "@/lib/api";
 
 const modules = [
   {
-    title: "Symptom Analyzer",
-    description: "Extract clinical signals, prioritize red flags, and convert free-text symptoms into structured observations.",
-    href: "/symptom-analyzer",
-    cta: "Launch Analyzer"
+    title: "Dashboard",
+    description: "Use your overview hub for quick actions across analyzers, note interpretation, and key health workflows.",
+    href: "/",
+    cta: "Stay on Dashboard"
   },
   {
-    title: "Note Interpreter",
-    description: "Transform care notes into readable summaries with key findings, follow-up context, and decision-support framing.",
-    href: "/note-interpreter",
-    cta: "Interpret Notes"
+    title: "My Health",
+    description: "Maintain your personal baseline and generate live risk insights from your saved profile data.",
+    href: "/profile",
+    cta: "Open My Health"
   },
   {
     title: "Health Trends",
-    description: "Review longitudinal snapshot patterns across your saved profile insights and report history.",
+    description: "Review longitudinal patterns across baseline updates, insights snapshots, and completed analyses.",
     href: "/health-trends",
-    cta: "Open Trends"
+    cta: "Open Health Trends"
+  },
+  {
+    title: "Reports",
+    description: "Access saved snapshots and prior workflow outputs for historical review and follow-up decisions.",
+    href: "/history",
+    cta: "Open Reports"
   }
 ] as const;
 
@@ -56,33 +62,33 @@ export default function HomePage() {
 
       <div className="relative space-y-6">
         <p className="inline-flex rounded-full border border-brand-200/80 bg-brand-50/85 px-3 py-1 text-xs font-medium uppercase tracking-[0.2em] text-brand-700 dark:border-sky-400/35 dark:bg-slate-900/65 dark:text-sky-300 dark:shadow-[0_0_0_1px_rgba(56,189,248,0.08),0_10px_24px_-18px_rgba(56,189,248,0.85)] dark:backdrop-blur-sm">
-          Clinical Command Center
+          Dashboard
         </p>
 
         <div className="grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
           <div className="space-y-5">
-            <h1 className="text-4xl font-semibold tracking-tight text-slate-900 dark:text-slate-100 md:text-5xl">Premium clinical intelligence workspace.</h1>
+            <h1 className="text-4xl font-semibold tracking-tight text-slate-900 dark:text-slate-100 md:text-5xl">Premium health intelligence dashboard.</h1>
             <p className="max-w-2xl text-sm leading-relaxed text-slate-600 dark:text-slate-300 md:text-base">
-              HealthSignal AI keeps your baseline profile, live Risk Insights interpretation, and longitudinal Health Trends in one polished environment.
+              HealthSignal AI keeps your overview, personal baseline with live insights, longitudinal trends, and report history in one polished environment.
             </p>
 
             {authenticated ? (
               <div className="space-y-4 rounded-2xl border border-emerald-200/70 bg-emerald-50/70 p-4 dark:border-emerald-400/30 dark:bg-emerald-900/20">
                 <p className="text-sm font-medium text-emerald-800 dark:text-emerald-100">
-                  {firstName ? `Welcome back, ${firstName}.` : "Welcome back."} Your command center is ready.
+                  {firstName ? `Welcome back, ${firstName}.` : "Welcome back."} Your dashboard is ready.
                 </p>
                 <div className="flex flex-wrap gap-3">
                   <Link
-                    href="/dashboard"
+                    href="/"
                     className="rounded-lg bg-brand-700 px-4 py-2 text-sm font-medium text-white shadow-md shadow-brand-700/25 transition hover:-translate-y-0.5 hover:bg-brand-600"
                   >
-                    Open Operations
+                    Open Dashboard
                   </Link>
                   <Link
                     href="/profile"
                     className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:-translate-y-0.5 hover:border-slate-400 hover:shadow-sm dark:border-slate-600 dark:bg-slate-900/80 dark:text-slate-200 dark:hover:border-slate-500"
                   >
-                    Open My Health Profile
+                    Open My Health
                   </Link>
                 </div>
               </div>
@@ -107,9 +113,9 @@ export default function HomePage() {
           <div className="frosted-panel animate-fade-up space-y-3 rounded-2xl p-5 [--stagger:100ms]">
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">Workspace Signal</p>
             <div className="space-y-2 text-sm text-slate-600 dark:text-slate-300">
-              <p>• My Health Profile is your source-of-truth baseline.</p>
-              <p>• Risk Insights are generated from your saved baseline profile.</p>
-              <p>• Health Trends tracks longitudinal patterns across snapshots and reports.</p>
+              <p>• My Health combines your profile baseline and live insights.</p>
+              <p>• Health Trends provides your longitudinal view over time.</p>
+              <p>• Reports stores your saved snapshots and workflow history.</p>
             </div>
           </div>
         </div>
@@ -117,7 +123,7 @@ export default function HomePage() {
 
       <DisclaimerBanner compact />
 
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="grid gap-4 md:grid-cols-2">
         {modules.map((card, index) => (
           <Link
             key={card.title}
