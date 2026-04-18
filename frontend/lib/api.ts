@@ -3,6 +3,8 @@ import {
   AuthLoginRequest,
   AuthTokenResponse,
   AuthSignupRequest,
+  HealthProfile,
+  HealthRiskInsightsResponse,
   NoteFileAnalysisResponse,
   NoteFollowUpRequest,
   NoteFollowUpResponse,
@@ -270,3 +272,20 @@ export function getReport(reportId: number) {
 export function saveReport(payload: ReportSavePayload) {
   return postAuthJSON<ReportSavePayload, ReportRead>("/api/reports", payload);
 }
+
+export function getHealthProfile() {
+  return getAuthJSON<HealthProfile>("/api/profile/health");
+}
+
+export function upsertHealthProfile(payload: HealthProfile) {
+  return request<HealthProfile>("/api/profile/health", {
+    method: "PUT",
+    body: JSON.stringify(payload),
+    authRequired: true
+  });
+}
+
+export function generateHealthInsights() {
+  return postAuthJSON<Record<string, never>, HealthRiskInsightsResponse>("/api/profile/health/insights", {});
+}
+
