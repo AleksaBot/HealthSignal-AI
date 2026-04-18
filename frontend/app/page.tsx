@@ -19,10 +19,10 @@ const modules = [
     cta: "Interpret Notes"
   },
   {
-    title: "Risk Form",
-    description: "Run structured stroke, cardiometabolic, and chronic risk estimations in a transparent workflow.",
-    href: "/risk-form",
-    cta: "Run Risk Workflow"
+    title: "Health Trends",
+    description: "Review longitudinal snapshot patterns across your saved profile insights and report history.",
+    href: "/health-trends",
+    cta: "Open Trends"
   }
 ] as const;
 
@@ -63,8 +63,7 @@ export default function HomePage() {
           <div className="space-y-5">
             <h1 className="text-4xl font-semibold tracking-tight text-slate-900 dark:text-slate-100 md:text-5xl">Premium clinical intelligence workspace.</h1>
             <p className="max-w-2xl text-sm leading-relaxed text-slate-600 dark:text-slate-300 md:text-base">
-              HealthSignal AI brings symptom analysis, note interpretation, and risk workflows into one polished environment designed for
-              focused, educational decision support.
+              HealthSignal AI keeps your baseline profile, live Risk Insights interpretation, and longitudinal Health Trends in one polished environment.
             </p>
 
             {authenticated ? (
@@ -77,13 +76,13 @@ export default function HomePage() {
                     href="/dashboard"
                     className="rounded-lg bg-brand-700 px-4 py-2 text-sm font-medium text-white shadow-md shadow-brand-700/25 transition hover:-translate-y-0.5 hover:bg-brand-600"
                   >
-                    Open Operations Dashboard
+                    Open Operations
                   </Link>
                   <Link
-                    href="/history"
+                    href="/profile"
                     className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:-translate-y-0.5 hover:border-slate-400 hover:shadow-sm dark:border-slate-600 dark:bg-slate-900/80 dark:text-slate-200 dark:hover:border-slate-500"
                   >
-                    Review Recent Reports
+                    Open My Health Profile
                   </Link>
                 </div>
               </div>
@@ -108,9 +107,9 @@ export default function HomePage() {
           <div className="frosted-panel animate-fade-up space-y-3 rounded-2xl p-5 [--stagger:100ms]">
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">Workspace Signal</p>
             <div className="space-y-2 text-sm text-slate-600 dark:text-slate-300">
-              <p>• Educational support only, with transparent interpretation layers.</p>
-              <p>• Designed for quick triage framing and longitudinal report review.</p>
-              <p>• Secure authentication required for saved report workflows.</p>
+              <p>• My Health Profile is your source-of-truth baseline.</p>
+              <p>• Risk Insights are generated from your saved baseline profile.</p>
+              <p>• Health Trends tracks longitudinal patterns across snapshots and reports.</p>
             </div>
           </div>
         </div>
