@@ -39,7 +39,7 @@ export default function AuthPage() {
         const token = await login({ email, password });
         saveToken(token.access_token);
         setMessage("Log in successful. Redirecting to dashboard...");
-        router.push("/dashboard");
+        router.push("/");
       }
     } catch (err) {
       setError(getUserErrorMessage(err));

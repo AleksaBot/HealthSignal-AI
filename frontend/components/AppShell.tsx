@@ -8,10 +8,10 @@ import { ThemeSelector } from "@/components/ThemeSelector";
 import { applyTheme, readStoredThemePreference, THEME_STORAGE_KEY, ThemePreference } from "@/lib/theme";
 
 const navItems = [
-  { href: "/", label: "Command Center" },
-  { href: "/dashboard", label: "Operations" },
-  { href: "/health-trends", label: "Health Trends" },
-  { href: "/history", label: "Reports" }
+  { href: "/", label: "Dashboard", emphasis: false },
+  { href: "/profile", label: "My Health", emphasis: true },
+  { href: "/health-trends", label: "Health Trends", emphasis: false },
+  { href: "/history", label: "Reports", emphasis: false }
 ] as const;
 
 export function AppShell({ children }: { children: ReactNode }) {
@@ -122,7 +122,7 @@ export function AppShell({ children }: { children: ReactNode }) {
     return "HS";
   }, [displayName, email]);
 
-  const profileLabel = displayName ?? "My Health Profile";
+  const profileLabel = displayName ?? "Account";
 
   return (
     <div className="site-backdrop">
@@ -141,16 +141,16 @@ export function AppShell({ children }: { children: ReactNode }) {
             {navItems.map((item) => {
               const active = pathname === item.href;
 
+              const classes = item.emphasis
+                ? active
+                  ? "rounded-full border border-brand-500/70 bg-gradient-to-r from-brand-700 to-cyan-600 px-4 py-1.5 font-medium text-white shadow-md shadow-brand-700/35"
+                  : "rounded-full border border-brand-200/90 bg-brand-50/85 px-4 py-1.5 font-medium text-brand-700 transition hover:border-brand-300 hover:bg-brand-100/90 dark:border-brand-500/35 dark:bg-brand-900/35 dark:text-brand-200 dark:hover:border-brand-400/60 dark:hover:bg-brand-900/55"
+                : active
+                  ? "rounded-full bg-brand-700 px-4 py-1.5 text-white shadow-md shadow-brand-700/25"
+                  : "rounded-full px-4 py-1.5 text-slate-600 transition hover:bg-slate-100 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white";
+
               return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  className={`rounded-full px-4 py-1.5 transition ${
-                    active
-                      ? "bg-brand-700 text-white shadow-md shadow-brand-700/25"
-                      : "text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white"
-                  }`}
-                >
+                <Link key={item.href} href={item.href} className={classes}>
                   {item.label}
                 </Link>
               );
@@ -177,11 +177,11 @@ export function AppShell({ children }: { children: ReactNode }) {
                     </div>
                     <div className="mt-2 space-y-1">
                       <Link
-                        href="/profile"
+                        href="/account"
                         className="block rounded-lg px-3 py-2 text-sm text-slate-700 transition hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800"
                         onClick={() => setMenuOpen(false)}
                       >
-                        My Health Profile
+                        Account
                       </Link>
                       <Link
                         href="/settings"
@@ -202,7 +202,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                       type="button"
                       className="w-full rounded-lg px-3 py-2 text-left text-sm font-medium text-rose-600 transition hover:bg-rose-50 dark:hover:bg-rose-950/30"
                     >
-                      Logout
+                      Sign out
                     </button>
                   </div>
                 ) : null}
