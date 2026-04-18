@@ -71,7 +71,7 @@ export default function ProfilePage() {
   const [savedReportId, setSavedReportId] = useState<number | null>(null);
   const [copyStatus, setCopyStatus] = useState<"idle" | "success" | "error">("idle");
 
-  const completion = useMemo(() => profileCompletion(profile), [profile]);
+  const completionPercent = useMemo(() => profileCompletion(profile), [profile]);
 
   useEffect(() => {
     async function loadProfile() {
@@ -222,9 +222,12 @@ export default function ProfilePage() {
         <div className="grid gap-4 md:grid-cols-3">
           <article className="premium-card p-4 md:col-span-2">
             <p className="text-xs uppercase tracking-[0.15em] text-slate-500 dark:text-slate-400">Profile completion</p>
-            <p className="mt-2 text-3xl font-semibold text-slate-900 dark:text-slate-100">{completion}%</p>
+            <p className="mt-2 text-3xl font-semibold text-slate-900 dark:text-slate-100">{completionPercent}%</p>
             <div className="mt-3 h-2 rounded-full bg-slate-200 dark:bg-slate-800">
-              <div className="h-2 rounded-full bg-brand-600 transition-all" style={{ width: `${completion}%` }} />
+              <div
+                className="h-2 rounded-full bg-gradient-to-r from-blue-500 to-cyan-400 transition-all duration-500 ease-out"
+                style={{ width: `${completionPercent}%` }}
+              />
             </div>
             <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">Complete key basics for better quality insights.</p>
           </article>
@@ -277,8 +280,8 @@ export default function ProfilePage() {
 
         <div className="flex flex-wrap gap-3">
           <button className="rounded-lg bg-brand-700 px-4 py-2 text-sm font-medium text-white disabled:opacity-60" onClick={onSaveProfile} disabled={saving}>{saving ? "Saving..." : "Save Profile"}</button>
-          <button className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 disabled:opacity-60 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-200" onClick={onGenerateInsights} disabled={generating}>{generating ? "Refreshing..." : "Refresh Insights"}</button>
-          <Link href="/history" className="rounded-lg border border-brand-300/80 bg-brand-50/90 px-4 py-2 text-sm font-medium text-brand-800 transition hover:-translate-y-0.5 hover:bg-brand-100 dark:border-brand-400/50 dark:bg-brand-950/30 dark:text-brand-200 dark:hover:bg-brand-900/45">View Reports</Link>
+          <button className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:-translate-y-0.5 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700 dark:disabled:border-slate-800 dark:disabled:bg-slate-900 dark:disabled:text-slate-500" onClick={onGenerateInsights} disabled={generating}>{generating ? "Refreshing..." : "Refresh Insights"}</button>
+          <Link href="/history" className="rounded-lg border border-brand-300/80 bg-brand-50/90 px-4 py-2 text-sm font-medium text-brand-800 transition hover:-translate-y-0.5 hover:bg-brand-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700">View Reports</Link>
         </div>
 
         {saveMessage ? <p className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800 dark:border-emerald-900 dark:bg-emerald-950/20 dark:text-emerald-200">{saveMessage}</p> : null}
@@ -295,13 +298,13 @@ export default function ProfilePage() {
               </div>
               <div className="flex flex-wrap gap-2">
                 <button
-                  className="rounded-lg border border-brand-300/80 bg-brand-50/90 px-4 py-2 text-sm font-medium text-brand-800 transition hover:-translate-y-0.5 hover:bg-brand-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-brand-400/50 dark:bg-brand-950/30 dark:text-brand-200 dark:hover:bg-brand-900/45"
+                  className="rounded-lg border border-brand-300/80 bg-brand-50/90 px-4 py-2 text-sm font-medium text-brand-800 transition hover:-translate-y-0.5 hover:bg-brand-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700 dark:disabled:border-slate-800 dark:disabled:bg-slate-900 dark:disabled:text-slate-500"
                   onClick={onCopySummary}
                 >
                   Copy Summary
                 </button>
                 <button
-                  className="rounded-lg bg-brand-700 px-4 py-2 text-sm font-medium text-white shadow-sm shadow-brand-700/25 transition hover:-translate-y-0.5 hover:bg-brand-600 disabled:cursor-not-allowed disabled:opacity-60"
+                  className="rounded-lg bg-brand-700 px-4 py-2 text-sm font-medium text-white shadow-sm shadow-brand-700/25 transition hover:-translate-y-0.5 hover:bg-brand-600 disabled:cursor-not-allowed disabled:opacity-60 dark:disabled:border dark:disabled:border-slate-800 dark:disabled:bg-slate-900 dark:disabled:text-slate-500"
                   onClick={onSaveReport}
                   disabled={savingReport || savedReportId !== null}
                 >
