@@ -116,6 +116,7 @@ function getProfileSnapshots(reports: ReportRead[]) {
         stress_level: (profileSnapshot.stress_level as StressLevel) ?? null,
         known_conditions: Array.isArray(profileSnapshot.known_conditions) ? (profileSnapshot.known_conditions as string[]) : [],
         current_medications: Array.isArray(profileSnapshot.current_medications) ? (profileSnapshot.current_medications as string[]) : [],
+        medications: Array.isArray(profileSnapshot.medications) ? (profileSnapshot.medications as HealthProfile["medications"]) : [],
         family_history: Array.isArray(profileSnapshot.family_history) ? (profileSnapshot.family_history as string[]) : [],
         systolic_bp: (profileSnapshot.systolic_bp as number | null) ?? null,
         diastolic_bp: (profileSnapshot.diastolic_bp as number | null) ?? null,

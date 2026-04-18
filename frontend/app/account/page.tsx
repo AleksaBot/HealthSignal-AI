@@ -42,7 +42,7 @@ export default function AccountPage() {
         <div className="space-y-2 border-b border-slate-200/80 pb-4 dark:border-slate-700/70">
           <p className="text-xs font-semibold uppercase tracking-[0.22em] text-brand-700">Account</p>
           <h1 className="text-3xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">Account overview</h1>
-          <p className="max-w-2xl text-sm text-slate-600 dark:text-slate-300">Manage your user identity and workspace-level account settings from this menu.</p>
+          <p className="max-w-2xl text-sm text-slate-600 dark:text-slate-300">Manage your account identity and quickly return to your health workflows.</p>
         </div>
 
         {loading ? <p className="text-sm text-slate-600 dark:text-slate-300">Loading account...</p> : null}
@@ -62,8 +62,7 @@ export default function AccountPage() {
         ) : null}
 
         <div className="flex flex-wrap gap-3">
-          <Link href="/settings" className="rounded-lg bg-brand-700 px-4 py-2 text-sm font-medium text-white">Open Settings</Link>
-          <Link href="/" className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-200">Return to Dashboard</Link>
+          <Link href="/" className="rounded-lg bg-brand-700 px-4 py-2 text-sm font-medium text-white">Return to Dashboard</Link>
         </div>
       </section>
     </RequireAuth>
