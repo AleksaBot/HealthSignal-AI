@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { RequireAuth } from "@/components/RequireAuth";
 import { generateHealthInsights, getHealthProfile, getUserErrorMessage, saveReport, upsertHealthProfile } from "@/lib/api";
-import { HealthProfile, HealthRiskInsightsResponse } from "@/lib/types";
+import { HealthProfile, HealthRiskInsightsResponse, MedicationEntry, MedicationFrequency, MedicationTimeOfDay } from "@/lib/types";
 
 const EMPTY_PROFILE: HealthProfile = {
   age: null,
@@ -18,11 +18,30 @@ const EMPTY_PROFILE: HealthProfile = {
   stress_level: null,
   known_conditions: [],
   current_medications: [],
+  medications: [],
   family_history: [],
   systolic_bp: null,
   diastolic_bp: null,
   total_cholesterol: null,
   updated_at: null
+};
+
+type MedicationDraft = {
+  name: string;
+  dosage: string;
+  frequency: MedicationFrequency;
+  custom_frequency: string;
+  time_of_day: MedicationTimeOfDay | "";
+  notes: string;
+};
+
+const EMPTY_MEDICATION_DRAFT: MedicationDraft = {
+  name: "",
+  dosage: "",
+  frequency: "daily",
+  custom_frequency: "",
+  time_of_day: "",
+  notes: ""
 };
 
 function parseList(value: string) {
@@ -34,6 +53,17 @@ function parseList(value: string) {
 
 function joinList(value: string[]) {
   return value.join(", ");
+}
+
+function normalizeMedicationNames(medications: MedicationEntry[]) {
+  return medications.map((entry) => entry.name.trim()).filter(Boolean);
+}
+
+function generateMedicationId() {
+  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
+    return crypto.randomUUID();
+  }
+  return `med-${Date.now()}-${Math.floor(Math.random() * 100000)}`;
 }
 
 function profileCompletion(profile: HealthProfile) {
@@ -70,6 +100,7 @@ export default function ProfilePage() {
   const [savingReport, setSavingReport] = useState(false);
   const [savedReportId, setSavedReportId] = useState<number | null>(null);
   const [copyStatus, setCopyStatus] = useState<"idle" | "success" | "error">("idle");
+  const [medicationDraft, setMedicationDraft] = useState<MedicationDraft>(EMPTY_MEDICATION_DRAFT);
 
   const completionPercent = useMemo(() => profileCompletion(profile), [profile]);
 
@@ -77,7 +108,23 @@ export default function ProfilePage() {
     async function loadProfile() {
       try {
         const response = await getHealthProfile();
-        setProfile({ ...EMPTY_PROFILE, ...response });
+        const normalizedMedications = response.medications?.length
+          ? response.medications
+          : (response.current_medications ?? []).map((name) => ({
+              id: generateMedicationId(),
+              name,
+              dosage: null,
+              frequency: "daily" as const,
+              custom_frequency: null,
+              time_of_day: null,
+              notes: "Imported from your previous My Health medications list."
+            }));
+        setProfile({
+          ...EMPTY_PROFILE,
+          ...response,
+          medications: normalizedMedications,
+          current_medications: normalizeMedicationNames(normalizedMedications)
+        });
       } catch (err) {
         setError(getUserErrorMessage(err, "Unable to load your health profile."));
       } finally {
@@ -94,13 +141,66 @@ export default function ProfilePage() {
     setSavedReportId(null);
   }
 
+  function onAddMedication() {
+    const name = medicationDraft.name.trim();
+    if (!name) {
+      setError("Medication name is required.");
+      return;
+    }
+
+    const nextMedication: MedicationEntry = {
+      id: generateMedicationId(),
+      name,
+      dosage: medicationDraft.dosage.trim() || null,
+      frequency: medicationDraft.frequency,
+      custom_frequency: medicationDraft.frequency === "custom" ? medicationDraft.custom_frequency.trim() || null : null,
+      time_of_day: medicationDraft.time_of_day || null,
+      notes: medicationDraft.notes.trim() || null
+    };
+
+    setProfile((current) => {
+      const medications = [...current.medications, nextMedication];
+      return {
+        ...current,
+        medications,
+        current_medications: normalizeMedicationNames(medications)
+      };
+    });
+
+    setMedicationDraft(EMPTY_MEDICATION_DRAFT);
+    setError(null);
+    setSaveMessage(null);
+    setSavedReportId(null);
+  }
+
+  function onRemoveMedication(medicationId: string) {
+    setProfile((current) => {
+      const medications = current.medications.filter((entry) => entry.id !== medicationId);
+      return {
+        ...current,
+        medications,
+        current_medications: normalizeMedicationNames(medications)
+      };
+    });
+    setSaveMessage(null);
+    setSavedReportId(null);
+  }
+
   async function onSaveProfile() {
     setSaving(true);
     setError(null);
 
     try {
-      const response = await upsertHealthProfile(profile);
-      setProfile(response);
+      const payload = {
+        ...profile,
+        current_medications: normalizeMedicationNames(profile.medications)
+      };
+      const response = await upsertHealthProfile(payload);
+      setProfile({
+        ...response,
+        medications: response.medications ?? [],
+        current_medications: normalizeMedicationNames(response.medications ?? [])
+      });
       setSaveMessage("Health profile updated.");
     } catch (err) {
       setError(getUserErrorMessage(err, "Unable to save health profile."));
@@ -213,9 +313,9 @@ export default function ProfilePage() {
 
         <div className="relative space-y-3 border-b border-slate-200/80 pb-5 dark:border-slate-700/70">
           <p className="text-xs font-semibold uppercase tracking-[0.22em] text-brand-700">My Health</p>
-          <h1 className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">My Health + Live Risk Insights</h1>
+          <h1 className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">Health Profile, Live Risk Insights, and Medication Tracker</h1>
           <p className="max-w-3xl text-sm text-slate-600 dark:text-slate-300">
-            Keep your profile up to date as a living baseline. Risk Insights are refreshed from your saved profile, and reports are optional archived snapshots.
+            Keep your baseline current, generate live insights from saved profile data, and maintain your active medications in one clean My Health workspace.
           </p>
         </div>
 
@@ -241,6 +341,7 @@ export default function ProfilePage() {
 
         <div className="grid gap-4 md:grid-cols-2">
           <article className="premium-card space-y-4 p-5">
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-brand-700">1. Health Profile baseline</p>
             <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Core profile</h2>
             <div className="grid gap-3 sm:grid-cols-2">
               <label className="space-y-1 text-sm"><span>Age</span><input className="w-full rounded-lg border border-slate-300 bg-white p-2 dark:border-slate-600 dark:bg-slate-900" type="number" value={profile.age ?? ""} onChange={(event) => updateField("age", event.target.value ? Number(event.target.value) : null)} /></label>
@@ -252,6 +353,7 @@ export default function ProfilePage() {
           </article>
 
           <article className="premium-card space-y-4 p-5">
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-brand-700">1. Health Profile baseline</p>
             <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Lifestyle snapshot</h2>
             <div className="grid gap-3 sm:grid-cols-2">
               <label className="space-y-1 text-sm"><span>Activity level</span><select className="w-full rounded-lg border border-slate-300 bg-white p-2 dark:border-slate-600 dark:bg-slate-900" value={profile.activity_level ?? ""} onChange={(event) => updateField("activity_level", (event.target.value || null) as HealthProfile["activity_level"])}><option value="">Select</option><option value="low">Low</option><option value="moderate">Moderate</option><option value="active">Active</option><option value="very_active">Very active</option></select></label>
@@ -264,10 +366,16 @@ export default function ProfilePage() {
           </article>
 
           <article className="premium-card space-y-4 p-5 md:col-span-2">
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-brand-700">1. Health Profile baseline</p>
             <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">History + optional metrics</h2>
             <div className="grid gap-3 md:grid-cols-2">
               <label className="space-y-1 text-sm"><span>Known conditions</span><input className="w-full rounded-lg border border-slate-300 bg-white p-2 dark:border-slate-600 dark:bg-slate-900" placeholder="e.g. hypertension, asthma" value={joinList(profile.known_conditions)} onChange={(event) => updateField("known_conditions", parseList(event.target.value))} /></label>
-              <label className="space-y-1 text-sm"><span>Current medications</span><input className="w-full rounded-lg border border-slate-300 bg-white p-2 dark:border-slate-600 dark:bg-slate-900" placeholder="e.g. lisinopril" value={joinList(profile.current_medications)} onChange={(event) => updateField("current_medications", parseList(event.target.value))} /></label>
+              <div className="space-y-1 text-sm">
+                <span>Current medications</span>
+                <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600 dark:border-slate-700 dark:bg-slate-800/60 dark:text-slate-300">
+                  Managed below in Medication Tracker ({profile.medications.length} active).
+                </div>
+              </div>
               <label className="space-y-1 text-sm md:col-span-2"><span>Family history</span><input className="w-full rounded-lg border border-slate-300 bg-white p-2 dark:border-slate-600 dark:bg-slate-900" placeholder="e.g. heart disease, type 2 diabetes" value={joinList(profile.family_history)} onChange={(event) => updateField("family_history", parseList(event.target.value))} /></label>
             </div>
             <div className="grid gap-3 sm:grid-cols-3">
@@ -277,6 +385,67 @@ export default function ProfilePage() {
             </div>
           </article>
         </div>
+
+        <section className="space-y-4 rounded-2xl border border-slate-200/80 bg-white/80 p-5 dark:border-slate-700 dark:bg-slate-900/70">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-brand-700">3. Medication Tracker</p>
+            <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100">Medication Tracker V1</h2>
+            <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">Track active medications as part of your My Health baseline. Save changes with the main Save My Health button.</p>
+          </div>
+
+          <div className="grid gap-3 md:grid-cols-2">
+            <label className="space-y-1 text-sm"><span>Medication name</span><input className="w-full rounded-lg border border-slate-300 bg-white p-2 dark:border-slate-600 dark:bg-slate-900" placeholder="e.g. Metformin" value={medicationDraft.name} onChange={(event) => setMedicationDraft((current) => ({ ...current, name: event.target.value }))} /></label>
+            <label className="space-y-1 text-sm"><span>Dosage (optional)</span><input className="w-full rounded-lg border border-slate-300 bg-white p-2 dark:border-slate-600 dark:bg-slate-900" placeholder="e.g. 500mg" value={medicationDraft.dosage} onChange={(event) => setMedicationDraft((current) => ({ ...current, dosage: event.target.value }))} /></label>
+            <label className="space-y-1 text-sm">
+              <span>Frequency</span>
+              <select className="w-full rounded-lg border border-slate-300 bg-white p-2 dark:border-slate-600 dark:bg-slate-900" value={medicationDraft.frequency} onChange={(event) => setMedicationDraft((current) => ({ ...current, frequency: event.target.value as MedicationFrequency }))}>
+                <option value="daily">Daily</option>
+                <option value="weekly">Weekly</option>
+                <option value="as_needed">As needed</option>
+                <option value="custom">Custom</option>
+              </select>
+            </label>
+            {medicationDraft.frequency === "custom" ? (
+              <label className="space-y-1 text-sm"><span>Custom frequency</span><input className="w-full rounded-lg border border-slate-300 bg-white p-2 dark:border-slate-600 dark:bg-slate-900" placeholder="e.g. Every other day" value={medicationDraft.custom_frequency} onChange={(event) => setMedicationDraft((current) => ({ ...current, custom_frequency: event.target.value }))} /></label>
+            ) : null}
+            <label className="space-y-1 text-sm">
+              <span>Time of day (optional)</span>
+              <select className="w-full rounded-lg border border-slate-300 bg-white p-2 dark:border-slate-600 dark:bg-slate-900" value={medicationDraft.time_of_day} onChange={(event) => setMedicationDraft((current) => ({ ...current, time_of_day: event.target.value as MedicationTimeOfDay | "" }))}>
+                <option value="">Not specified</option>
+                <option value="morning">Morning</option>
+                <option value="afternoon">Afternoon</option>
+                <option value="evening">Evening</option>
+                <option value="bedtime">Bedtime</option>
+              </select>
+            </label>
+            <label className="space-y-1 text-sm md:col-span-2"><span>Notes (optional)</span><textarea className="w-full rounded-lg border border-slate-300 bg-white p-2 dark:border-slate-600 dark:bg-slate-900" rows={2} value={medicationDraft.notes} onChange={(event) => setMedicationDraft((current) => ({ ...current, notes: event.target.value }))} /></label>
+          </div>
+          <div>
+            <button className="rounded-lg border border-brand-300/80 bg-brand-50/90 px-4 py-2 text-sm font-medium text-brand-800 transition hover:-translate-y-0.5 hover:bg-brand-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700" onClick={onAddMedication}>Add medication</button>
+          </div>
+
+          {profile.medications.length > 0 ? (
+            <div className="grid gap-3 md:grid-cols-2">
+              {profile.medications.map((medication) => (
+                <article key={medication.id} className="rounded-xl border border-slate-200/90 bg-slate-50/70 p-4 dark:border-slate-700 dark:bg-slate-800/55">
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <h3 className="text-base font-semibold text-slate-900 dark:text-slate-100">{medication.name}</h3>
+                      <p className="text-xs text-slate-500 dark:text-slate-400">
+                        {(medication.frequency === "custom" ? medication.custom_frequency : medication.frequency)?.replaceAll("_", " ") || "No frequency"}{medication.time_of_day ? ` • ${medication.time_of_day}` : ""}
+                      </p>
+                    </div>
+                    <button className="text-xs font-medium text-rose-600 hover:text-rose-500" onClick={() => onRemoveMedication(medication.id)}>Remove</button>
+                  </div>
+                  {medication.dosage ? <p className="mt-2 text-sm text-slate-700 dark:text-slate-200">Dosage: {medication.dosage}</p> : null}
+                  {medication.notes ? <p className="mt-1 text-xs text-slate-500 dark:text-slate-300">{medication.notes}</p> : null}
+                </article>
+              ))}
+            </div>
+          ) : (
+            <p className="rounded-xl border border-dashed border-slate-300/90 bg-slate-50/50 p-4 text-sm text-slate-600 dark:border-slate-700 dark:bg-slate-800/45 dark:text-slate-300">No medications added yet. Add your first medication above.</p>
+          )}
+        </section>
 
         <div className="flex flex-wrap gap-3">
           <button className="rounded-lg bg-brand-700 px-4 py-2 text-sm font-medium text-white disabled:opacity-60" onClick={onSaveProfile} disabled={saving}>{saving ? "Saving..." : "Save My Health"}</button>
@@ -291,7 +460,7 @@ export default function ProfilePage() {
           <section className="space-y-4 rounded-2xl border border-slate-200/80 bg-white/80 p-5 dark:border-slate-700 dark:bg-slate-900/70">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-brand-700">Risk Insights</p>
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-brand-700">2. Live Risk Insights</p>
                 <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100">Overall Health Snapshot</h2>
                 <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">{insights.overall_health_snapshot}</p>
                 <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">These insights are generated from your latest saved My Health baseline.</p>
@@ -353,7 +522,13 @@ export default function ProfilePage() {
 
             <p className="text-xs text-slate-500 dark:text-slate-400">{insights.disclaimer}</p>
           </section>
-        ) : null}
+        ) : (
+          <section className="space-y-3 rounded-2xl border border-slate-200/80 bg-white/80 p-5 dark:border-slate-700 dark:bg-slate-900/70">
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-brand-700">2. Live Risk Insights</p>
+            <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100">Generate your snapshot</h2>
+            <p className="text-sm text-slate-600 dark:text-slate-300">Save your profile baseline, then refresh insights to generate your current educational risk summary.</p>
+          </section>
+        )}
       </section>
     </RequireAuth>
   );

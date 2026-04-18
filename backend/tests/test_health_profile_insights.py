@@ -65,3 +65,27 @@ def test_health_profile_insights_requires_core_profile_fields(client: TestClient
     response = client.post("/api/profile/health/insights", headers=auth_headers)
     assert response.status_code == 400
     assert "age, height, and weight" in response.json()["detail"]
+
+
+def test_health_profile_medication_entries_sync_current_medications(client: TestClient, auth_headers: dict[str, str]):
+    payload = {
+        "age": 41,
+        "height_cm": 168,
+        "weight_kg": 84,
+        "medications": [
+            {
+                "id": "med-1",
+                "name": "metformin",
+                "dosage": "500mg",
+                "frequency": "daily",
+                "custom_frequency": None,
+                "time_of_day": "morning",
+                "notes": "Take with food",
+            }
+        ],
+    }
+    response = client.put("/api/profile/health", json=payload, headers=auth_headers)
+    assert response.status_code == 200
+    body = response.json()
+    assert body["current_medications"] == ["metformin"]
+    assert body["medications"][0]["name"] == "metformin"

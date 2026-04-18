@@ -9,6 +9,18 @@ ActivityLevelChoice = Literal["low", "moderate", "active", "very_active"]
 SmokingStatusChoice = Literal["none", "former", "occasional", "daily"]
 AlcoholFrequencyChoice = Literal["never", "monthly", "weekly", "several_times_weekly", "daily"]
 StressLevelChoice = Literal["low", "moderate", "high", "very_high"]
+MedicationFrequencyChoice = Literal["daily", "weekly", "as_needed", "custom"]
+MedicationTimeOfDayChoice = Literal["morning", "afternoon", "evening", "bedtime"]
+
+
+class MedicationEntry(BaseModel):
+    id: str = Field(min_length=1, max_length=64)
+    name: str = Field(min_length=1, max_length=120)
+    dosage: str | None = Field(default=None, max_length=120)
+    frequency: MedicationFrequencyChoice = "daily"
+    custom_frequency: str | None = Field(default=None, max_length=120)
+    time_of_day: MedicationTimeOfDayChoice | None = None
+    notes: str | None = Field(default=None, max_length=300)
 
 
 class HealthProfileUpdateRequest(BaseModel):
@@ -23,6 +35,7 @@ class HealthProfileUpdateRequest(BaseModel):
     stress_level: StressLevelChoice | None = None
     known_conditions: list[str] = Field(default_factory=list, max_length=30)
     current_medications: list[str] = Field(default_factory=list, max_length=30)
+    medications: list[MedicationEntry] = Field(default_factory=list, max_length=100)
     family_history: list[str] = Field(default_factory=list, max_length=30)
     systolic_bp: int | None = Field(default=None, ge=70, le=260)
     diastolic_bp: int | None = Field(default=None, ge=40, le=160)

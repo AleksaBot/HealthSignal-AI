@@ -158,11 +158,25 @@ export type HealthProfile = {
   stress_level: "low" | "moderate" | "high" | "very_high" | null;
   known_conditions: string[];
   current_medications: string[];
+  medications: MedicationEntry[];
   family_history: string[];
   systolic_bp: number | null;
   diastolic_bp: number | null;
   total_cholesterol: number | null;
   updated_at?: string | null;
+};
+
+export type MedicationFrequency = "daily" | "weekly" | "as_needed" | "custom";
+export type MedicationTimeOfDay = "morning" | "afternoon" | "evening" | "bedtime";
+
+export type MedicationEntry = {
+  id: string;
+  name: string;
+  dosage: string | null;
+  frequency: MedicationFrequency;
+  custom_frequency: string | null;
+  time_of_day: MedicationTimeOfDay | null;
+  notes: string | null;
 };
 
 export type HealthRiskSection = {

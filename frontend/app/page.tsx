@@ -17,24 +17,6 @@ const quickActions = [
     description: "Translate clinician notes or uploaded documents into patient-friendly language with clear highlights and suggested follow-ups.",
     href: "/note-interpreter",
     cta: "Open Note Interpreter"
-  },
-  {
-    title: "My Health",
-    description: "Maintain your personal baseline and generate live risk insights from your saved profile data.",
-    href: "/profile",
-    cta: "Open My Health"
-  },
-  {
-    title: "Health Trends",
-    description: "Review longitudinal patterns across baseline updates, insights snapshots, and completed analyses.",
-    href: "/health-trends",
-    cta: "Open Health Trends"
-  },
-  {
-    title: "Reports",
-    description: "Access saved snapshots and prior workflow outputs for historical review and follow-up decisions.",
-    href: "/history",
-    cta: "Open Reports"
   }
 ] as const;
 
@@ -75,7 +57,7 @@ export default function HomePage() {
           <div className="space-y-5">
             <h1 className="text-4xl font-semibold tracking-tight text-slate-900 dark:text-slate-100 md:text-5xl">Premium health intelligence dashboard.</h1>
             <p className="max-w-2xl text-sm leading-relaxed text-slate-600 dark:text-slate-300 md:text-base">
-              HealthSignal AI keeps your overview in focus while giving you fast launch access to core workflows, baseline insights, longitudinal trends, and report history in one polished environment.
+              HealthSignal AI keeps your overview in focus while giving you fast launch access to your most-used workflows in one polished environment.
             </p>
 
             {authenticated ? (
@@ -121,7 +103,7 @@ export default function HomePage() {
             <div className="space-y-2 text-sm text-slate-600 dark:text-slate-300">
               <p>• Symptom Analyzer starts a guided intake in under a minute.</p>
               <p>• Note Interpreter translates complex clinical notes into plain language.</p>
-              <p>• My Health, Health Trends, and Reports keep your context connected.</p>
+              <p>• Use top navigation to move between My Health, Health Trends, and Reports.</p>
             </div>
           </div>
         </div>
