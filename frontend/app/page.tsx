@@ -5,12 +5,18 @@ import { useEffect, useState } from "react";
 import { DisclaimerBanner } from "@/components/DisclaimerBanner";
 import { clearToken, getCurrentUser, isLoggedIn } from "@/lib/api";
 
-const modules = [
+const quickActions = [
   {
-    title: "Dashboard",
-    description: "Use your overview hub for quick actions across analyzers, note interpretation, and key health workflows.",
-    href: "/",
-    cta: "Stay on Dashboard"
+    title: "Symptom Analyzer",
+    description: "Start a guided symptom intake flow to capture concerns, answer targeted follow-up questions, and produce a triage-ready summary.",
+    href: "/symptom-analyzer",
+    cta: "Start Symptom Analyzer"
+  },
+  {
+    title: "Note Interpreter",
+    description: "Translate clinician notes or uploaded documents into patient-friendly language with clear highlights and suggested follow-ups.",
+    href: "/note-interpreter",
+    cta: "Open Note Interpreter"
   },
   {
     title: "My Health",
@@ -69,7 +75,7 @@ export default function HomePage() {
           <div className="space-y-5">
             <h1 className="text-4xl font-semibold tracking-tight text-slate-900 dark:text-slate-100 md:text-5xl">Premium health intelligence dashboard.</h1>
             <p className="max-w-2xl text-sm leading-relaxed text-slate-600 dark:text-slate-300 md:text-base">
-              HealthSignal AI keeps your overview, personal baseline with live insights, longitudinal trends, and report history in one polished environment.
+              HealthSignal AI keeps your overview in focus while giving you fast launch access to core workflows, baseline insights, longitudinal trends, and report history in one polished environment.
             </p>
 
             {authenticated ? (
@@ -111,11 +117,11 @@ export default function HomePage() {
           </div>
 
           <div className="frosted-panel animate-fade-up space-y-3 rounded-2xl p-5 [--stagger:100ms]">
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">Workspace Signal</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">Dashboard Launchpad</p>
             <div className="space-y-2 text-sm text-slate-600 dark:text-slate-300">
-              <p>• My Health combines your profile baseline and live insights.</p>
-              <p>• Health Trends provides your longitudinal view over time.</p>
-              <p>• Reports stores your saved snapshots and workflow history.</p>
+              <p>• Symptom Analyzer starts a guided intake in under a minute.</p>
+              <p>• Note Interpreter translates complex clinical notes into plain language.</p>
+              <p>• My Health, Health Trends, and Reports keep your context connected.</p>
             </div>
           </div>
         </div>
@@ -124,7 +130,7 @@ export default function HomePage() {
       <DisclaimerBanner compact />
 
       <div className="grid gap-4 md:grid-cols-2">
-        {modules.map((card, index) => (
+        {quickActions.map((card, index) => (
           <Link
             key={card.title}
             href={card.href}
