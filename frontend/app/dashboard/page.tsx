@@ -14,20 +14,20 @@ const quickActions = [
     href: "/note-interpreter"
   },
   {
-    title: "Health Profile + Risk Insights",
-    description: "Save your baseline profile and generate practical educational risk insights.",
+    title: "Risk Insights",
+    description: "Refresh live interpretation generated from your saved My Health Profile baseline.",
     href: "/profile"
   },
   {
-    title: "Report History",
-    description: "Review previous analyses and continue ongoing longitudinal workflows.",
-    href: "/history"
+    title: "Health Trends",
+    description: "Review longitudinal health patterns across saved snapshots and report history.",
+    href: "/health-trends"
   }
 ] as const;
 
 const statCards = [
-  { label: "Active Workflows", value: "3", context: "Analyzer, Notes, Profile Insights" },
-  { label: "Shortcuts", value: "4", context: "Operational modules" },
+  { label: "Active Workflows", value: "4", context: "Analyzer, Notes, Insights, Trends" },
+  { label: "Reports Shortcut", value: "Ready", context: "Longitudinal archive" },
   { label: "Workspace Mode", value: "Operational", context: "Control panel enabled" }
 ] as const;
 
@@ -42,13 +42,13 @@ export default function DashboardPage() {
           <div className="space-y-2">
             <p className="text-xs font-semibold uppercase tracking-[0.22em] text-brand-700">Operations Dashboard</p>
             <h1 className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">Clinical workflow control panel</h1>
-            <p className="text-sm text-slate-600 dark:text-slate-300">Monitor active modules, jump into workflows, and keep report production moving.</p>
+            <p className="text-sm text-slate-600 dark:text-slate-300">Run analyzers, refresh baseline-driven insights, and jump into trend monitoring.</p>
           </div>
           <Link
             href="/history"
             className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:-translate-y-0.5 hover:border-brand-300 hover:shadow-md dark:border-slate-600 dark:bg-slate-900/80 dark:text-slate-200"
           >
-            Open Report Queue
+            Open Reports
           </Link>
         </div>
 

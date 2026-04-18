@@ -10,6 +10,7 @@ import { applyTheme, readStoredThemePreference, THEME_STORAGE_KEY, ThemePreferen
 const navItems = [
   { href: "/", label: "Command Center" },
   { href: "/dashboard", label: "Operations" },
+  { href: "/health-trends", label: "Health Trends" },
   { href: "/history", label: "Reports" }
 ] as const;
 
@@ -121,7 +122,7 @@ export function AppShell({ children }: { children: ReactNode }) {
     return "HS";
   }, [displayName, email]);
 
-  const profileLabel = displayName ?? "Profile";
+  const profileLabel = displayName ?? "My Health Profile";
 
   return (
     <div className="site-backdrop">
@@ -180,7 +181,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                         className="block rounded-lg px-3 py-2 text-sm text-slate-700 transition hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800"
                         onClick={() => setMenuOpen(false)}
                       >
-                        Profile
+                        My Health Profile
                       </Link>
                       <Link
                         href="/settings"
