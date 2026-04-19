@@ -10,6 +10,7 @@ from typing import Sequence, Union
 
 from alembic import op
 import sqlalchemy as sa
+from sqlalchemy.dialects import postgresql
 
 
 # revision identifiers, used by Alembic.
@@ -19,16 +20,35 @@ branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
 
-medication_frequency_enum = sa.Enum("daily", "weekly", "as_needed", "custom", name="medicationfrequency")
-medication_time_of_day_enum = sa.Enum("morning", "afternoon", "evening", "bedtime", name="medicationtimeofday")
-medication_log_status_enum = sa.Enum("taken", "skipped", name="medicationlogstatus")
+MEDICATION_FREQUENCY_VALUES = ("daily", "weekly", "as_needed", "custom")
+MEDICATION_TIME_OF_DAY_VALUES = ("morning", "afternoon", "evening", "bedtime")
+MEDICATION_LOG_STATUS_VALUES = ("taken", "skipped")
+
+
+def _enum_types_for_dialect(dialect_name: str) -> tuple[sa.Enum, sa.Enum, sa.Enum]:
+    if dialect_name == "postgresql":
+        return (
+            postgresql.ENUM(*MEDICATION_FREQUENCY_VALUES, name="medicationfrequency", create_type=False),
+            postgresql.ENUM(*MEDICATION_TIME_OF_DAY_VALUES, name="medicationtimeofday", create_type=False),
+            postgresql.ENUM(*MEDICATION_LOG_STATUS_VALUES, name="medicationlogstatus", create_type=False),
+        )
+
+    return (
+        sa.Enum(*MEDICATION_FREQUENCY_VALUES, name="medicationfrequency"),
+        sa.Enum(*MEDICATION_TIME_OF_DAY_VALUES, name="medicationtimeofday"),
+        sa.Enum(*MEDICATION_LOG_STATUS_VALUES, name="medicationlogstatus"),
+    )
 
 
 def upgrade() -> None:
     bind = op.get_bind()
-    medication_frequency_enum.create(bind, checkfirst=True)
-    medication_time_of_day_enum.create(bind, checkfirst=True)
-    medication_log_status_enum.create(bind, checkfirst=True)
+    dialect_name = bind.dialect.name
+    medication_frequency_enum, medication_time_of_day_enum, medication_log_status_enum = _enum_types_for_dialect(dialect_name)
+
+    if dialect_name == "postgresql":
+        medication_frequency_enum.create(bind, checkfirst=True)
+        medication_time_of_day_enum.create(bind, checkfirst=True)
+        medication_log_status_enum.create(bind, checkfirst=True)
 
     op.create_table(
         "users",
@@ -97,6 +117,10 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
+    bind = op.get_bind()
+    dialect_name = bind.dialect.name
+    medication_frequency_enum, medication_time_of_day_enum, medication_log_status_enum = _enum_types_for_dialect(dialect_name)
+
     op.drop_index(op.f("ix_medication_logs_user_id"), table_name="medication_logs")
     op.drop_index(op.f("ix_medication_logs_medication_id"), table_name="medication_logs")
     op.drop_index(op.f("ix_medication_logs_id"), table_name="medication_logs")
@@ -113,7 +137,7 @@ def downgrade() -> None:
     op.drop_index(op.f("ix_users_email"), table_name="users")
     op.drop_table("users")
 
-    bind = op.get_bind()
-    medication_log_status_enum.drop(bind, checkfirst=True)
-    medication_time_of_day_enum.drop(bind, checkfirst=True)
-    medication_frequency_enum.drop(bind, checkfirst=True)
+    if dialect_name == "postgresql":
+        medication_log_status_enum.drop(bind, checkfirst=True)
+        medication_time_of_day_enum.drop(bind, checkfirst=True)
+        medication_frequency_enum.drop(bind, checkfirst=True)

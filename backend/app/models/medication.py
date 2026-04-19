@@ -25,6 +25,10 @@ class MedicationLogStatus(str, Enum):
     taken = "taken"
     skipped = "skipped"
 
+medication_frequency_enum = SqlEnum(MedicationFrequency, name="medicationfrequency")
+medication_time_of_day_enum = SqlEnum(MedicationTimeOfDay, name="medicationtimeofday")
+medication_log_status_enum = SqlEnum(MedicationLogStatus, name="medicationlogstatus")
+
 
 class Medication(Base):
     __tablename__ = "medications"
@@ -34,9 +38,9 @@ class Medication(Base):
     external_id: Mapped[str] = mapped_column(String(64), nullable=False)
     name: Mapped[str] = mapped_column(String(120), nullable=False)
     dosage: Mapped[str | None] = mapped_column(String(120), nullable=True)
-    frequency: Mapped[MedicationFrequency] = mapped_column(SqlEnum(MedicationFrequency), nullable=False, default=MedicationFrequency.daily)
+    frequency: Mapped[MedicationFrequency] = mapped_column(medication_frequency_enum, nullable=False, default=MedicationFrequency.daily)
     custom_frequency: Mapped[str | None] = mapped_column(String(120), nullable=True)
-    time_of_day: Mapped[MedicationTimeOfDay | None] = mapped_column(SqlEnum(MedicationTimeOfDay), nullable=True)
+    time_of_day: Mapped[MedicationTimeOfDay | None] = mapped_column(medication_time_of_day_enum, nullable=True)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
@@ -55,7 +59,7 @@ class MedicationLog(Base):
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     medication_id: Mapped[int] = mapped_column(ForeignKey("medications.id", ondelete="CASCADE"), nullable=False, index=True)
     event_date: Mapped[date] = mapped_column(Date, nullable=False)
-    status: Mapped[MedicationLogStatus] = mapped_column(SqlEnum(MedicationLogStatus), nullable=False)
+    status: Mapped[MedicationLogStatus] = mapped_column(medication_log_status_enum, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
 
     user = relationship("User", back_populates="medication_logs")
