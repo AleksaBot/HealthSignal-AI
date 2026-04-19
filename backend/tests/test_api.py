@@ -249,3 +249,49 @@ def test_note_follow_up_fallback_is_contextual(client: TestClient, auth_headers:
     assert "abdominal pain" in answer
     assert "nausea" in answer
     assert "monitor pain and hydration" in answer
+
+
+def test_medication_tracker_v2_today_status_and_history(client: TestClient, auth_headers: dict[str, str]):
+    profile_update = client.put(
+        "/api/profile/health",
+        json={
+            "age": 32,
+            "sex": "female",
+            "height_cm": 170,
+            "weight_kg": 64,
+            "activity_level": "moderate",
+            "smoking_vaping_status": "none",
+            "alcohol_frequency": "monthly",
+            "sleep_average_hours": 7,
+            "stress_level": "moderate",
+            "known_conditions": [],
+            "current_medications": [],
+            "medications": [
+                {
+                    "id": "med-test-1",
+                    "name": "Metformin",
+                    "dosage": "500mg",
+                    "frequency": "daily",
+                    "custom_frequency": None,
+                    "time_of_day": "morning",
+                    "notes": None,
+                }
+            ],
+            "family_history": [],
+            "systolic_bp": 120,
+            "diastolic_bp": 80,
+            "total_cholesterol": 180,
+        },
+        headers=auth_headers,
+    )
+    assert profile_update.status_code == 200
+
+    adherence_update = client.put(
+        "/api/profile/health/medications/today",
+        json={"medication_id": "med-test-1", "status": "taken"},
+        headers=auth_headers,
+    )
+    assert adherence_update.status_code == 200
+    payload = adherence_update.json()
+    assert payload["todays_medication_status"][0]["status"] == "taken"
+    assert payload["recent_medication_events"][0]["status"] == "taken"

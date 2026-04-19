@@ -164,10 +164,27 @@ export type HealthProfile = {
   diastolic_bp: number | null;
   total_cholesterol: number | null;
   updated_at?: string | null;
+  todays_medication_status?: TodayMedicationStatus[];
+  recent_medication_events?: MedicationAdherenceEvent[];
 };
 
 export type MedicationFrequency = "daily" | "weekly" | "as_needed" | "custom";
 export type MedicationTimeOfDay = "morning" | "afternoon" | "evening" | "bedtime";
+
+
+export type MedicationAdherenceStatus = "taken" | "skipped";
+
+export type TodayMedicationStatus = {
+  medication_id: string;
+  status: MedicationAdherenceStatus | null;
+};
+
+export type MedicationAdherenceEvent = {
+  medication_id: string;
+  medication_name: string;
+  event_date: string;
+  status: MedicationAdherenceStatus;
+};
 
 export type MedicationEntry = {
   id: string;

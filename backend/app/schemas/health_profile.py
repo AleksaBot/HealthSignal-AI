@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import date, datetime
 from typing import Literal
 
 from pydantic import BaseModel, Field
@@ -11,6 +11,7 @@ AlcoholFrequencyChoice = Literal["never", "monthly", "weekly", "several_times_we
 StressLevelChoice = Literal["low", "moderate", "high", "very_high"]
 MedicationFrequencyChoice = Literal["daily", "weekly", "as_needed", "custom"]
 MedicationTimeOfDayChoice = Literal["morning", "afternoon", "evening", "bedtime"]
+MedicationLogStatusChoice = Literal["taken", "skipped"]
 
 
 class MedicationEntry(BaseModel):
@@ -21,6 +22,23 @@ class MedicationEntry(BaseModel):
     custom_frequency: str | None = Field(default=None, max_length=120)
     time_of_day: MedicationTimeOfDayChoice | None = None
     notes: str | None = Field(default=None, max_length=300)
+
+
+class MedicationAdherenceEvent(BaseModel):
+    medication_id: str = Field(min_length=1, max_length=64)
+    medication_name: str = Field(min_length=1, max_length=120)
+    event_date: date
+    status: MedicationLogStatusChoice
+
+
+class TodayMedicationStatus(BaseModel):
+    medication_id: str = Field(min_length=1, max_length=64)
+    status: MedicationLogStatusChoice | None = None
+
+
+class MedicationAdherenceUpdateRequest(BaseModel):
+    medication_id: str = Field(min_length=1, max_length=64)
+    status: MedicationLogStatusChoice
 
 
 class HealthProfileUpdateRequest(BaseModel):
@@ -44,6 +62,8 @@ class HealthProfileUpdateRequest(BaseModel):
 
 class HealthProfileRead(HealthProfileUpdateRequest):
     updated_at: datetime | None = None
+    todays_medication_status: list[TodayMedicationStatus] = Field(default_factory=list)
+    recent_medication_events: list[MedicationAdherenceEvent] = Field(default_factory=list)
 
 
 class RiskInsightSection(BaseModel):

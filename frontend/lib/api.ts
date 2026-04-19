@@ -5,6 +5,7 @@ import {
   AuthSignupRequest,
   HealthProfile,
   HealthRiskInsightsResponse,
+  MedicationAdherenceStatus,
   NoteFileAnalysisResponse,
   NoteFollowUpRequest,
   NoteFollowUpResponse,
@@ -289,3 +290,11 @@ export function generateHealthInsights() {
   return postAuthJSON<Record<string, never>, HealthRiskInsightsResponse>("/api/profile/health/insights", {});
 }
 
+
+export function updateTodayMedicationStatus(payload: { medication_id: string; status: MedicationAdherenceStatus }) {
+  return request<HealthProfile>("/api/profile/health/medications/today", {
+    method: "PUT",
+    body: JSON.stringify(payload),
+    authRequired: true
+  });
+}

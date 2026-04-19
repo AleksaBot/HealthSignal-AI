@@ -16,6 +16,7 @@ os.environ.setdefault("DATABASE_URL", "sqlite:///./healthsignal.db")
 
 from app.db.session import Base, get_db  # noqa: E402
 from app.main import app  # noqa: E402
+from app.models import Medication, MedicationLog, Report, User  # noqa: F401,E402
 
 
 @pytest.fixture()

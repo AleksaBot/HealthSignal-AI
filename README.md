@@ -25,7 +25,7 @@ The system then returns readable summaries with red-flag detection, likely condi
 
 - **Frontend:** Next.js 14, TypeScript, Tailwind CSS
 - **Backend:** FastAPI, Python
-- **Data layer:** SQLite + SQLAlchemy
+- **Data layer:** SQLAlchemy ORM + Alembic migrations (PostgreSQL-ready via `DATABASE_URL`; SQLite-friendly for local dev)
 - **Auth model:** Token-based flow for protected app routes
 
 ## Local setup
@@ -37,10 +37,61 @@ cd backend
 python -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
+alembic upgrade head
 uvicorn app.main:app --reload --port 8000
 ```
 
 Backend: `http://localhost:8000`
+
+
+#### Database configuration (`DATABASE_URL`)
+
+The backend uses `DATABASE_URL` for both runtime DB connections and migrations:
+
+- Local SQLite (default): `sqlite:///./healthsignal.db`
+- Local PostgreSQL example: `postgresql+psycopg://postgres:postgres@localhost:5432/healthsignal`
+- Managed PostgreSQL (Render/Neon/Supabase/etc): provider connection string using the `postgresql+psycopg://...` format
+
+Example `.env` (backend):
+
+```bash
+DATABASE_URL=postgresql+psycopg://postgres:postgres@localhost:5432/healthsignal
+SECRET_KEY=replace-me-with-a-long-random-secret
+JWT_ALGORITHM=HS256
+CORS_ORIGINS=http://localhost:3000,https://your-frontend.vercel.app,https://*.vercel.app
+OPENAI_API_KEY=
+OPENAI_MODEL=gpt-4o-mini
+OPENAI_BASE_URL=https://api.openai.com/v1
+```
+
+#### Migrations (Alembic)
+
+Run from `backend/`:
+
+```bash
+# Apply all migrations
+alembic upgrade head
+
+# Create a new migration after schema changes
+alembic revision -m "describe_change"
+
+# (optional) auto-generate from SQLAlchemy models
+alembic revision --autogenerate -m "describe_change"
+
+# Roll back one migration
+alembic downgrade -1
+```
+
+Schema changes are now migration-driven and include:
+- `users`
+- `reports`
+- persistent medication records (`medications`)
+- medication adherence logs (`medication_logs`)
+- health profile JSON persistence fields on `users`
+
+Medication Tracker V2 migration compatibility:
+- Existing profile JSON medication data remains readable.
+- On profile read/update, legacy medication entries are synchronized into relational medication tables to avoid data loss while moving toward a single durable source of truth.
 
 #### Optional: train local ML intent-classifier artifact
 
@@ -83,16 +134,20 @@ For image OCR, **Tesseract OCR must be installed on your system** (e.g., `brew i
 
 - Deploy the `backend/` directory as a Python web service on Render.
 - Use build command: `pip install -r requirements.txt`
-- Use start command: `uvicorn app.main:app --host 0.0.0.0 --port $PORT`
+- Use start command: `alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port $PORT`
 - A starter `render.yaml` is included at the repository root.
+- Ensure `DATABASE_URL` points to a persistent managed PostgreSQL instance (not ephemeral local/temporary SQLite storage).
 
 ### Required environment variables
 
 Backend:
-- `DATABASE_URL` (defaults to `sqlite:///./healthsignal.db` for local use)
+- `DATABASE_URL` (recommended: PostgreSQL for persistent deployments; defaults to `sqlite:///./healthsignal.db` for local use)
 - `SECRET_KEY` (set a strong random value in production)
 - `JWT_ALGORITHM` (defaults to `HS256`)
 - `CORS_ORIGINS` (recommended; comma-separated list of explicit origins and optional wildcards like `https://*.vercel.app` for preview deploys; localhost origins remain allowed by default). `ALLOWED_ORIGINS` and `FRONTEND_ORIGIN` are still supported as legacy aliases.
+- `OPENAI_API_KEY` (optional for provider-backed note follow-up behavior)
+- `OPENAI_MODEL` (defaults to `gpt-4o-mini`)
+- `OPENAI_BASE_URL` (defaults to `https://api.openai.com/v1`)
 
 Frontend:
 - `NEXT_PUBLIC_API_URL` (the backend API base URL)
