@@ -18,3 +18,5 @@ class User(Base):
     health_profile_updated_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
     reports = relationship("Report", back_populates="user", cascade="all, delete-orphan")
+    medications = relationship("Medication", back_populates="user", cascade="all, delete-orphan")
+    medication_logs = relationship("MedicationLog", back_populates="user", cascade="all, delete-orphan")

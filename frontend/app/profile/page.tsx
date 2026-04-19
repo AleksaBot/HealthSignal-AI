@@ -3,8 +3,8 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { RequireAuth } from "@/components/RequireAuth";
-import { generateHealthInsights, getHealthProfile, getUserErrorMessage, saveReport, upsertHealthProfile } from "@/lib/api";
-import { HealthProfile, HealthRiskInsightsResponse, MedicationEntry, MedicationFrequency, MedicationTimeOfDay } from "@/lib/types";
+import { generateHealthInsights, getHealthProfile, getUserErrorMessage, saveReport, updateTodayMedicationStatus, upsertHealthProfile } from "@/lib/api";
+import { HealthProfile, HealthRiskInsightsResponse, MedicationAdherenceStatus, MedicationEntry, MedicationFrequency, MedicationTimeOfDay } from "@/lib/types";
 
 const EMPTY_PROFILE: HealthProfile = {
   age: null,
@@ -83,6 +83,12 @@ function profileCompletion(profile: HealthProfile) {
   return Math.round((complete / checks.length) * 100);
 }
 
+function formatMedicationStatusLabel(status: MedicationAdherenceStatus | null | undefined) {
+  if (status === "taken") return "Taken today";
+  if (status === "skipped") return "Skipped today";
+  return "Pending";
+}
+
 function levelClasses(level: "positive" | "watch" | "caution") {
   if (level === "positive") return "border-emerald-300/70 bg-emerald-50/70 text-emerald-800 dark:border-emerald-900 dark:bg-emerald-950/20 dark:text-emerald-200";
   if (level === "watch") return "border-amber-300/80 bg-amber-50/80 text-amber-800 dark:border-amber-900 dark:bg-amber-950/20 dark:text-amber-200";
@@ -101,8 +107,17 @@ export default function ProfilePage() {
   const [savedReportId, setSavedReportId] = useState<number | null>(null);
   const [copyStatus, setCopyStatus] = useState<"idle" | "success" | "error">("idle");
   const [medicationDraft, setMedicationDraft] = useState<MedicationDraft>(EMPTY_MEDICATION_DRAFT);
+  const [updatingMedicationId, setUpdatingMedicationId] = useState<string | null>(null);
 
   const completionPercent = useMemo(() => profileCompletion(profile), [profile]);
+  const todaysStatusByMedicationId = useMemo(
+    () => new Map((profile.todays_medication_status ?? []).map((entry) => [entry.medication_id, entry.status])),
+    [profile.todays_medication_status]
+  );
+  const medicationsDueToday = useMemo(
+    () => profile.medications.filter((medication) => medication.frequency !== "as_needed"),
+    [profile.medications]
+  );
 
   useEffect(() => {
     async function loadProfile() {
@@ -184,6 +199,25 @@ export default function ProfilePage() {
     });
     setSaveMessage(null);
     setSavedReportId(null);
+  }
+
+  async function onUpdateMedicationTodayStatus(medicationId: string, status: MedicationAdherenceStatus) {
+    setUpdatingMedicationId(medicationId);
+    setError(null);
+
+    try {
+      const response = await updateTodayMedicationStatus({ medication_id: medicationId, status });
+      setProfile({
+        ...response,
+        medications: response.medications ?? [],
+        current_medications: normalizeMedicationNames(response.medications ?? [])
+      });
+      setSaveMessage("Medication adherence saved for today.");
+    } catch (err) {
+      setError(getUserErrorMessage(err, "Unable to update medication status."));
+    } finally {
+      setUpdatingMedicationId(null);
+    }
   }
 
   async function onSaveProfile() {
@@ -389,8 +423,59 @@ export default function ProfilePage() {
         <section className="space-y-4 rounded-2xl border border-slate-200/80 bg-white/80 p-5 dark:border-slate-700 dark:bg-slate-900/70">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.16em] text-brand-700">3. Medication Tracker</p>
-            <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100">Medication Tracker V1</h2>
-            <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">Track active medications as part of your My Health baseline. Save changes with the main Save My Health button.</p>
+            <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100">Medication Tracker V2</h2>
+            <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">Use Today&apos;s Medications for quick adherence updates, manage your active list, and review recent taken/skipped history.</p>
+          </div>
+
+          <div className="grid gap-4 lg:grid-cols-2">
+            <article className="rounded-xl border border-cyan-200/70 bg-cyan-50/60 p-4 dark:border-cyan-900/70 dark:bg-cyan-950/20">
+              <h3 className="text-sm font-semibold uppercase tracking-[0.12em] text-cyan-800 dark:text-cyan-200">Today&apos;s Medications</h3>
+              <p className="mt-1 text-xs text-cyan-900/80 dark:text-cyan-200/80">Mark each scheduled medication as taken or skipped for {new Date().toLocaleDateString()}.</p>
+              <div className="mt-3 space-y-2">
+                {medicationsDueToday.length ? medicationsDueToday.map((medication) => (
+                  <div key={`today-${medication.id}`} className="rounded-lg border border-cyan-200/80 bg-white/80 p-3 dark:border-cyan-900/70 dark:bg-slate-900/70">
+                    <div className="flex items-center justify-between gap-2">
+                      <div>
+                        <p className="text-sm font-medium text-slate-900 dark:text-slate-100">{medication.name}</p>
+                        <p className="text-xs text-slate-600 dark:text-slate-300">{formatMedicationStatusLabel(todaysStatusByMedicationId.get(medication.id))}</p>
+                      </div>
+                      <div className="flex gap-2">
+                        <button
+                          className="rounded-md border border-emerald-300 bg-emerald-50 px-2 py-1 text-xs font-medium text-emerald-700 disabled:opacity-60 dark:border-emerald-900 dark:bg-emerald-950/30 dark:text-emerald-200"
+                          onClick={() => onUpdateMedicationTodayStatus(medication.id, "taken")}
+                          disabled={updatingMedicationId === medication.id}
+                        >
+                          Taken
+                        </button>
+                        <button
+                          className="rounded-md border border-amber-300 bg-amber-50 px-2 py-1 text-xs font-medium text-amber-700 disabled:opacity-60 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-200"
+                          onClick={() => onUpdateMedicationTodayStatus(medication.id, "skipped")}
+                          disabled={updatingMedicationId === medication.id}
+                        >
+                          Skipped
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )) : (
+                  <p className="rounded-lg border border-dashed border-cyan-300/80 bg-white/70 p-3 text-xs text-cyan-900/80 dark:border-cyan-900/60 dark:bg-slate-900/60 dark:text-cyan-200/80">No scheduled medications for today yet.</p>
+                )}
+              </div>
+            </article>
+
+            <article className="rounded-xl border border-slate-200/90 bg-slate-50/70 p-4 dark:border-slate-700 dark:bg-slate-800/55">
+              <h3 className="text-sm font-semibold uppercase tracking-[0.12em] text-slate-700 dark:text-slate-300">Recent Adherence</h3>
+              <div className="mt-3 space-y-2">
+                {(profile.recent_medication_events ?? []).length ? profile.recent_medication_events?.map((event, index) => (
+                  <div key={`${event.medication_id}-${event.event_date}-${index}`} className="flex items-center justify-between rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs dark:border-slate-700 dark:bg-slate-900">
+                    <span className="font-medium text-slate-800 dark:text-slate-200">{event.medication_name}</span>
+                    <span className="text-slate-500 dark:text-slate-400">{new Date(event.event_date).toLocaleDateString()} · {event.status}</span>
+                  </div>
+                )) : (
+                  <p className="rounded-lg border border-dashed border-slate-300/80 bg-white/80 p-3 text-xs text-slate-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">No adherence history yet. Mark taken/skipped in Today&apos;s Medications.</p>
+                )}
+              </div>
+            </article>
           </div>
 
           <div className="grid gap-3 md:grid-cols-2">
@@ -424,6 +509,7 @@ export default function ProfilePage() {
             <button className="rounded-lg border border-brand-300/80 bg-brand-50/90 px-4 py-2 text-sm font-medium text-brand-800 transition hover:-translate-y-0.5 hover:bg-brand-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700" onClick={onAddMedication}>Add medication</button>
           </div>
 
+          <h3 className="text-sm font-semibold uppercase tracking-[0.12em] text-slate-700 dark:text-slate-300">Active Medications</h3>
           {profile.medications.length > 0 ? (
             <div className="grid gap-3 md:grid-cols-2">
               {profile.medications.map((medication) => (
