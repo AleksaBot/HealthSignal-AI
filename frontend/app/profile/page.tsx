@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 import { RequireAuth } from "@/components/RequireAuth";
 import { getHealthProfile, getUserErrorMessage, updateTodayMedicationStatus, upsertHealthProfile } from "@/lib/api";
 import { HealthProfile, MedicationAdherenceStatus, MedicationEntry, MedicationFrequency, MedicationTimeOfDay, UserTier } from "@/lib/types";
@@ -41,9 +41,19 @@ type MedicationDraft = {
 type GuidancePlan = {
   snapshot: string;
   focus: string;
+  todaysSmallWin: string;
   goals: string[];
   watchlist: string[];
+  whyThisMatters: string;
   refreshedAt: string;
+};
+
+type MomentumScore = {
+  score: number;
+  label: "Needs Attention" | "Building Momentum" | "Stable" | "Strong Routine";
+  explanation: string;
+  improvingSignals: string[];
+  draggingSignals: string[];
 };
 
 const EMPTY_MEDICATION_DRAFT: MedicationDraft = {
@@ -55,21 +65,15 @@ const EMPTY_MEDICATION_DRAFT: MedicationDraft = {
   notes: ""
 };
 
-const FREE_FEATURES = [
-  "Baseline inputs",
-  "Basic AI guidance",
-  "Medication Tracker",
-  "Reports",
-  "Trends (basic)"
-];
+const FREE_FEATURES = ["Momentum Score", "Weekly coaching plan", "Medication tracker", "Structured AI coach prompts", "Trends overview"];
 
-const PREMIUM_FEATURES = [
-  "Daily adaptive coaching",
-  "Ask AI unlimited",
-  "Smart reminders",
-  "Deep trend analytics",
-  "Health score",
-  "Goal streaks"
+const PREMIUM_FEATURES = ["Adaptive coaching routines", "Long-term momentum history", "Advanced reminder flows", "Deeper AI guidance personalization", "Expanded trend analytics"];
+
+const COACH_SUGGESTED_PROMPTS = [
+  "What should I focus on this week?",
+  "What are my biggest health priorities right now?",
+  "How can I improve my momentum score?",
+  "What should I ask my doctor next?"
 ];
 
 function parseList(value: string) {
@@ -130,7 +134,135 @@ function addGoal(goals: string[], goal: string) {
   }
 }
 
-function buildGuidance(profile: HealthProfile): GuidancePlan {
+function calculateMedicationAdherenceSignal(profile: HealthProfile) {
+  const events = profile.recent_medication_events ?? [];
+  if (!events.length) {
+    return { score: 0, summary: "No recent adherence logs yet." };
+  }
+
+  const takenCount = events.filter((event) => event.status === "taken").length;
+  const adherenceRate = takenCount / events.length;
+
+  if (adherenceRate >= 0.8) {
+    return { score: 10, summary: "Recent medication logs show strong adherence." };
+  }
+
+  if (adherenceRate >= 0.5) {
+    return { score: 5, summary: "Medication adherence is present but inconsistent." };
+  }
+
+  return { score: 0, summary: "Medication routine is currently inconsistent." };
+}
+
+function calculateMomentumScore(profile: HealthProfile): MomentumScore {
+  const improvingSignals: string[] = [];
+  const draggingSignals: string[] = [];
+  const completion = profileCompletion(profile);
+
+  let score = 0;
+
+  const completionPoints = Math.round(completion * 0.22);
+  score += completionPoints;
+  if (completion >= 75) {
+    improvingSignals.push("Baseline profile is mostly complete");
+  } else {
+    draggingSignals.push("Profile baseline is still incomplete");
+  }
+
+  if ((profile.sleep_average_hours ?? 0) >= 7 && (profile.sleep_average_hours ?? 0) <= 9) {
+    score += 18;
+    improvingSignals.push("Sleep is within a steady recovery range");
+  } else if ((profile.sleep_average_hours ?? 0) > 0) {
+    score += 8;
+    draggingSignals.push("Sleep consistency is below target");
+  } else {
+    draggingSignals.push("Sleep data is missing");
+  }
+
+  if (profile.activity_level === "very_active") {
+    score += 18;
+    improvingSignals.push("Activity level is very strong");
+  } else if (profile.activity_level === "active") {
+    score += 15;
+    improvingSignals.push("Activity routine is strong");
+  } else if (profile.activity_level === "moderate") {
+    score += 10;
+  } else if (profile.activity_level === "low") {
+    score += 4;
+    draggingSignals.push("Movement routine can improve");
+  }
+
+  if (profile.smoking_vaping_status === "none" || profile.smoking_vaping_status === "former") {
+    score += 10;
+  } else if (profile.smoking_vaping_status === "occasional") {
+    score += 4;
+    draggingSignals.push("Smoking/vaping is still present");
+  } else if (profile.smoking_vaping_status === "daily") {
+    score += 0;
+    draggingSignals.push("Daily smoking/vaping is lowering momentum");
+  }
+
+  if (profile.stress_level === "low") {
+    score += 14;
+    improvingSignals.push("Stress load appears manageable");
+  } else if (profile.stress_level === "moderate") {
+    score += 10;
+  } else if (profile.stress_level === "high") {
+    score += 4;
+    draggingSignals.push("Stress load is elevated");
+  } else if (profile.stress_level === "very_high") {
+    score += 1;
+    draggingSignals.push("Stress load needs near-term support");
+  }
+
+  const medicationSignal = calculateMedicationAdherenceSignal(profile);
+  score += medicationSignal.score;
+  if (profile.medications.length > 0) {
+    if (medicationSignal.score >= 8) {
+      improvingSignals.push("Medication adherence routine is consistent");
+    } else {
+      draggingSignals.push(medicationSignal.summary);
+    }
+  }
+
+  if (profile.weekly_health_summary_enabled) {
+    score += 4;
+    improvingSignals.push("Weekly summary reminders are enabled");
+  } else {
+    draggingSignals.push("Weekly summary reminder is not enabled");
+  }
+
+  if (profile.medication_reminders_enabled && profile.medications.length > 0) {
+    score += 4;
+    improvingSignals.push("Medication reminders are configured");
+  }
+
+  score = Math.max(0, Math.min(100, score));
+
+  const label =
+    score < 40
+      ? "Needs Attention"
+      : score < 60
+        ? "Building Momentum"
+        : score < 80
+          ? "Stable"
+          : "Strong Routine";
+
+  const explanation =
+    improvingSignals.length > 0
+      ? `Your score reflects progress in ${improvingSignals[0].toLowerCase()}. Next improvement: ${(draggingSignals[0] ?? "keep your routines consistent").toLowerCase()}.`
+      : `Your score is currently driven by missing or inconsistent routine signals. Start with one small weekly action.`;
+
+  return {
+    score,
+    label,
+    explanation,
+    improvingSignals: improvingSignals.slice(0, 3),
+    draggingSignals: draggingSignals.slice(0, 3)
+  };
+}
+
+function buildGuidance(profile: HealthProfile, momentum: MomentumScore): GuidancePlan {
   const goals: string[] = [];
   const watchlist: string[] = [];
   const positives: string[] = [];
@@ -138,74 +270,120 @@ function buildGuidance(profile: HealthProfile): GuidancePlan {
   const bmi = calculateBmi(profile.height_cm, profile.weight_kg);
 
   if (profile.activity_level === "active" || profile.activity_level === "very_active") {
-    positives.push("active lifestyle habits");
+    positives.push("movement consistency");
   } else if (profile.activity_level === "low") {
-    improvements.push("movement consistency");
-    addGoal(goals, "Complete 3 walks or workouts this week.");
+    improvements.push("daily movement");
+    addGoal(goals, "Walk 20 minutes after work on 4 days this week.");
   }
 
   if ((profile.sleep_average_hours ?? 0) >= 7) {
-    positives.push("restorative sleep range");
+    positives.push("sleep recovery");
   } else if ((profile.sleep_average_hours ?? 0) > 0 && (profile.sleep_average_hours ?? 0) < 7) {
     improvements.push("sleep consistency");
-    watchlist.push("Low sleep consistency");
-    addGoal(goals, "Reach 7+ hours of sleep on at least 4 nights.");
+    watchlist.push("Sleep debt trend");
+    addGoal(goals, "Reach 7+ hours of sleep for at least 4 nights.");
   }
 
   if (profile.stress_level === "high" || profile.stress_level === "very_high") {
-    improvements.push("stress recovery");
-    addGoal(goals, "Schedule one 10-minute decompression routine each workday.");
+    improvements.push("stress decompression");
+    watchlist.push("High stress load");
+    addGoal(goals, "Book a 10-minute reset block during each workday.");
   }
 
   if (profile.smoking_vaping_status === "occasional" || profile.smoking_vaping_status === "daily") {
     watchlist.push("Smoking/vaping risk");
-    addGoal(goals, "Set one smoke-free streak target this week.");
+    addGoal(goals, "Set one smoke-free streak goal for this week.");
   }
 
   if (profile.alcohol_frequency === "several_times_weekly" || profile.alcohol_frequency === "daily") {
     watchlist.push("Frequent alcohol intake");
-    addGoal(goals, "Reduce alcohol intake by 1-2 nights this week.");
+    addGoal(goals, "Reduce alcohol nights by 1 this week.");
   }
 
   if (bmi && bmi >= 27) {
     watchlist.push("Elevated BMI trend");
-    addGoal(goals, "Prioritize movement + nutrition consistency for 5 days.");
-  }
-
-  if (profile.family_history.length > 0) {
-    watchlist.push("Family history cardiovascular/metabolic risk");
+    addGoal(goals, "Pair 5 movement days with a consistent dinner routine.");
   }
 
   if (profile.medications.length > 0) {
-    addGoal(goals, "Maintain medication adherence daily.");
+    addGoal(goals, "Mark each scheduled medication as taken or skipped.");
+  }
+
+  if (!profile.weekly_health_summary_enabled) {
+    addGoal(goals, "Enable weekly summary to keep your plan visible.");
   }
 
   if (goals.length < 3) {
-    addGoal(goals, "Hydrate consistently and follow regular meal timing.");
-    addGoal(goals, "Review baseline metrics once before week end.");
+    addGoal(goals, "Hydrate consistently and keep regular meal timing.");
+    addGoal(goals, "Review your trend snapshot once before Sunday.");
   }
 
   const focus =
-    (profile.sleep_average_hours ?? 0) < 7
-      ? "Recovery & Consistency"
-      : profile.stress_level === "high" || profile.stress_level === "very_high"
-        ? "Stress Reset"
+    momentum.label === "Needs Attention"
+      ? "Reset Fundamentals"
+      : (profile.sleep_average_hours ?? 0) < 7
+        ? "Recovery & Consistency"
         : profile.activity_level === "low"
           ? "Movement Momentum"
-          : "Sustain Your Momentum";
+          : "Protect Your Routine";
+
+  const todaysSmallWin =
+    (profile.sleep_average_hours ?? 0) < 7
+      ? "Set a wind-down alarm 45 minutes before bedtime."
+      : profile.activity_level === "low"
+        ? "Take a 20-minute walk before dinner."
+        : profile.stress_level === "high" || profile.stress_level === "very_high"
+          ? "Use one 10-minute breathing break this afternoon."
+          : "Repeat your strongest habit from yesterday.";
+
+  const whyThisMatters =
+    (profile.sleep_average_hours ?? 0) < 7
+      ? "Better sleep consistency can improve energy, stress resilience, and recovery momentum."
+      : profile.activity_level === "low"
+        ? "More daily movement supports long-term cardiovascular and metabolic health."
+        : "Consistency in routines helps protect your baseline and reduces backsliding risk.";
 
   const snapshot =
     positives.length > 0
-      ? `You maintain a solid baseline with ${positives.join(" and ")}. ${improvements.length ? `Your highest leverage area next is ${improvements[0]}.` : "Keep building consistency to preserve long-term gains."}`
-      : `Your baseline has meaningful opportunity in ${improvements[0] ?? "consistency"}. Small weekly actions will create measurable momentum.`;
+      ? `You are building from ${positives.join(" and ")}. Keep that base steady while improving ${improvements[0] ?? "consistency"}.`
+      : "Your plan starts with core consistency habits. Small weekly wins can quickly lift your momentum score.";
 
   return {
     snapshot,
     focus,
+    todaysSmallWin,
     goals: goals.slice(0, 5),
     watchlist,
+    whyThisMatters,
     refreshedAt: new Date().toISOString()
   };
+}
+
+function generateCoachResponse(question: string, profile: HealthProfile, guidance: GuidancePlan | null, momentum: MomentumScore): string {
+  const normalized = question.toLowerCase();
+
+  if (normalized.includes("focus") || normalized.includes("week")) {
+    return `This week, center on ${guidance?.focus ?? "your core baseline habits"}. Start with today's small win: ${guidance?.todaysSmallWin ?? "take one short movement break"}. Keep your top priorities to 1-2 habits for better consistency.`;
+  }
+
+  if (normalized.includes("priorit")) {
+    const priorityList = [
+      momentum.draggingSignals[0] ?? "improving sleep consistency",
+      guidance?.goals[0] ?? "tracking one daily health action",
+      profile.medications.length > 0 ? "maintaining medication adherence" : "keeping your weekly summary enabled"
+    ];
+    return `Your biggest priorities right now are: 1) ${priorityList[0].toLowerCase()}, 2) ${priorityList[1].toLowerCase()}, and 3) ${priorityList[2].toLowerCase()}. Focus on repeatable actions, not perfection.`;
+  }
+
+  if (normalized.includes("momentum")) {
+    return `To improve your momentum score, target the biggest drag first: ${momentum.draggingSignals[0] ?? "baseline completeness"}. Then reinforce one strong signal you already have: ${momentum.improvingSignals[0] ?? "weekly structure"}. This mix usually improves score stability.`;
+  }
+
+  if (normalized.includes("doctor")) {
+    return "Bring a concise update: your recent symptoms, medication adherence pattern, stress/sleep changes, and one clear goal you want support with. Ask which metrics matter most for your risk profile and what follow-up timeline is recommended.";
+  }
+
+  return "I can help you turn your profile into an educational weekly action plan. Try asking about this week’s focus, momentum score improvements, or doctor discussion prep.";
 }
 
 export default function ProfilePage() {
@@ -218,10 +396,12 @@ export default function ProfilePage() {
   const [updatingMedicationId, setUpdatingMedicationId] = useState<string | null>(null);
   const [guidance, setGuidance] = useState<GuidancePlan | null>(null);
   const [refreshingGuidance, setRefreshingGuidance] = useState(false);
+  const [coachQuestion, setCoachQuestion] = useState("");
+  const [coachAnswer, setCoachAnswer] = useState<string | null>(null);
 
-  // Foundation for free vs premium feature-gating.
   const [userTier] = useState<UserTier>("free");
   const completionPercent = useMemo(() => profileCompletion(profile), [profile]);
+  const momentum = useMemo(() => calculateMomentumScore(profile), [profile]);
   const todaysStatusByMedicationId = useMemo(
     () => new Map((profile.todays_medication_status ?? []).map((entry) => [entry.medication_id, entry.status])),
     [profile.todays_medication_status]
@@ -229,6 +409,15 @@ export default function ProfilePage() {
   const medicationsDueToday = useMemo(
     () => profile.medications.filter((medication) => medication.frequency !== "as_needed"),
     [profile.medications]
+  );
+  const trendSignal = useMemo(
+    () =>
+      momentum.score >= 75
+        ? "Momentum trend is improving compared with baseline setup habits."
+        : momentum.score >= 50
+          ? "Momentum is steady; refining one daily habit could lift next week."
+          : "Momentum is early-stage; focus on one foundational routine this week.",
+    [momentum.score]
   );
   const isPremium = userTier === "premium";
 
@@ -254,7 +443,7 @@ export default function ProfilePage() {
           current_medications: normalizeMedicationNames(normalizedMedications)
         };
         setProfile(hydratedProfile);
-        setGuidance(buildGuidance(hydratedProfile));
+        setGuidance(buildGuidance(hydratedProfile, calculateMomentumScore(hydratedProfile)));
       } catch (err) {
         setError(getUserErrorMessage(err, "Unable to load your health profile."));
       } finally {
@@ -319,17 +508,14 @@ export default function ProfilePage() {
 
     try {
       const response = await updateTodayMedicationStatus({ medication_id: medicationId, status });
-      setProfile({
+      const normalizedResponse = {
         ...response,
         medications: response.medications ?? [],
         current_medications: normalizeMedicationNames(response.medications ?? [])
-      });
+      };
+      setProfile(normalizedResponse);
       setSaveMessage("Medication adherence saved for today.");
-      setGuidance(buildGuidance({
-        ...response,
-        medications: response.medications ?? [],
-        current_medications: normalizeMedicationNames(response.medications ?? [])
-      }));
+      setGuidance(buildGuidance(normalizedResponse, calculateMomentumScore(normalizedResponse)));
     } catch (err) {
       setError(getUserErrorMessage(err, "Unable to update medication status."));
     } finally {
@@ -353,8 +539,8 @@ export default function ProfilePage() {
         current_medications: normalizeMedicationNames(response.medications ?? [])
       };
       setProfile(normalizedResponse);
-      setGuidance(buildGuidance(normalizedResponse));
-      setSaveMessage("Plan updated. Your personalized guidance has been refreshed.");
+      setGuidance(buildGuidance(normalizedResponse, calculateMomentumScore(normalizedResponse)));
+      setSaveMessage("Plan updated. Guidance and momentum were refreshed.");
     } catch (err) {
       setError(getUserErrorMessage(err, "Unable to save health profile."));
     } finally {
@@ -366,9 +552,16 @@ export default function ProfilePage() {
     setRefreshingGuidance(true);
     setError(null);
     window.setTimeout(() => {
-      setGuidance(buildGuidance(profile));
+      setGuidance(buildGuidance(profile, calculateMomentumScore(profile)));
       setRefreshingGuidance(false);
     }, 250);
+  }
+
+  function onAskCoach(event?: FormEvent) {
+    event?.preventDefault();
+    const question = coachQuestion.trim();
+    if (!question) return;
+    setCoachAnswer(generateCoachResponse(question, profile, guidance, momentum));
   }
 
   if (loading) {
@@ -391,85 +584,92 @@ export default function ProfilePage() {
           <p className="text-xs font-semibold uppercase tracking-[0.22em] text-brand-700">My Health</p>
           <h1 className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">Health Coaching Workspace</h1>
           <p className="max-w-3xl text-sm text-slate-600 dark:text-slate-300">
-            Update your health baseline, receive personalized guidance, and track long-term progress.
+            Plan your week, track progress, and use AI coaching insights from one clean workspace.
           </p>
         </div>
 
-        <div className="grid gap-4 md:grid-cols-3">
-          <article className="premium-card p-4 md:col-span-2">
-            <p className="text-xs uppercase tracking-[0.15em] text-slate-500 dark:text-slate-400">Profile completion</p>
-            <p className="mt-2 text-3xl font-semibold text-slate-900 dark:text-slate-100">{completionPercent}%</p>
-            <div className="mt-3 h-2 rounded-full bg-slate-200 dark:bg-slate-800">
-              <div
-                className="h-2 rounded-full bg-gradient-to-r from-blue-500 to-cyan-400 transition-all duration-500 ease-out"
-                style={{ width: `${completionPercent}%` }}
-              />
-            </div>
-            <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">Complete key basics for better weekly guidance quality.</p>
-          </article>
-
-          <article className="premium-card p-4">
-            <p className="text-xs uppercase tracking-[0.15em] text-slate-500 dark:text-slate-400">Last updated</p>
-            <p className="mt-2 text-sm font-medium text-slate-900 dark:text-slate-100">{profile.updated_at ? new Date(profile.updated_at).toLocaleString() : "Not saved yet"}</p>
-            <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">Saved to your account for continuity across sessions.</p>
-          </article>
+        <div className="flex flex-wrap gap-3">
+          <button className="rounded-lg bg-brand-700 px-4 py-2 text-sm font-medium text-white disabled:opacity-60" onClick={onSaveProfile} disabled={saving}>{saving ? "Saving..." : "Save & Update Plan"}</button>
+          <button className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:-translate-y-0.5 hover:bg-slate-100 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700" onClick={onRefreshGuidance} disabled={refreshingGuidance}>{refreshingGuidance ? "Refreshing..." : "Refresh Guidance"}</button>
+          <Link href="/health-trends" className="rounded-lg border border-brand-300/80 bg-brand-50/90 px-4 py-2 text-sm font-medium text-brand-800 transition hover:-translate-y-0.5 hover:bg-brand-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700">View Trends</Link>
+          <Link href="/history" className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:-translate-y-0.5 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700">Reports History</Link>
         </div>
 
-        <div className="grid gap-4 md:grid-cols-2">
-          <article className="premium-card space-y-4 p-5">
-            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-brand-700">Health Baseline Inputs</p>
-            <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Core profile</h2>
-            <div className="grid gap-3 sm:grid-cols-2">
-              <label className="space-y-1 text-sm"><span>Age</span><input className="w-full rounded-lg border border-slate-300 bg-white p-2 dark:border-slate-600 dark:bg-slate-900" type="number" value={profile.age ?? ""} onChange={(event) => updateField("age", event.target.value ? Number(event.target.value) : null)} /></label>
-              <label className="space-y-1 text-sm"><span>Sex</span><select className="w-full rounded-lg border border-slate-300 bg-white p-2 dark:border-slate-600 dark:bg-slate-900" value={profile.sex ?? ""} onChange={(event) => updateField("sex", (event.target.value || null) as HealthProfile["sex"])}><option value="">Select</option><option value="female">Female</option><option value="male">Male</option><option value="non_binary">Non-binary</option><option value="other">Other</option><option value="prefer_not_to_say">Prefer not to say</option></select></label>
-              <label className="space-y-1 text-sm"><span>Height (cm)</span><input className="w-full rounded-lg border border-slate-300 bg-white p-2 dark:border-slate-600 dark:bg-slate-900" type="number" value={profile.height_cm ?? ""} onChange={(event) => updateField("height_cm", event.target.value ? Number(event.target.value) : null)} /></label>
-              <label className="space-y-1 text-sm"><span>Weight (kg)</span><input className="w-full rounded-lg border border-slate-300 bg-white p-2 dark:border-slate-600 dark:bg-slate-900" type="number" value={profile.weight_kg ?? ""} onChange={(event) => updateField("weight_kg", event.target.value ? Number(event.target.value) : null)} /></label>
-            </div>
-          </article>
+        {saveMessage ? <p className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800 dark:border-emerald-900 dark:bg-emerald-950/20 dark:text-emerald-200">{saveMessage}</p> : null}
+        {error ? <p className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700 dark:border-rose-900 dark:bg-rose-950/20 dark:text-rose-200">{error}</p> : null}
 
-          <article className="premium-card space-y-4 p-5">
-            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-brand-700">Health Baseline Inputs</p>
-            <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Lifestyle snapshot</h2>
-            <div className="grid gap-3 sm:grid-cols-2">
-              <label className="space-y-1 text-sm"><span>Activity level</span><select className="w-full rounded-lg border border-slate-300 bg-white p-2 dark:border-slate-600 dark:bg-slate-900" value={profile.activity_level ?? ""} onChange={(event) => updateField("activity_level", (event.target.value || null) as HealthProfile["activity_level"])}><option value="">Select</option><option value="low">Low</option><option value="moderate">Moderate</option><option value="active">Active</option><option value="very_active">Very active</option></select></label>
-              <label className="space-y-1 text-sm"><span>Smoking / vaping</span><select className="w-full rounded-lg border border-slate-300 bg-white p-2 dark:border-slate-600 dark:bg-slate-900" value={profile.smoking_vaping_status ?? ""} onChange={(event) => updateField("smoking_vaping_status", (event.target.value || null) as HealthProfile["smoking_vaping_status"])}><option value="">Select</option><option value="none">None</option><option value="former">Former</option><option value="occasional">Occasional</option><option value="daily">Daily</option></select></label>
-              <label className="space-y-1 text-sm"><span>Alcohol frequency</span><select className="w-full rounded-lg border border-slate-300 bg-white p-2 dark:border-slate-600 dark:bg-slate-900" value={profile.alcohol_frequency ?? ""} onChange={(event) => updateField("alcohol_frequency", (event.target.value || null) as HealthProfile["alcohol_frequency"])}><option value="">Select</option><option value="never">Never</option><option value="monthly">Monthly</option><option value="weekly">Weekly</option><option value="several_times_weekly">Several times weekly</option><option value="daily">Daily</option></select></label>
-              <label className="space-y-1 text-sm"><span>Sleep average (hours)</span><input className="w-full rounded-lg border border-slate-300 bg-white p-2 dark:border-slate-600 dark:bg-slate-900" type="number" step="0.5" value={profile.sleep_average_hours ?? ""} onChange={(event) => updateField("sleep_average_hours", event.target.value ? Number(event.target.value) : null)} /></label>
-              <label className="space-y-1 text-sm sm:col-span-2"><span>Stress level</span><select className="w-full rounded-lg border border-slate-300 bg-white p-2 dark:border-slate-600 dark:bg-slate-900" value={profile.stress_level ?? ""} onChange={(event) => updateField("stress_level", (event.target.value || null) as HealthProfile["stress_level"])}><option value="">Select</option><option value="low">Low</option><option value="moderate">Moderate</option><option value="high">High</option><option value="very_high">Very high</option></select></label>
-            </div>
-          </article>
+        <section className="space-y-4">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-brand-700">1. Health Baseline</p>
+            <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100">Profile foundation</h2>
+          </div>
 
-          <article className="premium-card space-y-4 p-5 md:col-span-2">
-            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-brand-700">Health Baseline Inputs</p>
-            <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">History + optional metrics</h2>
-            <div className="grid gap-3 md:grid-cols-2">
-              <label className="space-y-1 text-sm"><span>Known conditions</span><input className="w-full rounded-lg border border-slate-300 bg-white p-2 dark:border-slate-600 dark:bg-slate-900" placeholder="e.g. hypertension, asthma" value={joinList(profile.known_conditions)} onChange={(event) => updateField("known_conditions", parseList(event.target.value))} /></label>
-              <div className="space-y-1 text-sm">
-                <span>Current medications</span>
-                <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600 dark:border-slate-700 dark:bg-slate-800/60 dark:text-slate-300">
-                  Managed below in Medication Tracker ({profile.medications.length} active).
-                </div>
+          <div className="grid gap-4 md:grid-cols-3">
+            <article className="premium-card p-4 md:col-span-2">
+              <p className="text-xs uppercase tracking-[0.15em] text-slate-500 dark:text-slate-400">Profile completion</p>
+              <p className="mt-2 text-3xl font-semibold text-slate-900 dark:text-slate-100">{completionPercent}%</p>
+              <div className="mt-3 h-2 rounded-full bg-slate-200 dark:bg-slate-800">
+                <div className="h-2 rounded-full bg-gradient-to-r from-blue-500 to-cyan-400 transition-all duration-500 ease-out" style={{ width: `${completionPercent}%` }} />
               </div>
-              <label className="space-y-1 text-sm md:col-span-2"><span>Family history</span><input className="w-full rounded-lg border border-slate-300 bg-white p-2 dark:border-slate-600 dark:bg-slate-900" placeholder="e.g. heart disease, type 2 diabetes" value={joinList(profile.family_history)} onChange={(event) => updateField("family_history", parseList(event.target.value))} /></label>
-            </div>
-            <div className="grid gap-3 sm:grid-cols-3">
-              <label className="space-y-1 text-sm"><span>Systolic BP (optional)</span><input className="w-full rounded-lg border border-slate-300 bg-white p-2 dark:border-slate-600 dark:bg-slate-900" type="number" value={profile.systolic_bp ?? ""} onChange={(event) => updateField("systolic_bp", event.target.value ? Number(event.target.value) : null)} /></label>
-              <label className="space-y-1 text-sm"><span>Diastolic BP (optional)</span><input className="w-full rounded-lg border border-slate-300 bg-white p-2 dark:border-slate-600 dark:bg-slate-900" type="number" value={profile.diastolic_bp ?? ""} onChange={(event) => updateField("diastolic_bp", event.target.value ? Number(event.target.value) : null)} /></label>
-              <label className="space-y-1 text-sm"><span>Total cholesterol (optional)</span><input className="w-full rounded-lg border border-slate-300 bg-white p-2 dark:border-slate-600 dark:bg-slate-900" type="number" value={profile.total_cholesterol ?? ""} onChange={(event) => updateField("total_cholesterol", event.target.value ? Number(event.target.value) : null)} /></label>
-            </div>
-          </article>
-        </div>
+              <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">Complete key basics for better weekly coaching quality.</p>
+            </article>
+
+            <article className="premium-card p-4">
+              <p className="text-xs uppercase tracking-[0.15em] text-slate-500 dark:text-slate-400">Last updated</p>
+              <p className="mt-2 text-sm font-medium text-slate-900 dark:text-slate-100">{profile.updated_at ? new Date(profile.updated_at).toLocaleString() : "Not saved yet"}</p>
+              <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">Saved to your account for continuity across sessions.</p>
+            </article>
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-2">
+            <article className="premium-card space-y-4 p-5">
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-brand-700">Health Baseline Inputs</p>
+              <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Core profile</h3>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <label className="space-y-1 text-sm"><span>Age</span><input className="w-full rounded-lg border border-slate-300 bg-white p-2 dark:border-slate-600 dark:bg-slate-900" type="number" value={profile.age ?? ""} onChange={(event) => updateField("age", event.target.value ? Number(event.target.value) : null)} /></label>
+                <label className="space-y-1 text-sm"><span>Sex</span><select className="w-full rounded-lg border border-slate-300 bg-white p-2 dark:border-slate-600 dark:bg-slate-900" value={profile.sex ?? ""} onChange={(event) => updateField("sex", (event.target.value || null) as HealthProfile["sex"])}><option value="">Select</option><option value="female">Female</option><option value="male">Male</option><option value="non_binary">Non-binary</option><option value="other">Other</option><option value="prefer_not_to_say">Prefer not to say</option></select></label>
+                <label className="space-y-1 text-sm"><span>Height (cm)</span><input className="w-full rounded-lg border border-slate-300 bg-white p-2 dark:border-slate-600 dark:bg-slate-900" type="number" value={profile.height_cm ?? ""} onChange={(event) => updateField("height_cm", event.target.value ? Number(event.target.value) : null)} /></label>
+                <label className="space-y-1 text-sm"><span>Weight (kg)</span><input className="w-full rounded-lg border border-slate-300 bg-white p-2 dark:border-slate-600 dark:bg-slate-900" type="number" value={profile.weight_kg ?? ""} onChange={(event) => updateField("weight_kg", event.target.value ? Number(event.target.value) : null)} /></label>
+              </div>
+            </article>
+
+            <article className="premium-card space-y-4 p-5">
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-brand-700">Health Baseline Inputs</p>
+              <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Lifestyle snapshot</h3>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <label className="space-y-1 text-sm"><span>Activity level</span><select className="w-full rounded-lg border border-slate-300 bg-white p-2 dark:border-slate-600 dark:bg-slate-900" value={profile.activity_level ?? ""} onChange={(event) => updateField("activity_level", (event.target.value || null) as HealthProfile["activity_level"])}><option value="">Select</option><option value="low">Low</option><option value="moderate">Moderate</option><option value="active">Active</option><option value="very_active">Very active</option></select></label>
+                <label className="space-y-1 text-sm"><span>Smoking / vaping</span><select className="w-full rounded-lg border border-slate-300 bg-white p-2 dark:border-slate-600 dark:bg-slate-900" value={profile.smoking_vaping_status ?? ""} onChange={(event) => updateField("smoking_vaping_status", (event.target.value || null) as HealthProfile["smoking_vaping_status"])}><option value="">Select</option><option value="none">None</option><option value="former">Former</option><option value="occasional">Occasional</option><option value="daily">Daily</option></select></label>
+                <label className="space-y-1 text-sm"><span>Alcohol frequency</span><select className="w-full rounded-lg border border-slate-300 bg-white p-2 dark:border-slate-600 dark:bg-slate-900" value={profile.alcohol_frequency ?? ""} onChange={(event) => updateField("alcohol_frequency", (event.target.value || null) as HealthProfile["alcohol_frequency"])}><option value="">Select</option><option value="never">Never</option><option value="monthly">Monthly</option><option value="weekly">Weekly</option><option value="several_times_weekly">Several times weekly</option><option value="daily">Daily</option></select></label>
+                <label className="space-y-1 text-sm"><span>Sleep average (hours)</span><input className="w-full rounded-lg border border-slate-300 bg-white p-2 dark:border-slate-600 dark:bg-slate-900" type="number" step="0.5" value={profile.sleep_average_hours ?? ""} onChange={(event) => updateField("sleep_average_hours", event.target.value ? Number(event.target.value) : null)} /></label>
+                <label className="space-y-1 text-sm sm:col-span-2"><span>Stress level</span><select className="w-full rounded-lg border border-slate-300 bg-white p-2 dark:border-slate-600 dark:bg-slate-900" value={profile.stress_level ?? ""} onChange={(event) => updateField("stress_level", (event.target.value || null) as HealthProfile["stress_level"])}><option value="">Select</option><option value="low">Low</option><option value="moderate">Moderate</option><option value="high">High</option><option value="very_high">Very high</option></select></label>
+              </div>
+            </article>
+
+            <article className="premium-card space-y-4 p-5 md:col-span-2">
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-brand-700">Health Baseline Inputs</p>
+              <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">History + optional metrics</h3>
+              <div className="grid gap-3 md:grid-cols-2">
+                <label className="space-y-1 text-sm"><span>Known conditions</span><input className="w-full rounded-lg border border-slate-300 bg-white p-2 dark:border-slate-600 dark:bg-slate-900" placeholder="e.g. hypertension, asthma" value={joinList(profile.known_conditions)} onChange={(event) => updateField("known_conditions", parseList(event.target.value))} /></label>
+                <div className="space-y-1 text-sm"><span>Current medications</span><div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600 dark:border-slate-700 dark:bg-slate-800/60 dark:text-slate-300">Managed below in Medication Tracker ({profile.medications.length} active).</div></div>
+                <label className="space-y-1 text-sm md:col-span-2"><span>Family history</span><input className="w-full rounded-lg border border-slate-300 bg-white p-2 dark:border-slate-600 dark:bg-slate-900" placeholder="e.g. heart disease, type 2 diabetes" value={joinList(profile.family_history)} onChange={(event) => updateField("family_history", parseList(event.target.value))} /></label>
+              </div>
+              <div className="grid gap-3 sm:grid-cols-3">
+                <label className="space-y-1 text-sm"><span>Systolic BP (optional)</span><input className="w-full rounded-lg border border-slate-300 bg-white p-2 dark:border-slate-600 dark:bg-slate-900" type="number" value={profile.systolic_bp ?? ""} onChange={(event) => updateField("systolic_bp", event.target.value ? Number(event.target.value) : null)} /></label>
+                <label className="space-y-1 text-sm"><span>Diastolic BP (optional)</span><input className="w-full rounded-lg border border-slate-300 bg-white p-2 dark:border-slate-600 dark:bg-slate-900" type="number" value={profile.diastolic_bp ?? ""} onChange={(event) => updateField("diastolic_bp", event.target.value ? Number(event.target.value) : null)} /></label>
+                <label className="space-y-1 text-sm"><span>Total cholesterol (optional)</span><input className="w-full rounded-lg border border-slate-300 bg-white p-2 dark:border-slate-600 dark:bg-slate-900" type="number" value={profile.total_cholesterol ?? ""} onChange={(event) => updateField("total_cholesterol", event.target.value ? Number(event.target.value) : null)} /></label>
+              </div>
+            </article>
+          </div>
+        </section>
 
         <section className="space-y-4 rounded-2xl border border-brand-200/70 bg-gradient-to-br from-brand-50/80 to-cyan-50/70 p-5 dark:border-brand-900/50 dark:from-slate-900 dark:to-slate-900/80">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-brand-700">Your AI Health Guidance</p>
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-brand-700">2. AI Guidance / Plan</p>
               <h2 className="mt-1 text-xl font-semibold text-slate-900 dark:text-slate-100">Weekly coaching plan</h2>
-              <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">Guidance is personalized from your saved baseline and refreshed each time you update your profile.</p>
+              <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">Actionable guidance from your current baseline and momentum context.</p>
             </div>
-            <p className="rounded-full border border-slate-300/70 bg-white/70 px-3 py-1 text-xs text-slate-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200">
-              Refreshed {guidance?.refreshedAt ? new Date(guidance.refreshedAt).toLocaleString() : "Not yet"}
-            </p>
+            <p className="rounded-full border border-slate-300/70 bg-white/70 px-3 py-1 text-xs text-slate-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200">Refreshed {guidance?.refreshedAt ? new Date(guidance.refreshedAt).toLocaleString() : "Not yet"}</p>
           </div>
 
           <div className="grid gap-4 lg:grid-cols-2">
@@ -482,39 +682,102 @@ export default function ProfilePage() {
               <p className="mt-2 text-base font-semibold text-slate-900 dark:text-slate-100">{guidance?.focus ?? "Complete your baseline"}</p>
             </article>
             <article className="premium-card p-4">
-              <h3 className="text-sm font-semibold uppercase tracking-[0.12em] text-slate-700 dark:text-slate-300">Recommended Goals</h3>
-              <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-slate-700 dark:text-slate-200">
-                {(guidance?.goals ?? []).map((goal) => <li key={goal}>{goal}</li>)}
-              </ul>
+              <h3 className="text-sm font-semibold uppercase tracking-[0.12em] text-slate-700 dark:text-slate-300">Today&apos;s Small Win</h3>
+              <p className="mt-2 text-sm text-slate-700 dark:text-slate-200">{guidance?.todaysSmallWin ?? "Save your profile to generate today's small win."}</p>
+              <p className="mt-3 text-xs text-slate-500 dark:text-slate-400">Why this matters: {guidance?.whyThisMatters ?? "Small daily wins build weekly health momentum."}</p>
             </article>
             <article className="premium-card p-4">
-              <h3 className="text-sm font-semibold uppercase tracking-[0.12em] text-slate-700 dark:text-slate-300">Risk Watchlist</h3>
-              {(guidance?.watchlist?.length ?? 0) > 0 ? (
-                <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-slate-700 dark:text-slate-200">
-                  {guidance?.watchlist.map((risk) => <li key={risk}>{risk}</li>)}
-                </ul>
-              ) : (
-                <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">No major watchlist flags from current profile data.</p>
-              )}
+              <h3 className="text-sm font-semibold uppercase tracking-[0.12em] text-slate-700 dark:text-slate-300">Watchlist</h3>
+              {(guidance?.watchlist?.length ?? 0) > 0 ? <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-slate-700 dark:text-slate-200">{guidance?.watchlist.map((risk) => <li key={risk}>{risk}</li>)}</ul> : <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">No major watchlist flags from current profile data.</p>}
             </article>
           </div>
+          <article className="premium-card p-4">
+            <h3 className="text-sm font-semibold uppercase tracking-[0.12em] text-slate-700 dark:text-slate-300">Recommended Goals</h3>
+            <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-slate-700 dark:text-slate-200">{(guidance?.goals ?? []).map((goal) => <li key={goal}>{goal}</li>)}</ul>
+          </article>
         </section>
 
-        <div className="flex flex-wrap gap-3">
-          <button className="rounded-lg bg-brand-700 px-4 py-2 text-sm font-medium text-white disabled:opacity-60" onClick={onSaveProfile} disabled={saving}>{saving ? "Saving..." : "Save & Update Plan"}</button>
-          <button className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:-translate-y-0.5 hover:bg-slate-100 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700" onClick={onRefreshGuidance} disabled={refreshingGuidance}>{refreshingGuidance ? "Refreshing..." : "Refresh Guidance"}</button>
-          <Link href="/health-trends" className="rounded-lg border border-brand-300/80 bg-brand-50/90 px-4 py-2 text-sm font-medium text-brand-800 transition hover:-translate-y-0.5 hover:bg-brand-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700">View Trends</Link>
-          <Link href="/history" className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:-translate-y-0.5 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700">Reports History</Link>
-        </div>
+        <section className="space-y-4">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-brand-700">3. Momentum / Progress</p>
+            <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100">Momentum Score</h2>
+          </div>
+          <div className="grid gap-4 lg:grid-cols-3">
+            <article className="premium-card lg:col-span-2 p-5">
+              <div className="flex items-end justify-between gap-4">
+                <div>
+                  <p className="text-xs uppercase tracking-[0.15em] text-slate-500 dark:text-slate-400">Score (0-100)</p>
+                  <p className="mt-2 text-4xl font-semibold text-slate-900 dark:text-slate-100">{momentum.score}</p>
+                  <p className="mt-2 inline-flex rounded-full border border-cyan-300/70 bg-cyan-50 px-3 py-1 text-xs font-semibold text-cyan-800 dark:border-cyan-800 dark:bg-cyan-950/30 dark:text-cyan-200">{momentum.label}</p>
+                </div>
+                <div className="h-24 w-24 rounded-full border-8 border-slate-200 dark:border-slate-700 relative">
+                  <div className="absolute inset-0 rounded-full border-8 border-transparent border-t-cyan-400 border-r-blue-500" style={{ transform: `rotate(${(momentum.score / 100) * 360}deg)` }} />
+                  <div className="absolute inset-0 flex items-center justify-center text-xs font-semibold text-slate-600 dark:text-slate-300">{momentum.score}%</div>
+                </div>
+              </div>
+              <div className="mt-4 h-2 rounded-full bg-slate-200 dark:bg-slate-800"><div className="h-2 rounded-full bg-gradient-to-r from-cyan-500 to-blue-500" style={{ width: `${momentum.score}%` }} /></div>
+              <p className="mt-3 text-sm text-slate-700 dark:text-slate-200">{momentum.explanation}</p>
+            </article>
+            <article className="premium-card p-5">
+              <h3 className="text-sm font-semibold uppercase tracking-[0.12em] text-slate-700 dark:text-slate-300">Progress over time</h3>
+              <p className="mt-2 text-sm text-slate-700 dark:text-slate-200">{trendSignal}</p>
+              <Link href="/health-trends" className="mt-3 inline-flex rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-medium text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100">Open Trends Workspace</Link>
+            </article>
+          </div>
+          <div className="grid gap-4 md:grid-cols-2">
+            <article className="premium-card p-4">
+              <h3 className="text-sm font-semibold uppercase tracking-[0.12em] text-emerald-700 dark:text-emerald-300">What&apos;s helping</h3>
+              <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-slate-700 dark:text-slate-200">{momentum.improvingSignals.map((signal) => <li key={signal}>{signal}</li>)}</ul>
+            </article>
+            <article className="premium-card p-4">
+              <h3 className="text-sm font-semibold uppercase tracking-[0.12em] text-amber-700 dark:text-amber-300">What&apos;s dragging score</h3>
+              <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-slate-700 dark:text-slate-200">{momentum.draggingSignals.map((signal) => <li key={signal}>{signal}</li>)}</ul>
+            </article>
+          </div>
 
-        {saveMessage ? <p className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800 dark:border-emerald-900 dark:bg-emerald-950/20 dark:text-emerald-200">{saveMessage}</p> : null}
-        {error ? <p className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700 dark:border-rose-900 dark:bg-rose-950/20 dark:text-rose-200">{error}</p> : null}
+          <article className="premium-card p-5">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-brand-700">Ask AI Health Coach</p>
+                <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Structured coaching Q&A</h3>
+                <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">Educational responses grounded in your baseline, weekly plan, and momentum score.</p>
+              </div>
+            </div>
+            <div className="mt-4 flex flex-wrap gap-2">
+              {COACH_SUGGESTED_PROMPTS.map((prompt) => (
+                <button
+                  key={prompt}
+                  className="rounded-full border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:hover:bg-slate-800"
+                  onClick={() => {
+                    setCoachQuestion(prompt);
+                    setCoachAnswer(generateCoachResponse(prompt, profile, guidance, momentum));
+                  }}
+                >
+                  {prompt}
+                </button>
+              ))}
+            </div>
+            <form onSubmit={onAskCoach} className="mt-4 grid gap-3 md:grid-cols-[1fr_auto]">
+              <input
+                value={coachQuestion}
+                onChange={(event) => setCoachQuestion(event.target.value)}
+                placeholder="Ask a coaching question..."
+                className="w-full rounded-lg border border-slate-300 bg-white p-2.5 text-sm dark:border-slate-600 dark:bg-slate-900"
+              />
+              <button type="submit" className="rounded-lg bg-brand-700 px-4 py-2 text-sm font-medium text-white">Ask Coach</button>
+            </form>
+            <div className="mt-3 rounded-xl border border-cyan-200/70 bg-cyan-50/50 p-3 text-sm text-slate-700 dark:border-cyan-900/60 dark:bg-cyan-950/20 dark:text-slate-200">
+              {coachAnswer ?? "Select a suggested question or type your own to get a focused coaching response."}
+            </div>
+            <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">Educational only. Not medical diagnosis or emergency guidance.</p>
+          </article>
+        </section>
 
         <section className="space-y-4 rounded-2xl border border-slate-200/80 bg-white/80 p-5 dark:border-slate-700 dark:bg-slate-900/70">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-brand-700">Medication Tracker</p>
-            <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100">Medication Tracker V2</h2>
-            <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">Manage active medications and adherence after reviewing your weekly plan.</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-brand-700">4. Medication / Reminders</p>
+            <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100">Medication tracker + reminders</h2>
+            <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">Keep your medication routine and reminder preferences aligned with your weekly coaching plan.</p>
           </div>
 
           <div className="grid gap-4 lg:grid-cols-2">
@@ -530,26 +793,12 @@ export default function ProfilePage() {
                         <p className="text-xs text-slate-600 dark:text-slate-300">{formatMedicationStatusLabel(todaysStatusByMedicationId.get(medication.id))}</p>
                       </div>
                       <div className="flex gap-2">
-                        <button
-                          className="rounded-md border border-emerald-300 bg-emerald-50 px-2 py-1 text-xs font-medium text-emerald-700 disabled:opacity-60 dark:border-emerald-900 dark:bg-emerald-950/30 dark:text-emerald-200"
-                          onClick={() => onUpdateMedicationTodayStatus(medication.id, "taken")}
-                          disabled={updatingMedicationId === medication.id}
-                        >
-                          Taken
-                        </button>
-                        <button
-                          className="rounded-md border border-amber-300 bg-amber-50 px-2 py-1 text-xs font-medium text-amber-700 disabled:opacity-60 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-200"
-                          onClick={() => onUpdateMedicationTodayStatus(medication.id, "skipped")}
-                          disabled={updatingMedicationId === medication.id}
-                        >
-                          Skipped
-                        </button>
+                        <button className="rounded-md border border-emerald-300 bg-emerald-50 px-2 py-1 text-xs font-medium text-emerald-700 disabled:opacity-60 dark:border-emerald-900 dark:bg-emerald-950/30 dark:text-emerald-200" onClick={() => onUpdateMedicationTodayStatus(medication.id, "taken")} disabled={updatingMedicationId === medication.id}>Taken</button>
+                        <button className="rounded-md border border-amber-300 bg-amber-50 px-2 py-1 text-xs font-medium text-amber-700 disabled:opacity-60 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-200" onClick={() => onUpdateMedicationTodayStatus(medication.id, "skipped")} disabled={updatingMedicationId === medication.id}>Skipped</button>
                       </div>
                     </div>
                   </div>
-                )) : (
-                  <p className="rounded-lg border border-dashed border-cyan-300/80 bg-white/70 p-3 text-xs text-cyan-900/80 dark:border-cyan-900/60 dark:bg-slate-900/60 dark:text-cyan-200/80">No scheduled medications for today yet.</p>
-                )}
+                )) : <p className="rounded-lg border border-dashed border-cyan-300/80 bg-white/70 p-3 text-xs text-cyan-900/80 dark:border-cyan-900/60 dark:bg-slate-900/60 dark:text-cyan-200/80">No scheduled medications for today yet.</p>}
               </div>
             </article>
 
@@ -561,142 +810,57 @@ export default function ProfilePage() {
                     <span className="font-medium text-slate-800 dark:text-slate-200">{event.medication_name}</span>
                     <span className="text-slate-500 dark:text-slate-400">{new Date(event.event_date).toLocaleDateString()} · {event.status}</span>
                   </div>
-                )) : (
-                  <p className="rounded-lg border border-dashed border-slate-300/80 bg-white/80 p-3 text-xs text-slate-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">No adherence history yet. Mark taken/skipped in Today&apos;s Medications.</p>
-                )}
+                )) : <p className="rounded-lg border border-dashed border-slate-300/80 bg-white/80 p-3 text-xs text-slate-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">No adherence history yet. Mark taken/skipped in Today&apos;s Medications.</p>}
               </div>
             </article>
           </div>
 
+          <article className="premium-card p-4">
+            <h3 className="text-sm font-semibold uppercase tracking-[0.12em] text-slate-700 dark:text-slate-300">Reminder preferences</h3>
+            <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">Reminders support medication routines, weekly summaries, and upcoming coaching prompts.</p>
+            <div className="mt-3 grid gap-4 md:grid-cols-2">
+              <label className="flex items-start gap-3 rounded-xl border border-slate-200/90 bg-white/80 p-3 text-sm dark:border-slate-700 dark:bg-slate-900/70"><input type="checkbox" checked={profile.medication_reminders_enabled} onChange={(event) => updateField("medication_reminders_enabled", event.target.checked)} className="mt-1 h-4 w-4 rounded border-slate-400" /><span><span className="font-medium text-slate-900 dark:text-slate-100">Medication reminders</span><span className="block text-xs text-slate-500 dark:text-slate-400">Guides daily medication consistency and adherence tracking.</span></span></label>
+              <label className="space-y-1 text-sm"><span>Preferred reminder time</span><input type="time" value={profile.medication_reminder_time ?? "08:00"} onChange={(event) => updateField("medication_reminder_time", event.target.value || null)} className="w-full rounded-lg border border-slate-300 bg-white p-2 dark:border-slate-600 dark:bg-slate-900" /></label>
+              <label className="flex items-start gap-3 rounded-xl border border-slate-200/90 bg-white/80 p-3 text-sm md:col-span-2 dark:border-slate-700 dark:bg-slate-900/70"><input type="checkbox" checked={profile.weekly_health_summary_enabled} onChange={(event) => updateField("weekly_health_summary_enabled", event.target.checked)} className="mt-1 h-4 w-4 rounded border-slate-400" /><span><span className="font-medium text-slate-900 dark:text-slate-100">Weekly health summary</span><span className="block text-xs text-slate-500 dark:text-slate-400">Receive a weekly educational recap of trends, adherence, and next-step suggestions.</span></span></label>
+            </div>
+            <div className="mt-3 rounded-xl border border-dashed border-slate-300/80 bg-slate-50/60 p-3 text-xs text-slate-600 dark:border-slate-700 dark:bg-slate-800/50 dark:text-slate-300">
+              {profile.medication_reminders_enabled && profile.medications.length > 0
+                ? `Medication reminder set for ${profile.medication_reminder_time ?? "08:00"}.`
+                : "Medication reminders not configured yet."}{" "}
+              {profile.weekly_health_summary_enabled ? "Weekly summary enabled." : "Weekly summary disabled."}
+            </div>
+          </article>
+
           <div className="grid gap-3 md:grid-cols-2">
             <label className="space-y-1 text-sm"><span>Medication name</span><input className="w-full rounded-lg border border-slate-300 bg-white p-2 dark:border-slate-600 dark:bg-slate-900" placeholder="e.g. Metformin" value={medicationDraft.name} onChange={(event) => setMedicationDraft((current) => ({ ...current, name: event.target.value }))} /></label>
             <label className="space-y-1 text-sm"><span>Dosage (optional)</span><input className="w-full rounded-lg border border-slate-300 bg-white p-2 dark:border-slate-600 dark:bg-slate-900" placeholder="e.g. 500mg" value={medicationDraft.dosage} onChange={(event) => setMedicationDraft((current) => ({ ...current, dosage: event.target.value }))} /></label>
-            <label className="space-y-1 text-sm">
-              <span>Frequency</span>
-              <select className="w-full rounded-lg border border-slate-300 bg-white p-2 dark:border-slate-600 dark:bg-slate-900" value={medicationDraft.frequency} onChange={(event) => setMedicationDraft((current) => ({ ...current, frequency: event.target.value as MedicationFrequency }))}>
-                <option value="daily">Daily</option>
-                <option value="weekly">Weekly</option>
-                <option value="as_needed">As needed</option>
-                <option value="custom">Custom</option>
-              </select>
-            </label>
-            {medicationDraft.frequency === "custom" ? (
-              <label className="space-y-1 text-sm"><span>Custom frequency</span><input className="w-full rounded-lg border border-slate-300 bg-white p-2 dark:border-slate-600 dark:bg-slate-900" placeholder="e.g. Every other day" value={medicationDraft.custom_frequency} onChange={(event) => setMedicationDraft((current) => ({ ...current, custom_frequency: event.target.value }))} /></label>
-            ) : null}
-            <label className="space-y-1 text-sm">
-              <span>Time of day (optional)</span>
-              <select className="w-full rounded-lg border border-slate-300 bg-white p-2 dark:border-slate-600 dark:bg-slate-900" value={medicationDraft.time_of_day} onChange={(event) => setMedicationDraft((current) => ({ ...current, time_of_day: event.target.value as MedicationTimeOfDay | "" }))}>
-                <option value="">Not specified</option>
-                <option value="morning">Morning</option>
-                <option value="afternoon">Afternoon</option>
-                <option value="evening">Evening</option>
-                <option value="bedtime">Bedtime</option>
-              </select>
-            </label>
+            <label className="space-y-1 text-sm"><span>Frequency</span><select className="w-full rounded-lg border border-slate-300 bg-white p-2 dark:border-slate-600 dark:bg-slate-900" value={medicationDraft.frequency} onChange={(event) => setMedicationDraft((current) => ({ ...current, frequency: event.target.value as MedicationFrequency }))}><option value="daily">Daily</option><option value="weekly">Weekly</option><option value="as_needed">As needed</option><option value="custom">Custom</option></select></label>
+            {medicationDraft.frequency === "custom" ? <label className="space-y-1 text-sm"><span>Custom frequency</span><input className="w-full rounded-lg border border-slate-300 bg-white p-2 dark:border-slate-600 dark:bg-slate-900" placeholder="e.g. Every other day" value={medicationDraft.custom_frequency} onChange={(event) => setMedicationDraft((current) => ({ ...current, custom_frequency: event.target.value }))} /></label> : null}
+            <label className="space-y-1 text-sm"><span>Time of day (optional)</span><select className="w-full rounded-lg border border-slate-300 bg-white p-2 dark:border-slate-600 dark:bg-slate-900" value={medicationDraft.time_of_day} onChange={(event) => setMedicationDraft((current) => ({ ...current, time_of_day: event.target.value as MedicationTimeOfDay | "" }))}><option value="">Not specified</option><option value="morning">Morning</option><option value="afternoon">Afternoon</option><option value="evening">Evening</option><option value="bedtime">Bedtime</option></select></label>
             <label className="space-y-1 text-sm md:col-span-2"><span>Notes (optional)</span><textarea className="w-full rounded-lg border border-slate-300 bg-white p-2 dark:border-slate-600 dark:bg-slate-900" rows={2} value={medicationDraft.notes} onChange={(event) => setMedicationDraft((current) => ({ ...current, notes: event.target.value }))} /></label>
           </div>
-          <div>
-            <button className="rounded-lg border border-brand-300/80 bg-brand-50/90 px-4 py-2 text-sm font-medium text-brand-800 transition hover:-translate-y-0.5 hover:bg-brand-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700" onClick={onAddMedication}>Add medication</button>
-          </div>
+          <div><button className="rounded-lg border border-brand-300/80 bg-brand-50/90 px-4 py-2 text-sm font-medium text-brand-800 transition hover:-translate-y-0.5 hover:bg-brand-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700" onClick={onAddMedication}>Add medication</button></div>
 
           <h3 className="text-sm font-semibold uppercase tracking-[0.12em] text-slate-700 dark:text-slate-300">Active Medications</h3>
-          {profile.medications.length > 0 ? (
-            <div className="grid gap-3 md:grid-cols-2">
-              {profile.medications.map((medication) => (
-                <article key={medication.id} className="rounded-xl border border-slate-200/90 bg-slate-50/70 p-4 dark:border-slate-700 dark:bg-slate-800/55">
-                  <div className="flex items-start justify-between gap-2">
-                    <div>
-                      <h3 className="text-base font-semibold text-slate-900 dark:text-slate-100">{medication.name}</h3>
-                      <p className="text-xs text-slate-500 dark:text-slate-400">
-                        {(medication.frequency === "custom" ? medication.custom_frequency : medication.frequency)?.replaceAll("_", " ") || "No frequency"}{medication.time_of_day ? ` • ${medication.time_of_day}` : ""}
-                      </p>
-                    </div>
-                    <button className="text-xs font-medium text-rose-600 hover:text-rose-500" onClick={() => onRemoveMedication(medication.id)}>Remove</button>
-                  </div>
-                  {medication.dosage ? <p className="mt-2 text-sm text-slate-700 dark:text-slate-200">Dosage: {medication.dosage}</p> : null}
-                  {medication.notes ? <p className="mt-1 text-xs text-slate-500 dark:text-slate-300">{medication.notes}</p> : null}
-                </article>
-              ))}
-            </div>
-          ) : (
-            <p className="rounded-xl border border-dashed border-slate-300/90 bg-slate-50/50 p-4 text-sm text-slate-600 dark:border-slate-700 dark:bg-slate-800/45 dark:text-slate-300">No medications added yet. Add your first medication above.</p>
-          )}
-        </section>
-
-        <section className="premium-card space-y-4 p-5">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-brand-700">Notifications foundation</p>
-            <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Reminder preferences</h2>
-            <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">Set your reminder intent now. Scheduled delivery channels can be connected in a future release.</p>
-          </div>
-          <div className="grid gap-4 md:grid-cols-2">
-            <label className="flex items-start gap-3 rounded-xl border border-slate-200/90 bg-white/80 p-3 text-sm dark:border-slate-700 dark:bg-slate-900/70">
-              <input
-                type="checkbox"
-                checked={profile.medication_reminders_enabled}
-                onChange={(event) => updateField("medication_reminders_enabled", event.target.checked)}
-                className="mt-1 h-4 w-4 rounded border-slate-400"
-              />
-              <span>
-                <span className="font-medium text-slate-900 dark:text-slate-100">Medication reminders</span>
-                <span className="block text-xs text-slate-500 dark:text-slate-400">Use your active Medication Tracker list as reminder context.</span>
-              </span>
-            </label>
-            <label className="space-y-1 text-sm">
-              <span>Preferred reminder time</span>
-              <input
-                type="time"
-                value={profile.medication_reminder_time ?? "08:00"}
-                onChange={(event) => updateField("medication_reminder_time", event.target.value || null)}
-                className="w-full rounded-lg border border-slate-300 bg-white p-2 dark:border-slate-600 dark:bg-slate-900"
-              />
-            </label>
-            <label className="flex items-start gap-3 rounded-xl border border-slate-200/90 bg-white/80 p-3 text-sm md:col-span-2 dark:border-slate-700 dark:bg-slate-900/70">
-              <input
-                type="checkbox"
-                checked={profile.weekly_health_summary_enabled}
-                onChange={(event) => updateField("weekly_health_summary_enabled", event.target.checked)}
-                className="mt-1 h-4 w-4 rounded border-slate-400"
-              />
-              <span>
-                <span className="font-medium text-slate-900 dark:text-slate-100">Weekly health summary</span>
-                <span className="block text-xs text-slate-500 dark:text-slate-400">Receive a weekly educational recap of trends, adherence, and next-step suggestions.</span>
-              </span>
-            </label>
-          </div>
+          {profile.medications.length > 0 ? <div className="grid gap-3 md:grid-cols-2">{profile.medications.map((medication) => (<article key={medication.id} className="rounded-xl border border-slate-200/90 bg-slate-50/70 p-4 dark:border-slate-700 dark:bg-slate-800/55"><div className="flex items-start justify-between gap-2"><div><h3 className="text-base font-semibold text-slate-900 dark:text-slate-100">{medication.name}</h3><p className="text-xs text-slate-500 dark:text-slate-400">{(medication.frequency === "custom" ? medication.custom_frequency : medication.frequency)?.replaceAll("_", " ") || "No frequency"}{medication.time_of_day ? ` • ${medication.time_of_day}` : ""}</p></div><button className="text-xs font-medium text-rose-600 hover:text-rose-500" onClick={() => onRemoveMedication(medication.id)}>Remove</button></div>{medication.dosage ? <p className="mt-2 text-sm text-slate-700 dark:text-slate-200">Dosage: {medication.dosage}</p> : null}{medication.notes ? <p className="mt-1 text-xs text-slate-500 dark:text-slate-300">{medication.notes}</p> : null}</article>))}</div> : <p className="rounded-xl border border-dashed border-slate-300/90 bg-slate-50/50 p-4 text-sm text-slate-600 dark:border-slate-700 dark:bg-slate-800/45 dark:text-slate-300">No medications added yet. Add your first medication above.</p>}
         </section>
 
         <section className="rounded-2xl border border-amber-300/60 bg-gradient-to-br from-slate-900 to-slate-800 p-5 text-slate-100">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-amber-300">Premium Preview</p>
-              <h2 className="mt-1 text-xl font-semibold">Unlock Premium Health Coaching</h2>
-              <p className="mt-1 max-w-2xl text-sm text-slate-300">Upgrade for deeper automation and adaptive coaching built on top of your existing baseline, guidance, and adherence data.</p>
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-amber-300">5. Premium Upgrade Preview</p>
+              <h2 className="mt-1 text-xl font-semibold">Unlock deeper coaching automation</h2>
+              <p className="mt-1 max-w-2xl text-sm text-slate-300">Your current workspace remains fully usable on free. Premium adds long-range coaching depth without changing your baseline workflow.</p>
             </div>
-            <span className="rounded-full border border-amber-200/50 bg-amber-100/10 px-3 py-1 text-xs font-semibold text-amber-200">
-              {isPremium ? "Premium Active" : "Locked on Free"}
-            </span>
+            <span className="rounded-full border border-amber-200/50 bg-amber-100/10 px-3 py-1 text-xs font-semibold text-amber-200">{isPremium ? "Premium Active" : "Locked on Free"}</span>
           </div>
 
           <div className="mt-4 grid gap-4 md:grid-cols-2">
-            <article className="rounded-xl border border-slate-600/70 bg-slate-900/60 p-4">
-              <h3 className="text-sm font-semibold uppercase tracking-[0.12em] text-slate-300">Free Access</h3>
-              <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-slate-200">
-                {FREE_FEATURES.map((feature) => <li key={feature}>{feature}</li>)}
-              </ul>
-            </article>
-            <article className="rounded-xl border border-amber-300/40 bg-amber-100/10 p-4">
-              <h3 className="text-sm font-semibold uppercase tracking-[0.12em] text-amber-200">Premium Includes</h3>
-              <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-amber-100">
-                {PREMIUM_FEATURES.map((feature) => <li key={feature}>{feature}</li>)}
-              </ul>
-            </article>
+            <article className="rounded-xl border border-slate-600/70 bg-slate-900/60 p-4"><h3 className="text-sm font-semibold uppercase tracking-[0.12em] text-slate-300">Included on Free</h3><ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-slate-200">{FREE_FEATURES.map((feature) => <li key={feature}>{feature}</li>)}</ul></article>
+            <article className="rounded-xl border border-amber-300/40 bg-amber-100/10 p-4"><h3 className="text-sm font-semibold uppercase tracking-[0.12em] text-amber-200">Premium adds</h3><ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-amber-100">{PREMIUM_FEATURES.map((feature) => <li key={feature}>{feature}</li>)}</ul></article>
           </div>
 
-          <div className="mt-5 flex flex-wrap gap-3">
-            <button className="rounded-lg bg-amber-300 px-4 py-2 text-sm font-semibold text-slate-900 hover:bg-amber-200">Upgrade to Premium</button>
-            <button className="rounded-lg border border-slate-500 bg-transparent px-4 py-2 text-sm font-medium text-slate-100 hover:bg-slate-800">Learn More</button>
-          </div>
+          <div className="mt-5 flex flex-wrap gap-3"><button className="rounded-lg bg-amber-300 px-4 py-2 text-sm font-semibold text-slate-900 hover:bg-amber-200">Upgrade to Premium</button><button className="rounded-lg border border-slate-500 bg-transparent px-4 py-2 text-sm font-medium text-slate-100 hover:bg-slate-800">Learn More</button></div>
         </section>
       </section>
     </RequireAuth>
