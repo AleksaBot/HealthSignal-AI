@@ -124,12 +124,25 @@ export default function HealthTrendsPage() {
 
               <section className="space-y-4">
                 <article className="premium-card p-5">
+                  <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">AI Trend Interpretation</h2>
+                  <p className="mt-2 text-sm leading-relaxed text-slate-700 dark:text-slate-300">{summary.aiSummary}</p>
+                  <p className="mt-3 text-xs text-slate-500 dark:text-slate-400">
+                    Educational insight only — this interpretation is not a diagnosis and should be reviewed with your clinician when making care decisions.
+                  </p>
+                </article>
+
+                <article className="premium-card p-5">
                   <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Health pattern insights</h2>
                   <ul className="mt-3 list-disc space-y-2 pl-5 text-sm text-slate-600 dark:text-slate-300">
                     {summary.patternInsights.map((insight) => (
                       <li key={insight}>{insight}</li>
                     ))}
                   </ul>
+                </article>
+
+                <article className="premium-card p-5">
+                  <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Medication adherence interpretation</h2>
+                  <p className="mt-2 text-sm text-slate-700 dark:text-slate-300">{summary.medicationAdherenceInsight}</p>
                 </article>
 
                 <article className="premium-card p-5">

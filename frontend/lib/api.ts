@@ -95,7 +95,7 @@ export function isLoggedIn() {
 function userMessageForStatus(status: number, fallback: string) {
   if (status === 401) return "Your session is invalid or expired. Please sign in again.";
   if (status === 403) return "You do not have permission to perform this action.";
-  if (status === 404) return "The requested resource was not found.";
+  if (status === 404) return "We couldn't complete that request right now. Please refresh and try again.";
   if (status >= 500) return "The server is currently unavailable. Please try again shortly.";
   return fallback;
 }
@@ -252,7 +252,13 @@ export function verifyEmailToken(token: string) {
 }
 
 export function resendVerificationEmail(payload: ForgotPasswordRequest) {
-  return postJSON<ForgotPasswordRequest, AuthActionResponse>("/api/auth/verification/resend", payload);
+  return postJSON<ForgotPasswordRequest, AuthActionResponse>("/api/auth/verification/resend", payload).catch((error) => {
+    if (!(error instanceof ApiError) || error.status !== 404) {
+      throw error;
+    }
+
+    return postJSON<ForgotPasswordRequest, AuthActionResponse>("/api/auth/resend-verification", payload);
+  });
 }
 
 export function getCurrentUser() {

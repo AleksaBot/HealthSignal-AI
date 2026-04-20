@@ -27,6 +27,8 @@ export type HealthTrendsSummary = {
   trendCards: TrendCard[];
   timeline: TimelineItem[];
   patternInsights: string[];
+  aiSummary: string;
+  medicationAdherenceInsight: string;
   reportsLast30Days: number;
   snapshotsThisMonth: number;
 };
@@ -121,6 +123,9 @@ function getProfileSnapshots(reports: ReportRead[]) {
         systolic_bp: (profileSnapshot.systolic_bp as number | null) ?? null,
         diastolic_bp: (profileSnapshot.diastolic_bp as number | null) ?? null,
         total_cholesterol: (profileSnapshot.total_cholesterol as number | null) ?? null,
+        medication_reminders_enabled: (profileSnapshot.medication_reminders_enabled as boolean) ?? false,
+        medication_reminder_time: (profileSnapshot.medication_reminder_time as string | null) ?? "08:00",
+        weekly_health_summary_enabled: (profileSnapshot.weekly_health_summary_enabled as boolean) ?? false,
         updated_at: (profileSnapshot.updated_at as string | null) ?? null
       }
     });
@@ -235,11 +240,39 @@ export function buildHealthTrendsSummary(profile: HealthProfile | null, reports:
     patternInsights.push("No strong longitudinal pattern yet. Save more snapshots to unlock deeper trend signals.");
   }
 
+  const takenCount = (profile?.recent_medication_events ?? []).filter((event) => event.status === "taken").length;
+  const skippedCount = (profile?.recent_medication_events ?? []).filter((event) => event.status === "skipped").length;
+  const adherenceTotal = takenCount + skippedCount;
+  const adherenceRate = adherenceTotal ? Math.round((takenCount / adherenceTotal) * 100) : null;
+
+  const medicationAdherenceInsight =
+    adherenceRate === null
+      ? "No recent medication adherence entries yet. Logging taken/skipped events unlocks smarter adherence insights."
+      : adherenceRate >= 85
+        ? `Medication adherence looks steady (${adherenceRate}% taken in recent logs). Keep this consistency.`
+        : adherenceRate >= 65
+          ? `Medication adherence is mixed (${adherenceRate}% taken). Consider reminder preferences to improve consistency.`
+          : `Medication adherence appears low (${adherenceRate}% taken). Use reminders and a fixed daily routine to improve follow-through.`;
+
+  const aiSummaryParts: string[] = [];
+  aiSummaryParts.push(
+    reportsLast30Days > 0
+      ? `You completed ${reportsLast30Days} report${reportsLast30Days > 1 ? "s" : ""} in the last 30 days, showing active monitoring.`
+      : "No reports were generated in the last 30 days; consider refreshing your baseline for better AI interpretation."
+  );
+  if (snapshotsThisMonth > 0) {
+    aiSummaryParts.push(`You saved ${snapshotsThisMonth} profile snapshot${snapshotsThisMonth > 1 ? "s" : ""} this month.`);
+  }
+  aiSummaryParts.push(medicationAdherenceInsight);
+  const aiSummary = aiSummaryParts.join(" ");
+
   return {
     hasHistory,
     trendCards,
     timeline: recentTimeline,
     patternInsights,
+    aiSummary,
+    medicationAdherenceInsight,
     reportsLast30Days,
     snapshotsThisMonth
   };

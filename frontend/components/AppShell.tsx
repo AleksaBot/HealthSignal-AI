@@ -11,7 +11,8 @@ const navItems = [
   { href: "/", label: "Dashboard", emphasis: false },
   { href: "/profile", label: "My Health", emphasis: true },
   { href: "/health-trends", label: "Health Trends", emphasis: false },
-  { href: "/history", label: "Reports", emphasis: false }
+  { href: "/history", label: "Reports", emphasis: false },
+  { href: "/pricing", label: "Pricing", emphasis: false }
 ] as const;
 
 export function AppShell({ children }: { children: ReactNode }) {
@@ -220,6 +221,17 @@ export function AppShell({ children }: { children: ReactNode }) {
       </header>
 
       <main className="mx-auto max-w-6xl space-y-8 px-6 py-8">{children}</main>
+      <footer className="border-t border-slate-200/70 bg-white/60 backdrop-blur dark:border-slate-700/60 dark:bg-slate-950/60">
+        <div className="mx-auto flex max-w-6xl flex-col justify-between gap-3 px-6 py-5 text-xs text-slate-600 md:flex-row md:items-center dark:text-slate-300">
+          <p>HealthSignal AI provides educational health guidance and is not a medical diagnosis tool.</p>
+          <div className="flex flex-wrap gap-3">
+            <Link href="/pricing" className="font-medium text-slate-700 hover:text-brand-700 dark:text-slate-200 dark:hover:text-brand-300">Pricing</Link>
+            <Link href="/privacy" className="font-medium text-slate-700 hover:text-brand-700 dark:text-slate-200 dark:hover:text-brand-300">Privacy</Link>
+            <Link href="/terms" className="font-medium text-slate-700 hover:text-brand-700 dark:text-slate-200 dark:hover:text-brand-300">Terms</Link>
+            <Link href="/contact" className="font-medium text-slate-700 hover:text-brand-700 dark:text-slate-200 dark:hover:text-brand-300">Contact</Link>
+          </div>
+        </div>
+      </footer>
     </div>
   );
 }

@@ -26,6 +26,13 @@ const productSignals = [
   { label: "Clinical clarity", value: "Action-ready output", detail: "Summaries designed for follow-up conversations." }
 ] as const;
 
+const trustLinks = [
+  { href: "/privacy", label: "Privacy" },
+  { href: "/terms", label: "Terms" },
+  { href: "/contact", label: "Contact" },
+  { href: "/pricing", label: "Pricing" }
+] as const;
+
 export default function HomePage() {
   const [authenticated, setAuthenticated] = useState(false);
   const [firstName, setFirstName] = useState<string | null>(null);
@@ -102,6 +109,12 @@ export default function HomePage() {
                 >
                   Create Account
                 </Link>
+                <Link
+                  href="/pricing"
+                  className="rounded-lg border border-brand-300/70 bg-brand-50/80 px-4 py-2 text-sm font-medium text-brand-700 transition hover:-translate-y-0.5 hover:bg-brand-100 dark:border-brand-500/40 dark:bg-brand-950/30 dark:text-brand-200"
+                >
+                  View Pricing
+                </Link>
               </div>
             )}
           </div>
@@ -142,6 +155,19 @@ export default function HomePage() {
             <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">{item.detail}</p>
           </article>
         ))}
+      </div>
+
+      <div className="premium-card flex flex-wrap items-center justify-between gap-3 p-4">
+        <p className="text-xs text-slate-600 dark:text-slate-300">
+          HealthSignal AI provides educational guidance and does not replace licensed medical diagnosis or treatment.
+        </p>
+        <div className="flex flex-wrap gap-3 text-xs">
+          {trustLinks.map((link) => (
+            <Link key={link.href} href={link.href} className="font-semibold text-slate-700 hover:text-brand-700 dark:text-slate-200 dark:hover:text-brand-300">
+              {link.label}
+            </Link>
+          ))}
+        </div>
       </div>
     </section>
   );

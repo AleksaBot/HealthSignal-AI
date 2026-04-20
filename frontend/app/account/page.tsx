@@ -19,6 +19,7 @@ export default function AccountPage() {
   const [error, setError] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<{ tone: "success" | "error"; message: string } | null>(null);
   const [verificationMessage, setVerificationMessage] = useState<string | null>(null);
+  const [resendingVerification, setResendingVerification] = useState(false);
 
   useEffect(() => {
     async function loadAccount() {
@@ -67,11 +68,15 @@ export default function AccountPage() {
 
   async function onResendVerification() {
     if (!account) return;
+    setResendingVerification(true);
+    setVerificationMessage(null);
     try {
       const response = await resendVerificationEmail({ email: account.email });
       setVerificationMessage(response.message);
     } catch (err) {
-      setVerificationMessage(getUserErrorMessage(err, "Unable to resend verification link."));
+      setVerificationMessage(getUserErrorMessage(err, "We couldn't send a new verification link right now. Please try again."));
+    } finally {
+      setResendingVerification(false);
     }
   }
 
@@ -135,9 +140,10 @@ export default function AccountPage() {
                 <button
                   type="button"
                   onClick={onResendVerification}
+                  disabled={resendingVerification}
                   className="w-fit rounded-lg border border-amber-300 bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-800 transition hover:bg-amber-100 dark:border-amber-600/50 dark:bg-amber-900/30 dark:text-amber-100 dark:hover:bg-amber-900/50"
                 >
-                  Resend verification
+                  {resendingVerification ? "Sending..." : "Resend verification"}
                 </button>
               ) : null}
               {verificationMessage ? <p className="text-xs text-slate-600 dark:text-slate-300">{verificationMessage}</p> : null}
