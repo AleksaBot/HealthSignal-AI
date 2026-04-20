@@ -3,8 +3,8 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { RequireAuth } from "@/components/RequireAuth";
-import { generateHealthInsights, getHealthProfile, getUserErrorMessage, saveReport, updateTodayMedicationStatus, upsertHealthProfile } from "@/lib/api";
-import { HealthProfile, HealthRiskInsightsResponse, MedicationAdherenceStatus, MedicationEntry, MedicationFrequency, MedicationTimeOfDay } from "@/lib/types";
+import { getHealthProfile, getUserErrorMessage, updateTodayMedicationStatus, upsertHealthProfile } from "@/lib/api";
+import { HealthProfile, MedicationAdherenceStatus, MedicationEntry, MedicationFrequency, MedicationTimeOfDay, UserTier } from "@/lib/types";
 
 const EMPTY_PROFILE: HealthProfile = {
   age: null,
@@ -38,6 +38,14 @@ type MedicationDraft = {
   notes: string;
 };
 
+type GuidancePlan = {
+  snapshot: string;
+  focus: string;
+  goals: string[];
+  watchlist: string[];
+  refreshedAt: string;
+};
+
 const EMPTY_MEDICATION_DRAFT: MedicationDraft = {
   name: "",
   dosage: "",
@@ -46,6 +54,23 @@ const EMPTY_MEDICATION_DRAFT: MedicationDraft = {
   time_of_day: "",
   notes: ""
 };
+
+const FREE_FEATURES = [
+  "Baseline inputs",
+  "Basic AI guidance",
+  "Medication Tracker",
+  "Reports",
+  "Trends (basic)"
+];
+
+const PREMIUM_FEATURES = [
+  "Daily adaptive coaching",
+  "Ask AI unlimited",
+  "Smart reminders",
+  "Deep trend analytics",
+  "Health score",
+  "Goal streaks"
+];
 
 function parseList(value: string) {
   return value
@@ -92,10 +117,95 @@ function formatMedicationStatusLabel(status: MedicationAdherenceStatus | null | 
   return "Pending";
 }
 
-function levelClasses(level: "positive" | "watch" | "caution") {
-  if (level === "positive") return "border-emerald-300/70 bg-emerald-50/70 text-emerald-800 dark:border-emerald-900 dark:bg-emerald-950/20 dark:text-emerald-200";
-  if (level === "watch") return "border-amber-300/80 bg-amber-50/80 text-amber-800 dark:border-amber-900 dark:bg-amber-950/20 dark:text-amber-200";
-  return "border-rose-300/80 bg-rose-50/80 text-rose-800 dark:border-rose-900 dark:bg-rose-950/20 dark:text-rose-200";
+function calculateBmi(heightCm: number | null, weightKg: number | null) {
+  if (!heightCm || !weightKg) return null;
+  const heightMeters = heightCm / 100;
+  if (!heightMeters) return null;
+  return Number((weightKg / (heightMeters * heightMeters)).toFixed(1));
+}
+
+function addGoal(goals: string[], goal: string) {
+  if (!goals.includes(goal) && goals.length < 5) {
+    goals.push(goal);
+  }
+}
+
+function buildGuidance(profile: HealthProfile): GuidancePlan {
+  const goals: string[] = [];
+  const watchlist: string[] = [];
+  const positives: string[] = [];
+  const improvements: string[] = [];
+  const bmi = calculateBmi(profile.height_cm, profile.weight_kg);
+
+  if (profile.activity_level === "active" || profile.activity_level === "very_active") {
+    positives.push("active lifestyle habits");
+  } else if (profile.activity_level === "low") {
+    improvements.push("movement consistency");
+    addGoal(goals, "Complete 3 walks or workouts this week.");
+  }
+
+  if ((profile.sleep_average_hours ?? 0) >= 7) {
+    positives.push("restorative sleep range");
+  } else if ((profile.sleep_average_hours ?? 0) > 0 && (profile.sleep_average_hours ?? 0) < 7) {
+    improvements.push("sleep consistency");
+    watchlist.push("Low sleep consistency");
+    addGoal(goals, "Reach 7+ hours of sleep on at least 4 nights.");
+  }
+
+  if (profile.stress_level === "high" || profile.stress_level === "very_high") {
+    improvements.push("stress recovery");
+    addGoal(goals, "Schedule one 10-minute decompression routine each workday.");
+  }
+
+  if (profile.smoking_vaping_status === "occasional" || profile.smoking_vaping_status === "daily") {
+    watchlist.push("Smoking/vaping risk");
+    addGoal(goals, "Set one smoke-free streak target this week.");
+  }
+
+  if (profile.alcohol_frequency === "several_times_weekly" || profile.alcohol_frequency === "daily") {
+    watchlist.push("Frequent alcohol intake");
+    addGoal(goals, "Reduce alcohol intake by 1-2 nights this week.");
+  }
+
+  if (bmi && bmi >= 27) {
+    watchlist.push("Elevated BMI trend");
+    addGoal(goals, "Prioritize movement + nutrition consistency for 5 days.");
+  }
+
+  if (profile.family_history.length > 0) {
+    watchlist.push("Family history cardiovascular/metabolic risk");
+  }
+
+  if (profile.medications.length > 0) {
+    addGoal(goals, "Maintain medication adherence daily.");
+  }
+
+  if (goals.length < 3) {
+    addGoal(goals, "Hydrate consistently and follow regular meal timing.");
+    addGoal(goals, "Review baseline metrics once before week end.");
+  }
+
+  const focus =
+    (profile.sleep_average_hours ?? 0) < 7
+      ? "Recovery & Consistency"
+      : profile.stress_level === "high" || profile.stress_level === "very_high"
+        ? "Stress Reset"
+        : profile.activity_level === "low"
+          ? "Movement Momentum"
+          : "Sustain Your Momentum";
+
+  const snapshot =
+    positives.length > 0
+      ? `You maintain a solid baseline with ${positives.join(" and ")}. ${improvements.length ? `Your highest leverage area next is ${improvements[0]}.` : "Keep building consistency to preserve long-term gains."}`
+      : `Your baseline has meaningful opportunity in ${improvements[0] ?? "consistency"}. Small weekly actions will create measurable momentum.`;
+
+  return {
+    snapshot,
+    focus,
+    goals: goals.slice(0, 5),
+    watchlist,
+    refreshedAt: new Date().toISOString()
+  };
 }
 
 export default function ProfilePage() {
@@ -104,14 +214,13 @@ export default function ProfilePage() {
   const [saving, setSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [insights, setInsights] = useState<HealthRiskInsightsResponse | null>(null);
-  const [generating, setGenerating] = useState(false);
-  const [savingReport, setSavingReport] = useState(false);
-  const [savedReportId, setSavedReportId] = useState<number | null>(null);
-  const [copyStatus, setCopyStatus] = useState<"idle" | "success" | "error">("idle");
   const [medicationDraft, setMedicationDraft] = useState<MedicationDraft>(EMPTY_MEDICATION_DRAFT);
   const [updatingMedicationId, setUpdatingMedicationId] = useState<string | null>(null);
+  const [guidance, setGuidance] = useState<GuidancePlan | null>(null);
+  const [refreshingGuidance, setRefreshingGuidance] = useState(false);
 
+  // Foundation for free vs premium feature-gating.
+  const [userTier] = useState<UserTier>("free");
   const completionPercent = useMemo(() => profileCompletion(profile), [profile]);
   const todaysStatusByMedicationId = useMemo(
     () => new Map((profile.todays_medication_status ?? []).map((entry) => [entry.medication_id, entry.status])),
@@ -121,6 +230,7 @@ export default function ProfilePage() {
     () => profile.medications.filter((medication) => medication.frequency !== "as_needed"),
     [profile.medications]
   );
+  const isPremium = userTier === "premium";
 
   useEffect(() => {
     async function loadProfile() {
@@ -137,12 +247,14 @@ export default function ProfilePage() {
               time_of_day: null,
               notes: "Imported from your previous My Health medications list."
             }));
-        setProfile({
+        const hydratedProfile = {
           ...EMPTY_PROFILE,
           ...response,
           medications: normalizedMedications,
           current_medications: normalizeMedicationNames(normalizedMedications)
-        });
+        };
+        setProfile(hydratedProfile);
+        setGuidance(buildGuidance(hydratedProfile));
       } catch (err) {
         setError(getUserErrorMessage(err, "Unable to load your health profile."));
       } finally {
@@ -156,7 +268,6 @@ export default function ProfilePage() {
   function updateField<K extends keyof HealthProfile>(key: K, value: HealthProfile[K]) {
     setProfile((current) => ({ ...current, [key]: value }));
     setSaveMessage(null);
-    setSavedReportId(null);
   }
 
   function onAddMedication() {
@@ -188,7 +299,6 @@ export default function ProfilePage() {
     setMedicationDraft(EMPTY_MEDICATION_DRAFT);
     setError(null);
     setSaveMessage(null);
-    setSavedReportId(null);
   }
 
   function onRemoveMedication(medicationId: string) {
@@ -201,7 +311,6 @@ export default function ProfilePage() {
       };
     });
     setSaveMessage(null);
-    setSavedReportId(null);
   }
 
   async function onUpdateMedicationTodayStatus(medicationId: string, status: MedicationAdherenceStatus) {
@@ -216,6 +325,11 @@ export default function ProfilePage() {
         current_medications: normalizeMedicationNames(response.medications ?? [])
       });
       setSaveMessage("Medication adherence saved for today.");
+      setGuidance(buildGuidance({
+        ...response,
+        medications: response.medications ?? [],
+        current_medications: normalizeMedicationNames(response.medications ?? [])
+      }));
     } catch (err) {
       setError(getUserErrorMessage(err, "Unable to update medication status."));
     } finally {
@@ -233,12 +347,14 @@ export default function ProfilePage() {
         current_medications: normalizeMedicationNames(profile.medications)
       };
       const response = await upsertHealthProfile(payload);
-      setProfile({
+      const normalizedResponse = {
         ...response,
         medications: response.medications ?? [],
         current_medications: normalizeMedicationNames(response.medications ?? [])
-      });
-      setSaveMessage("Health profile updated.");
+      };
+      setProfile(normalizedResponse);
+      setGuidance(buildGuidance(normalizedResponse));
+      setSaveMessage("Plan updated. Your personalized guidance has been refreshed.");
     } catch (err) {
       setError(getUserErrorMessage(err, "Unable to save health profile."));
     } finally {
@@ -246,90 +362,13 @@ export default function ProfilePage() {
     }
   }
 
-  async function onGenerateInsights() {
-    setGenerating(true);
+  function onRefreshGuidance() {
+    setRefreshingGuidance(true);
     setError(null);
-
-    try {
-      const response = await generateHealthInsights();
-      setInsights(response);
-    } catch (err) {
-      setError(getUserErrorMessage(err, "Unable to generate insights yet. Make sure age, height, and weight are saved."));
-    } finally {
-      setGenerating(false);
-    }
-  }
-
-  async function onCopySummary() {
-    if (!insights) return;
-    const savedAt = insights.generated_at ? new Date(insights.generated_at).toLocaleString() : "Unknown";
-    const summary = [
-      "HealthSignal AI Profile Insight Summary",
-      `Saved: ${savedAt}`,
-      `Overall Snapshot: ${insights.overall_health_snapshot}`,
-      `Cardiovascular Caution: ${insights.cardiovascular_caution.summary}`,
-      `Metabolic / Weight-related Caution: ${insights.metabolic_weight_caution.summary}`,
-      "",
-      "Lifestyle Risk Factors:",
-      ...(insights.lifestyle_risk_factors.length ? insights.lifestyle_risk_factors.map((item) => `- ${item}`) : ["- None noted"]),
-      "",
-      "Positive Habits:",
-      ...(insights.positive_habits.length ? insights.positive_habits.map((item) => `- ${item}`) : ["- None noted"]),
-      "",
-      "Top Priorities:",
-      ...(insights.top_priorities_for_improvement.length ? insights.top_priorities_for_improvement.map((item) => `- ${item}`) : ["- None noted"]),
-      "",
-      "Suggested Next Steps:",
-      ...(insights.suggested_next_steps.length ? insights.suggested_next_steps.map((item) => `- ${item}`) : ["- None noted"])
-    ].join("\n");
-
-    try {
-      await navigator.clipboard.writeText(summary);
-      setCopyStatus("success");
-      window.setTimeout(() => setCopyStatus("idle"), 2500);
-    } catch {
-      setCopyStatus("error");
-      window.setTimeout(() => setCopyStatus("idle"), 2500);
-    }
-  }
-
-  async function onSaveReport() {
-    if (!insights || savingReport || savedReportId) return;
-
-    setSavingReport(true);
-    setError(null);
-
-    try {
-      const response = await saveReport({
-        report_type: "health-profile-risk-insights-v1",
-        original_input_text: "Health Profile + Risk Insights educational report",
-        structured_data: {
-          profile_snapshot: insights.profile_snapshot
-        },
-        follow_up_qa: [],
-        outputs: {
-          overall_health_snapshot: insights.overall_health_snapshot,
-          cardiovascular_caution: insights.cardiovascular_caution,
-          metabolic_weight_caution: insights.metabolic_weight_caution,
-          lifestyle_risk_factors: insights.lifestyle_risk_factors,
-          positive_habits: insights.positive_habits,
-          top_priorities_for_improvement: insights.top_priorities_for_improvement,
-          suggested_next_steps: insights.suggested_next_steps,
-          generated_at: insights.generated_at,
-          disclaimer: insights.disclaimer
-        },
-        source_metadata: {
-          workflow: "health-profile-risk-insights-v1"
-        },
-        completed_at: insights.generated_at
-      });
-
-      setSavedReportId(response.id);
-    } catch (err) {
-      setError(getUserErrorMessage(err, "Unable to save report right now."));
-    } finally {
-      setSavingReport(false);
-    }
+    window.setTimeout(() => {
+      setGuidance(buildGuidance(profile));
+      setRefreshingGuidance(false);
+    }, 250);
   }
 
   if (loading) {
@@ -350,9 +389,9 @@ export default function ProfilePage() {
 
         <div className="relative space-y-3 border-b border-slate-200/80 pb-5 dark:border-slate-700/70">
           <p className="text-xs font-semibold uppercase tracking-[0.22em] text-brand-700">My Health</p>
-          <h1 className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">Health Profile, Live Risk Insights, and Medication Tracker</h1>
+          <h1 className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">Health Coaching Workspace</h1>
           <p className="max-w-3xl text-sm text-slate-600 dark:text-slate-300">
-            Keep your baseline current, generate live insights from saved profile data, and maintain your active medications in one clean My Health workspace.
+            Update your health baseline, receive personalized guidance, and track long-term progress.
           </p>
         </div>
 
@@ -366,19 +405,19 @@ export default function ProfilePage() {
                 style={{ width: `${completionPercent}%` }}
               />
             </div>
-            <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">Complete key basics for better quality insights.</p>
+            <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">Complete key basics for better weekly guidance quality.</p>
           </article>
 
           <article className="premium-card p-4">
             <p className="text-xs uppercase tracking-[0.15em] text-slate-500 dark:text-slate-400">Last updated</p>
             <p className="mt-2 text-sm font-medium text-slate-900 dark:text-slate-100">{profile.updated_at ? new Date(profile.updated_at).toLocaleString() : "Not saved yet"}</p>
-            <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">Saved to your account and reused in risk insights.</p>
+            <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">Saved to your account for continuity across sessions.</p>
           </article>
         </div>
 
         <div className="grid gap-4 md:grid-cols-2">
           <article className="premium-card space-y-4 p-5">
-            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-brand-700">1. Health Profile baseline</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-brand-700">Health Baseline Inputs</p>
             <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Core profile</h2>
             <div className="grid gap-3 sm:grid-cols-2">
               <label className="space-y-1 text-sm"><span>Age</span><input className="w-full rounded-lg border border-slate-300 bg-white p-2 dark:border-slate-600 dark:bg-slate-900" type="number" value={profile.age ?? ""} onChange={(event) => updateField("age", event.target.value ? Number(event.target.value) : null)} /></label>
@@ -386,11 +425,10 @@ export default function ProfilePage() {
               <label className="space-y-1 text-sm"><span>Height (cm)</span><input className="w-full rounded-lg border border-slate-300 bg-white p-2 dark:border-slate-600 dark:bg-slate-900" type="number" value={profile.height_cm ?? ""} onChange={(event) => updateField("height_cm", event.target.value ? Number(event.target.value) : null)} /></label>
               <label className="space-y-1 text-sm"><span>Weight (kg)</span><input className="w-full rounded-lg border border-slate-300 bg-white p-2 dark:border-slate-600 dark:bg-slate-900" type="number" value={profile.weight_kg ?? ""} onChange={(event) => updateField("weight_kg", event.target.value ? Number(event.target.value) : null)} /></label>
             </div>
-            <p className="text-xs text-slate-500 dark:text-slate-400">These are your baseline anchors for educational trend insights.</p>
           </article>
 
           <article className="premium-card space-y-4 p-5">
-            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-brand-700">1. Health Profile baseline</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-brand-700">Health Baseline Inputs</p>
             <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Lifestyle snapshot</h2>
             <div className="grid gap-3 sm:grid-cols-2">
               <label className="space-y-1 text-sm"><span>Activity level</span><select className="w-full rounded-lg border border-slate-300 bg-white p-2 dark:border-slate-600 dark:bg-slate-900" value={profile.activity_level ?? ""} onChange={(event) => updateField("activity_level", (event.target.value || null) as HealthProfile["activity_level"])}><option value="">Select</option><option value="low">Low</option><option value="moderate">Moderate</option><option value="active">Active</option><option value="very_active">Very active</option></select></label>
@@ -399,11 +437,10 @@ export default function ProfilePage() {
               <label className="space-y-1 text-sm"><span>Sleep average (hours)</span><input className="w-full rounded-lg border border-slate-300 bg-white p-2 dark:border-slate-600 dark:bg-slate-900" type="number" step="0.5" value={profile.sleep_average_hours ?? ""} onChange={(event) => updateField("sleep_average_hours", event.target.value ? Number(event.target.value) : null)} /></label>
               <label className="space-y-1 text-sm sm:col-span-2"><span>Stress level</span><select className="w-full rounded-lg border border-slate-300 bg-white p-2 dark:border-slate-600 dark:bg-slate-900" value={profile.stress_level ?? ""} onChange={(event) => updateField("stress_level", (event.target.value || null) as HealthProfile["stress_level"])}><option value="">Select</option><option value="low">Low</option><option value="moderate">Moderate</option><option value="high">High</option><option value="very_high">Very high</option></select></label>
             </div>
-            <p className="text-xs text-slate-500 dark:text-slate-400">Short and practical habits drive most of your suggestions.</p>
           </article>
 
           <article className="premium-card space-y-4 p-5 md:col-span-2">
-            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-brand-700">1. Health Profile baseline</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-brand-700">Health Baseline Inputs</p>
             <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">History + optional metrics</h2>
             <div className="grid gap-3 md:grid-cols-2">
               <label className="space-y-1 text-sm"><span>Known conditions</span><input className="w-full rounded-lg border border-slate-300 bg-white p-2 dark:border-slate-600 dark:bg-slate-900" placeholder="e.g. hypertension, asthma" value={joinList(profile.known_conditions)} onChange={(event) => updateField("known_conditions", parseList(event.target.value))} /></label>
@@ -423,11 +460,61 @@ export default function ProfilePage() {
           </article>
         </div>
 
+        <section className="space-y-4 rounded-2xl border border-brand-200/70 bg-gradient-to-br from-brand-50/80 to-cyan-50/70 p-5 dark:border-brand-900/50 dark:from-slate-900 dark:to-slate-900/80">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-brand-700">Your AI Health Guidance</p>
+              <h2 className="mt-1 text-xl font-semibold text-slate-900 dark:text-slate-100">Weekly coaching plan</h2>
+              <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">Guidance is personalized from your saved baseline and refreshed each time you update your profile.</p>
+            </div>
+            <p className="rounded-full border border-slate-300/70 bg-white/70 px-3 py-1 text-xs text-slate-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200">
+              Refreshed {guidance?.refreshedAt ? new Date(guidance.refreshedAt).toLocaleString() : "Not yet"}
+            </p>
+          </div>
+
+          <div className="grid gap-4 lg:grid-cols-2">
+            <article className="premium-card p-4">
+              <h3 className="text-sm font-semibold uppercase tracking-[0.12em] text-slate-700 dark:text-slate-300">Snapshot Summary</h3>
+              <p className="mt-2 text-sm text-slate-700 dark:text-slate-200">{guidance?.snapshot ?? "Save your profile to generate your first personalized snapshot."}</p>
+            </article>
+            <article className="premium-card p-4">
+              <h3 className="text-sm font-semibold uppercase tracking-[0.12em] text-slate-700 dark:text-slate-300">This Week&apos;s Focus</h3>
+              <p className="mt-2 text-base font-semibold text-slate-900 dark:text-slate-100">{guidance?.focus ?? "Complete your baseline"}</p>
+            </article>
+            <article className="premium-card p-4">
+              <h3 className="text-sm font-semibold uppercase tracking-[0.12em] text-slate-700 dark:text-slate-300">Recommended Goals</h3>
+              <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-slate-700 dark:text-slate-200">
+                {(guidance?.goals ?? []).map((goal) => <li key={goal}>{goal}</li>)}
+              </ul>
+            </article>
+            <article className="premium-card p-4">
+              <h3 className="text-sm font-semibold uppercase tracking-[0.12em] text-slate-700 dark:text-slate-300">Risk Watchlist</h3>
+              {(guidance?.watchlist?.length ?? 0) > 0 ? (
+                <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-slate-700 dark:text-slate-200">
+                  {guidance?.watchlist.map((risk) => <li key={risk}>{risk}</li>)}
+                </ul>
+              ) : (
+                <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">No major watchlist flags from current profile data.</p>
+              )}
+            </article>
+          </div>
+        </section>
+
+        <div className="flex flex-wrap gap-3">
+          <button className="rounded-lg bg-brand-700 px-4 py-2 text-sm font-medium text-white disabled:opacity-60" onClick={onSaveProfile} disabled={saving}>{saving ? "Saving..." : "Save & Update Plan"}</button>
+          <button className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:-translate-y-0.5 hover:bg-slate-100 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700" onClick={onRefreshGuidance} disabled={refreshingGuidance}>{refreshingGuidance ? "Refreshing..." : "Refresh Guidance"}</button>
+          <Link href="/health-trends" className="rounded-lg border border-brand-300/80 bg-brand-50/90 px-4 py-2 text-sm font-medium text-brand-800 transition hover:-translate-y-0.5 hover:bg-brand-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700">View Trends</Link>
+          <Link href="/history" className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:-translate-y-0.5 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700">Reports History</Link>
+        </div>
+
+        {saveMessage ? <p className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800 dark:border-emerald-900 dark:bg-emerald-950/20 dark:text-emerald-200">{saveMessage}</p> : null}
+        {error ? <p className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700 dark:border-rose-900 dark:bg-rose-950/20 dark:text-rose-200">{error}</p> : null}
+
         <section className="space-y-4 rounded-2xl border border-slate-200/80 bg-white/80 p-5 dark:border-slate-700 dark:bg-slate-900/70">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-brand-700">3. Medication Tracker</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-brand-700">Medication Tracker</p>
             <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100">Medication Tracker V2</h2>
-            <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">Use Today&apos;s Medications for quick adherence updates, manage your active list, and review recent taken/skipped history.</p>
+            <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">Manage active medications and adherence after reviewing your weekly plan.</p>
           </div>
 
           <div className="grid gap-4 lg:grid-cols-2">
@@ -538,7 +625,7 @@ export default function ProfilePage() {
 
         <section className="premium-card space-y-4 p-5">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-brand-700">4. Notifications foundation</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-brand-700">Notifications foundation</p>
             <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Reminder preferences</h2>
             <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">Set your reminder intent now. Scheduled delivery channels can be connected in a future release.</p>
           </div>
@@ -579,88 +666,38 @@ export default function ProfilePage() {
           </div>
         </section>
 
-        <div className="flex flex-wrap gap-3">
-          <button className="rounded-lg bg-brand-700 px-4 py-2 text-sm font-medium text-white disabled:opacity-60" onClick={onSaveProfile} disabled={saving}>{saving ? "Saving..." : "Save My Health"}</button>
-          <button className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:-translate-y-0.5 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700 dark:disabled:border-slate-800 dark:disabled:bg-slate-900 dark:disabled:text-slate-500" onClick={onGenerateInsights} disabled={generating}>{generating ? "Refreshing..." : "Refresh Insights"}</button>
-          <Link href="/history" className="rounded-lg border border-brand-300/80 bg-brand-50/90 px-4 py-2 text-sm font-medium text-brand-800 transition hover:-translate-y-0.5 hover:bg-brand-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700">Review Archived Reports</Link>
-        </div>
-
-        {saveMessage ? <p className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800 dark:border-emerald-900 dark:bg-emerald-950/20 dark:text-emerald-200">{saveMessage}</p> : null}
-        {error ? <p className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700 dark:border-rose-900 dark:bg-rose-950/20 dark:text-rose-200">{error}</p> : null}
-
-        {insights ? (
-          <section className="space-y-4 rounded-2xl border border-slate-200/80 bg-white/80 p-5 dark:border-slate-700 dark:bg-slate-900/70">
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-brand-700">2. Live Risk Insights</p>
-                <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100">Overall Health Snapshot</h2>
-                <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">{insights.overall_health_snapshot}</p>
-                <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">These insights are generated from your latest saved My Health baseline.</p>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                <button
-                  className="rounded-lg border border-brand-300/80 bg-brand-50/90 px-4 py-2 text-sm font-medium text-brand-800 transition hover:-translate-y-0.5 hover:bg-brand-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700 dark:disabled:border-slate-800 dark:disabled:bg-slate-900 dark:disabled:text-slate-500"
-                  onClick={onCopySummary}
-                >
-                  Copy Summary
-                </button>
-                <button
-                  className="rounded-lg bg-brand-700 px-4 py-2 text-sm font-medium text-white shadow-sm shadow-brand-700/25 transition hover:-translate-y-0.5 hover:bg-brand-600 disabled:cursor-not-allowed disabled:opacity-60 dark:disabled:border dark:disabled:border-slate-800 dark:disabled:bg-slate-900 dark:disabled:text-slate-500"
-                  onClick={onSaveReport}
-                  disabled={savingReport || savedReportId !== null}
-                >
-                  {savedReportId ? "Snapshot Saved" : savingReport ? "Saving Snapshot..." : "Save Snapshot to Reports"}
-                </button>
-              </div>
+        <section className="rounded-2xl border border-amber-300/60 bg-gradient-to-br from-slate-900 to-slate-800 p-5 text-slate-100">
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-amber-300">Premium Preview</p>
+              <h2 className="mt-1 text-xl font-semibold">Unlock Premium Health Coaching</h2>
+              <p className="mt-1 max-w-2xl text-sm text-slate-300">Upgrade for deeper automation and adaptive coaching built on top of your existing baseline, guidance, and adherence data.</p>
             </div>
-            {copyStatus === "success" ? <p className="text-xs font-medium text-emerald-600 dark:text-emerald-300">Summary copied to clipboard.</p> : null}
-            {copyStatus === "error" ? <p className="text-xs font-medium text-rose-600 dark:text-rose-300">Unable to copy summary right now.</p> : null}
+            <span className="rounded-full border border-amber-200/50 bg-amber-100/10 px-3 py-1 text-xs font-semibold text-amber-200">
+              {isPremium ? "Premium Active" : "Locked on Free"}
+            </span>
+          </div>
 
-            <div className="grid gap-4 md:grid-cols-2">
-              <article className={`rounded-xl border p-4 ${levelClasses(insights.cardiovascular_caution.level)}`}>
-                <h3 className="text-sm font-semibold uppercase tracking-[0.12em]">Cardiovascular Caution</h3>
-                <p className="mt-2 text-sm">{insights.cardiovascular_caution.summary}</p>
-                <ul className="mt-2 list-disc space-y-1 pl-5 text-sm">
-                  {insights.cardiovascular_caution.factors.map((item) => <li key={item}>{item}</li>)}
-                </ul>
-              </article>
-              <article className={`rounded-xl border p-4 ${levelClasses(insights.metabolic_weight_caution.level)}`}>
-                <h3 className="text-sm font-semibold uppercase tracking-[0.12em]">Metabolic / Weight-related Caution</h3>
-                <p className="mt-2 text-sm">{insights.metabolic_weight_caution.summary}</p>
-                <ul className="mt-2 list-disc space-y-1 pl-5 text-sm">
-                  {insights.metabolic_weight_caution.factors.map((item) => <li key={item}>{item}</li>)}
-                </ul>
-              </article>
-            </div>
+          <div className="mt-4 grid gap-4 md:grid-cols-2">
+            <article className="rounded-xl border border-slate-600/70 bg-slate-900/60 p-4">
+              <h3 className="text-sm font-semibold uppercase tracking-[0.12em] text-slate-300">Free Access</h3>
+              <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-slate-200">
+                {FREE_FEATURES.map((feature) => <li key={feature}>{feature}</li>)}
+              </ul>
+            </article>
+            <article className="rounded-xl border border-amber-300/40 bg-amber-100/10 p-4">
+              <h3 className="text-sm font-semibold uppercase tracking-[0.12em] text-amber-200">Premium Includes</h3>
+              <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-amber-100">
+                {PREMIUM_FEATURES.map((feature) => <li key={feature}>{feature}</li>)}
+              </ul>
+            </article>
+          </div>
 
-            <div className="grid gap-4 md:grid-cols-2">
-              <article className="premium-card p-4">
-                <h3 className="text-sm font-semibold uppercase tracking-[0.12em] text-slate-700 dark:text-slate-300">Lifestyle Risk Factors</h3>
-                <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-slate-700 dark:text-slate-200">{insights.lifestyle_risk_factors.map((item) => <li key={item}>{item}</li>)}</ul>
-              </article>
-              <article className="premium-card p-4">
-                <h3 className="text-sm font-semibold uppercase tracking-[0.12em] text-slate-700 dark:text-slate-300">Positive Habits</h3>
-                <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-slate-700 dark:text-slate-200">{insights.positive_habits.map((item) => <li key={item}>{item}</li>)}</ul>
-              </article>
-              <article className="premium-card p-4">
-                <h3 className="text-sm font-semibold uppercase tracking-[0.12em] text-slate-700 dark:text-slate-300">Top Priorities for Improvement</h3>
-                <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-slate-700 dark:text-slate-200">{insights.top_priorities_for_improvement.map((item) => <li key={item}>{item}</li>)}</ul>
-              </article>
-              <article className="premium-card p-4">
-                <h3 className="text-sm font-semibold uppercase tracking-[0.12em] text-slate-700 dark:text-slate-300">Suggested Next Steps</h3>
-                <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-slate-700 dark:text-slate-200">{insights.suggested_next_steps.map((item) => <li key={item}>{item}</li>)}</ul>
-              </article>
-            </div>
-
-            <p className="text-xs text-slate-500 dark:text-slate-400">{insights.disclaimer}</p>
-          </section>
-        ) : (
-          <section className="space-y-3 rounded-2xl border border-slate-200/80 bg-white/80 p-5 dark:border-slate-700 dark:bg-slate-900/70">
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-brand-700">2. Live Risk Insights</p>
-            <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100">Generate your snapshot</h2>
-            <p className="text-sm text-slate-600 dark:text-slate-300">Save your profile baseline, then refresh insights to generate your current educational risk summary.</p>
-          </section>
-        )}
+          <div className="mt-5 flex flex-wrap gap-3">
+            <button className="rounded-lg bg-amber-300 px-4 py-2 text-sm font-semibold text-slate-900 hover:bg-amber-200">Upgrade to Premium</button>
+            <button className="rounded-lg border border-slate-500 bg-transparent px-4 py-2 text-sm font-medium text-slate-100 hover:bg-slate-800">Learn More</button>
+          </div>
+        </section>
       </section>
     </RequireAuth>
   );
