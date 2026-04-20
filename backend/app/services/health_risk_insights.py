@@ -97,9 +97,9 @@ def build_health_risk_insights(profile: HealthProfileRead) -> HealthRiskInsights
     metabolic_level = "caution" if len(metabolic_factors) >= 2 else "watch" if metabolic_factors else "positive"
 
     overall_snapshot = (
-        "Your profile shows a strong prevention opportunity. Focus on a few consistent habits to improve long-term risk trends."
+        "Your profile suggests meaningful prevention opportunities. The most useful next move is a small set of repeatable weekly habits."
         if priorities
-        else "Your profile currently reflects supportive habits. Keep your routines steady and reassess periodically."
+        else "Your profile currently reflects supportive habits. Keep your routines steady and reassess trends periodically."
     )
 
     return HealthRiskInsightsResponse(
@@ -109,22 +109,22 @@ def build_health_risk_insights(profile: HealthProfileRead) -> HealthRiskInsights
         cardiovascular_caution=RiskInsightSection(
             level=cardiovascular_level,
             summary=(
-                "Your cardiovascular profile has some caution flags that are worth addressing early."
+                "What this means: a few heart-health signals are elevated, and early action can lower long-term risk."
                 if cardiovascular_level == "caution"
-                else "Your cardiovascular profile has a few areas to keep an eye on."
+                else "What this means: there are mild cardiovascular watch-points worth tracking with routine follow-up."
                 if cardiovascular_level == "watch"
-                else "Your cardiovascular profile currently looks supportive."
+                else "What this means: current cardiovascular signals look generally supportive."
             ),
             factors=cardiovascular_factors,
         ),
         metabolic_weight_caution=RiskInsightSection(
             level=metabolic_level,
             summary=(
-                "Your metabolic/weight profile shows caution signs that benefit from consistent lifestyle changes."
+                "What this means: metabolic and weight-related patterns may benefit from consistent nutrition, activity, and sleep routines."
                 if metabolic_level == "caution"
-                else "Your metabolic/weight profile has moderate watch-points."
+                else "What this means: a few metabolic watch-points are present and can improve with consistent habits."
                 if metabolic_level == "watch"
-                else "Your metabolic/weight profile currently looks supportive."
+                else "What this means: current metabolic and weight patterns look supportive."
             ),
             factors=metabolic_factors,
         ),

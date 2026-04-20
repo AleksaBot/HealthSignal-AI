@@ -197,6 +197,9 @@ export type HealthProfile = {
   systolic_bp: number | null;
   diastolic_bp: number | null;
   total_cholesterol: number | null;
+  medication_reminders_enabled: boolean;
+  medication_reminder_time: string | null;
+  weekly_health_summary_enabled: boolean;
   updated_at?: string | null;
   todays_medication_status?: TodayMedicationStatus[];
   recent_medication_events?: MedicationAdherenceEvent[];

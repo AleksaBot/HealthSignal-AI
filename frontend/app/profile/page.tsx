@@ -23,6 +23,9 @@ const EMPTY_PROFILE: HealthProfile = {
   systolic_bp: null,
   diastolic_bp: null,
   total_cholesterol: null,
+  medication_reminders_enabled: false,
+  medication_reminder_time: "08:00",
+  weekly_health_summary_enabled: false,
   updated_at: null
 };
 
@@ -531,6 +534,49 @@ export default function ProfilePage() {
           ) : (
             <p className="rounded-xl border border-dashed border-slate-300/90 bg-slate-50/50 p-4 text-sm text-slate-600 dark:border-slate-700 dark:bg-slate-800/45 dark:text-slate-300">No medications added yet. Add your first medication above.</p>
           )}
+        </section>
+
+        <section className="premium-card space-y-4 p-5">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-brand-700">4. Notifications foundation</p>
+            <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Reminder preferences</h2>
+            <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">Set your reminder intent now. Scheduled delivery channels can be connected in a future release.</p>
+          </div>
+          <div className="grid gap-4 md:grid-cols-2">
+            <label className="flex items-start gap-3 rounded-xl border border-slate-200/90 bg-white/80 p-3 text-sm dark:border-slate-700 dark:bg-slate-900/70">
+              <input
+                type="checkbox"
+                checked={profile.medication_reminders_enabled}
+                onChange={(event) => updateField("medication_reminders_enabled", event.target.checked)}
+                className="mt-1 h-4 w-4 rounded border-slate-400"
+              />
+              <span>
+                <span className="font-medium text-slate-900 dark:text-slate-100">Medication reminders</span>
+                <span className="block text-xs text-slate-500 dark:text-slate-400">Use your active Medication Tracker list as reminder context.</span>
+              </span>
+            </label>
+            <label className="space-y-1 text-sm">
+              <span>Preferred reminder time</span>
+              <input
+                type="time"
+                value={profile.medication_reminder_time ?? "08:00"}
+                onChange={(event) => updateField("medication_reminder_time", event.target.value || null)}
+                className="w-full rounded-lg border border-slate-300 bg-white p-2 dark:border-slate-600 dark:bg-slate-900"
+              />
+            </label>
+            <label className="flex items-start gap-3 rounded-xl border border-slate-200/90 bg-white/80 p-3 text-sm md:col-span-2 dark:border-slate-700 dark:bg-slate-900/70">
+              <input
+                type="checkbox"
+                checked={profile.weekly_health_summary_enabled}
+                onChange={(event) => updateField("weekly_health_summary_enabled", event.target.checked)}
+                className="mt-1 h-4 w-4 rounded border-slate-400"
+              />
+              <span>
+                <span className="font-medium text-slate-900 dark:text-slate-100">Weekly health summary</span>
+                <span className="block text-xs text-slate-500 dark:text-slate-400">Receive a weekly educational recap of trends, adherence, and next-step suggestions.</span>
+              </span>
+            </label>
+          </div>
         </section>
 
         <div className="flex flex-wrap gap-3">

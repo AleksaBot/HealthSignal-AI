@@ -81,7 +81,9 @@ def hash_token(token: str) -> str:
 
 
 def build_frontend_link(path: str, token: str) -> str:
-    base = settings.app_public_base_url.rstrip("/")
+    base = settings.app_public_base_url.strip().rstrip("/")
+    if not base:
+        return ""
     return f"{base}{path}?token={token}"
 
 
@@ -216,8 +218,7 @@ def verify_email(payload: EmailVerificationConfirmRequest, db: Session = Depends
     return AuthActionResponse(message="Email verified successfully. You can continue using your account.")
 
 
-@router.post("/auth/verification/resend", response_model=AuthActionResponse)
-def resend_verification(payload: ForgotPasswordRequest, db: Session = Depends(get_db)):
+def _resend_verification(payload: ForgotPasswordRequest, db: Session) -> AuthActionResponse:
     normalized_email = payload.email.lower()
     user = db.query(User).filter(User.email == normalized_email).first()
     token = secrets.token_urlsafe(32)
@@ -230,14 +231,26 @@ def resend_verification(payload: ForgotPasswordRequest, db: Session = Depends(ge
         db.add(user)
         db.commit()
         if settings.enable_dev_auth_link_preview:
-            dev_verification_link = build_frontend_link("/auth/verify-email", token)
+            link = build_frontend_link("/auth/verify-email", token)
+            dev_verification_link = link or None
     elif settings.enable_dev_auth_link_preview:
-        dev_verification_link = build_frontend_link("/auth/verify-email", token)
+        link = build_frontend_link("/auth/verify-email", token)
+        dev_verification_link = link or None
 
     return AuthActionResponse(
         message="If your account needs verification, a confirmation link has been sent.",
         dev_verification_link=dev_verification_link,
     )
+
+
+@router.post("/auth/verification/resend", response_model=AuthActionResponse)
+def resend_verification(payload: ForgotPasswordRequest, db: Session = Depends(get_db)):
+    return _resend_verification(payload, db)
+
+
+@router.post("/auth/resend-verification", response_model=AuthActionResponse)
+def resend_verification_legacy(payload: ForgotPasswordRequest, db: Session = Depends(get_db)):
+    return _resend_verification(payload, db)
 
 
 @router.put("/auth/me/name", response_model=UserRead)

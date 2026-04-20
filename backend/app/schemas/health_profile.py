@@ -58,6 +58,9 @@ class HealthProfileUpdateRequest(BaseModel):
     systolic_bp: int | None = Field(default=None, ge=70, le=260)
     diastolic_bp: int | None = Field(default=None, ge=40, le=160)
     total_cholesterol: int | None = Field(default=None, ge=80, le=500)
+    medication_reminders_enabled: bool = False
+    medication_reminder_time: str | None = Field(default=None, pattern=r"^([01]\d|2[0-3]):[0-5]\d$")
+    weekly_health_summary_enabled: bool = False
 
 
 class HealthProfileRead(HealthProfileUpdateRequest):
