@@ -272,3 +272,37 @@ export type ReportSavePayload = {
   source_metadata?: Record<string, unknown>;
   completed_at?: string;
 };
+
+
+export type MomentumSnapshot = {
+  id: number;
+  user_id: number;
+  score: number;
+  label: string;
+  created_at: string;
+};
+
+export type MomentumHistoryResponse = {
+  snapshots: MomentumSnapshot[];
+};
+
+export type MomentumSummaryStats = {
+  best_score_last_30_days: number | null;
+  average_score_last_30_days: number | null;
+  current_streak: number;
+};
+
+export type MomentumSummaryResponse = {
+  trend_direction: "Improving" | "Stable" | "Declining";
+  weekly_delta: number;
+  stats: MomentumSummaryStats;
+};
+
+export type CoachQueryRequest = {
+  question: string;
+};
+
+export type CoachQueryResponse = {
+  answer: string;
+  based_on: string;
+};

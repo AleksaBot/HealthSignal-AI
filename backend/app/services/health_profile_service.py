@@ -14,6 +14,7 @@ from app.schemas.health_profile import (
     MedicationEntry,
     TodayMedicationStatus,
 )
+from app.services.momentum_service import calculate_momentum_score, maybe_create_snapshot, momentum_label
 
 _RECENT_MEDICATION_EVENT_LIMIT = 14
 
@@ -206,6 +207,9 @@ def update_health_profile_for_user(*, db: Session, user: User, payload: HealthPr
     db.commit()
     db.refresh(user)
 
+    profile = get_health_profile_for_user(user, db)
+    score = calculate_momentum_score(profile)
+    maybe_create_snapshot(db, user, score, momentum_label(score))
     return get_health_profile_for_user(user, db)
 
 
@@ -246,4 +250,7 @@ def upsert_medication_adherence_for_today(*, db: Session, user: User, medication
     db.add(log)
     db.commit()
     db.refresh(user)
+    profile = get_health_profile_for_user(user, db)
+    score = calculate_momentum_score(profile)
+    maybe_create_snapshot(db, user, score, momentum_label(score))
     return get_health_profile_for_user(user, db)

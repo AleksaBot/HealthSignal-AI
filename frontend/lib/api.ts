@@ -9,6 +9,10 @@ import {
   HealthProfile,
   HealthRiskInsightsResponse,
   MedicationAdherenceStatus,
+  MomentumHistoryResponse,
+  MomentumSummaryResponse,
+  CoachQueryRequest,
+  CoachQueryResponse,
   NoteFileAnalysisResponse,
   NoteFollowUpRequest,
   NoteFollowUpResponse,
@@ -354,4 +358,17 @@ export function updateTodayMedicationStatus(payload: { medication_id: string; st
     body: JSON.stringify(payload),
     authRequired: true
   });
+}
+
+
+export function getMomentumHistory() {
+  return getAuthJSON<MomentumHistoryResponse>("/api/momentum/history");
+}
+
+export function getMomentumSummary() {
+  return getAuthJSON<MomentumSummaryResponse>("/api/momentum/summary");
+}
+
+export function queryCoach(payload: CoachQueryRequest) {
+  return postAuthJSON<CoachQueryRequest, CoachQueryResponse>("/api/coach/query", payload);
 }

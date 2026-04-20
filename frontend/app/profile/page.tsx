@@ -3,8 +3,26 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { RequireAuth } from "@/components/RequireAuth";
-import { getHealthProfile, getUserErrorMessage, updateTodayMedicationStatus, upsertHealthProfile } from "@/lib/api";
-import { HealthProfile, MedicationAdherenceStatus, MedicationEntry, MedicationFrequency, MedicationTimeOfDay, UserTier } from "@/lib/types";
+import {
+  getHealthProfile,
+  getMomentumHistory,
+  getMomentumSummary,
+  getUserErrorMessage,
+  queryCoach,
+  updateTodayMedicationStatus,
+  upsertHealthProfile
+} from "@/lib/api";
+import {
+  CoachQueryResponse,
+  HealthProfile,
+  MedicationAdherenceStatus,
+  MedicationEntry,
+  MedicationFrequency,
+  MedicationTimeOfDay,
+  MomentumSnapshot,
+  MomentumSummaryResponse,
+  UserTier
+} from "@/lib/types";
 
 const EMPTY_PROFILE: HealthProfile = {
   age: null,
@@ -208,6 +226,22 @@ function buildGuidance(profile: HealthProfile): GuidancePlan {
   };
 }
 
+function calculateMomentumScore(profile: HealthProfile) {
+  const sleepScore = (profile.sleep_average_hours ?? 0) >= 7 ? 100 : (profile.sleep_average_hours ?? 0) >= 6 ? 70 : 45;
+  const activityScore = profile.activity_level === "very_active" ? 95 : profile.activity_level === "active" ? 85 : profile.activity_level === "moderate" ? 68 : profile.activity_level === "low" ? 35 : 55;
+  const stressScore = profile.stress_level === "low" ? 92 : profile.stress_level === "moderate" ? 75 : profile.stress_level === "high" ? 50 : profile.stress_level === "very_high" ? 32 : 60;
+  const events = profile.recent_medication_events ?? [];
+  const adherenceScore = events.length ? Math.round((events.filter((event) => event.status === "taken").length / events.length) * 100) : 70;
+  return Math.max(0, Math.min(100, Math.round((sleepScore + activityScore + stressScore + adherenceScore + profileCompletion(profile)) / 5)));
+}
+
+function momentumMeta(score: number) {
+  if (score <= 39) return { label: "Needs Attention", ring: "text-rose-500", chip: "bg-rose-100 text-rose-800 dark:bg-rose-950/30 dark:text-rose-200" };
+  if (score <= 59) return { label: "Building Momentum", ring: "text-amber-500", chip: "bg-amber-100 text-amber-800 dark:bg-amber-950/30 dark:text-amber-200" };
+  if (score <= 79) return { label: "Stable", ring: "text-blue-500", chip: "bg-blue-100 text-blue-800 dark:bg-blue-950/30 dark:text-blue-200" };
+  return { label: "Strong Routine", ring: "text-emerald-500", chip: "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-200" };
+}
+
 export default function ProfilePage() {
   const [profile, setProfile] = useState<HealthProfile>(EMPTY_PROFILE);
   const [loading, setLoading] = useState(true);
@@ -218,6 +252,11 @@ export default function ProfilePage() {
   const [updatingMedicationId, setUpdatingMedicationId] = useState<string | null>(null);
   const [guidance, setGuidance] = useState<GuidancePlan | null>(null);
   const [refreshingGuidance, setRefreshingGuidance] = useState(false);
+  const [momentumHistory, setMomentumHistory] = useState<MomentumSnapshot[]>([]);
+  const [momentumSummary, setMomentumSummary] = useState<MomentumSummaryResponse | null>(null);
+  const [coachQuestion, setCoachQuestion] = useState("");
+  const [coachLoading, setCoachLoading] = useState(false);
+  const [coachAnswer, setCoachAnswer] = useState<CoachQueryResponse | null>(null);
 
   // Foundation for free vs premium feature-gating.
   const [userTier] = useState<UserTier>("free");
@@ -230,6 +269,9 @@ export default function ProfilePage() {
     () => profile.medications.filter((medication) => medication.frequency !== "as_needed"),
     [profile.medications]
   );
+  const momentumScore = useMemo(() => calculateMomentumScore(profile), [profile]);
+  const momentumInfo = useMemo(() => momentumMeta(momentumScore), [momentumScore]);
+  const ringProgress = useMemo(() => Math.round((momentumScore / 100) * 283), [momentumScore]);
   const isPremium = userTier === "premium";
 
   useEffect(() => {
@@ -255,6 +297,9 @@ export default function ProfilePage() {
         };
         setProfile(hydratedProfile);
         setGuidance(buildGuidance(hydratedProfile));
+        const [historyResponse, summaryResponse] = await Promise.all([getMomentumHistory(), getMomentumSummary()]);
+        setMomentumHistory(historyResponse.snapshots);
+        setMomentumSummary(summaryResponse);
       } catch (err) {
         setError(getUserErrorMessage(err, "Unable to load your health profile."));
       } finally {
@@ -354,6 +399,9 @@ export default function ProfilePage() {
       };
       setProfile(normalizedResponse);
       setGuidance(buildGuidance(normalizedResponse));
+      const [historyResponse, summaryResponse] = await Promise.all([getMomentumHistory(), getMomentumSummary()]);
+      setMomentumHistory(historyResponse.snapshots);
+      setMomentumSummary(summaryResponse);
       setSaveMessage("Plan updated. Your personalized guidance has been refreshed.");
     } catch (err) {
       setError(getUserErrorMessage(err, "Unable to save health profile."));
@@ -369,6 +417,21 @@ export default function ProfilePage() {
       setGuidance(buildGuidance(profile));
       setRefreshingGuidance(false);
     }, 250);
+  }
+
+  async function onAskCoach(question: string) {
+    const text = question.trim();
+    if (!text) return;
+    setCoachLoading(true);
+    setCoachQuestion(text);
+    try {
+      const response = await queryCoach({ question: text });
+      setCoachAnswer(response);
+    } catch (err) {
+      setError(getUserErrorMessage(err, "Unable to get coach response right now."));
+    } finally {
+      setCoachLoading(false);
+    }
   }
 
   if (loading) {
@@ -498,6 +561,84 @@ export default function ProfilePage() {
               )}
             </article>
           </div>
+        </section>
+
+        <section className="space-y-4 rounded-2xl border border-slate-200/80 bg-white/80 p-5 dark:border-slate-700 dark:bg-slate-900/70">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-brand-700">Momentum</p>
+            <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100">Momentum Score</h2>
+            <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">Your score reflects consistency across sleep, movement, stress, adherence, and baseline completeness.</p>
+          </div>
+          <div className="grid gap-4 lg:grid-cols-2">
+            <article className="premium-card p-5">
+              <div className="flex items-center gap-6">
+                <div className="relative h-28 w-28">
+                  <svg className="h-28 w-28 -rotate-90 transform" viewBox="0 0 100 100">
+                    <circle cx="50" cy="50" r="45" stroke="currentColor" strokeWidth="8" fill="transparent" className="text-slate-200 dark:text-slate-700" />
+                    <circle
+                      cx="50"
+                      cy="50"
+                      r="45"
+                      stroke="currentColor"
+                      strokeWidth="8"
+                      fill="transparent"
+                      strokeDasharray="283"
+                      strokeDashoffset={283 - ringProgress}
+                      strokeLinecap="round"
+                      className={`${momentumInfo.ring} transition-all duration-700 ease-out`}
+                    />
+                  </svg>
+                  <div className="absolute inset-0 flex items-center justify-center text-3xl font-bold text-slate-900 dark:text-slate-100">{momentumScore}</div>
+                </div>
+                <div className="space-y-2">
+                  <p className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${momentumInfo.chip}`}>{momentumInfo.label}</p>
+                  <p className="text-sm text-slate-600 dark:text-slate-300">
+                    {momentumSummary?.weekly_delta
+                      ? `${momentumSummary.weekly_delta > 0 ? "+" : ""}${momentumSummary.weekly_delta} this week`
+                      : "unchanged this week"}
+                  </p>
+                </div>
+              </div>
+            </article>
+            <article className="premium-card p-5">
+              <h3 className="text-sm font-semibold uppercase tracking-[0.12em] text-slate-700 dark:text-slate-300">Momentum Over Time</h3>
+              <div className="mt-3 grid grid-cols-10 items-end gap-1">
+                {momentumHistory.slice(0, 10).reverse().map((entry) => (
+                  <div key={entry.id} className="rounded-t bg-gradient-to-t from-brand-500 to-cyan-400" style={{ height: `${Math.max(12, entry.score)}px` }} title={`${entry.score} on ${new Date(entry.created_at).toLocaleDateString()}`} />
+                ))}
+              </div>
+              <div className="mt-3 grid gap-1 text-xs text-slate-600 dark:text-slate-300">
+                <p>Trend: <span className="font-semibold">{momentumSummary?.trend_direction ?? "Stable"}</span></p>
+                <p>Best (30d): <span className="font-semibold">{momentumSummary?.stats.best_score_last_30_days ?? "-"}</span></p>
+                <p>Average: <span className="font-semibold">{momentumSummary?.stats.average_score_last_30_days ?? "-"}</span></p>
+                <p>Current streak: <span className="font-semibold">{momentumSummary?.stats.current_streak ?? 0}</span></p>
+              </div>
+            </article>
+          </div>
+        </section>
+
+        <section className="space-y-4 rounded-2xl border border-slate-200/80 bg-white/80 p-5 dark:border-slate-700 dark:bg-slate-900/70">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-brand-700">AI Coach</p>
+            <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100">Personal Coach V2</h2>
+            <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Based on your current profile</p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {["How do I improve my score?", "What should I focus on this week?", "What should I ask my doctor?"].map((prompt) => (
+              <button key={prompt} className="rounded-full border border-slate-300 bg-white px-3 py-1 text-xs font-medium text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200" onClick={() => onAskCoach(prompt)}>
+                {prompt}
+              </button>
+            ))}
+          </div>
+          <div className="flex gap-2">
+            <input value={coachQuestion} onChange={(event) => setCoachQuestion(event.target.value)} placeholder="Ask your coach..." className="w-full rounded-lg border border-slate-300 bg-white p-2 text-sm dark:border-slate-600 dark:bg-slate-900" />
+            <button className="rounded-lg bg-brand-700 px-4 py-2 text-sm font-medium text-white disabled:opacity-60" disabled={coachLoading} onClick={() => onAskCoach(coachQuestion)}>
+              {coachLoading ? "Thinking..." : "Ask"}
+            </button>
+          </div>
+          <article className="rounded-xl border border-slate-200 bg-slate-50/70 p-4 text-sm text-slate-700 dark:border-slate-700 dark:bg-slate-800/55 dark:text-slate-200">
+            {coachLoading ? "Analyzing your profile and trend..." : coachAnswer?.answer ?? "Ask a question to get personalized guidance tied to your momentum, watchlist, and baseline."}
+          </article>
         </section>
 
         <div className="flex flex-wrap gap-3">
