@@ -648,7 +648,7 @@ export default function HistoryPage() {
               </Link>
               <Link
                 href="/note-interpreter"
-                className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:-translate-y-0.5 hover:border-brand-200 hover:shadow-sm dark:border-slate-600 dark:bg-slate-900/80 dark:text-slate-200 dark:hover:border-brand-400/40"
+                className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:-translate-y-0.5 hover:border-brand-200 hover:shadow-sm dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100 dark:hover:border-brand-400/50 dark:hover:bg-slate-800"
               >
                 Open Note Interpreter
               </Link>
@@ -738,20 +738,20 @@ export default function HistoryPage() {
                 </span>
                 <div className="flex w-full flex-wrap gap-2 sm:w-auto">
                   <button
-                    className="rounded-lg border border-brand-300/70 bg-white/90 px-3 py-1.5 text-xs font-medium text-brand-700 transition hover:-translate-y-0.5 hover:border-brand-400 hover:bg-brand-50 dark:border-brand-400/50 dark:bg-slate-900/70 dark:text-brand-200 dark:hover:border-brand-300"
+                    className="rounded-lg border border-brand-300/70 bg-white/90 px-3 py-1.5 text-xs font-medium text-brand-700 transition hover:-translate-y-0.5 hover:border-brand-400 hover:bg-brand-50 dark:border-brand-400/55 dark:bg-slate-900 dark:text-brand-100 dark:hover:border-brand-300 dark:hover:bg-brand-950/35"
                     onClick={copySummary}
                   >
                     <span className="inline-flex items-center gap-1.5"><span aria-hidden>📋</span>Copy Summary</span>
                   </button>
                   <button
-                    className="cursor-not-allowed rounded-lg border border-slate-300/80 bg-slate-100/90 px-3 py-1.5 text-xs font-medium text-slate-500 dark:border-slate-600 dark:bg-slate-800/80 dark:text-slate-400"
+                    className="cursor-not-allowed rounded-lg border border-slate-300/80 bg-slate-100/90 px-3 py-1.5 text-xs font-medium text-slate-500 dark:border-slate-700 dark:bg-slate-900/85 dark:text-slate-500"
                     disabled
                     title="PDF export is coming soon"
                   >
                     Download PDF
                   </button>
                   <button
-                    className="rounded-lg border border-violet-300/70 bg-violet-50/80 px-3 py-1.5 text-xs font-medium text-violet-800 transition hover:-translate-y-0.5 hover:border-violet-400 hover:bg-violet-100 dark:border-violet-400/45 dark:bg-violet-900/30 dark:text-violet-100 dark:hover:border-violet-300"
+                    className="rounded-lg border border-violet-300/70 bg-violet-50/80 px-3 py-1.5 text-xs font-medium text-violet-800 transition hover:-translate-y-0.5 hover:border-violet-400 hover:bg-violet-100 dark:border-violet-400/45 dark:bg-violet-950/35 dark:text-violet-100 dark:hover:border-violet-300 dark:hover:bg-violet-900/45"
                     onClick={shareWithDoctor}
                   >
                     <span className="inline-flex items-center gap-1.5"><span aria-hidden>💬</span>Share with Doctor</span>

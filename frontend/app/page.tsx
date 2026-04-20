@@ -20,6 +20,12 @@ const quickActions = [
   }
 ] as const;
 
+const productSignals = [
+  { label: "Unified workflow", value: "4 core surfaces", detail: "Dashboard, My Health, Trends, Reports." },
+  { label: "Session continuity", value: "Persistent data", detail: "Profiles, medication tracking, and saved analyses." },
+  { label: "Clinical clarity", value: "Action-ready output", detail: "Summaries designed for follow-up conversations." }
+] as const;
+
 export default function HomePage() {
   const [authenticated, setAuthenticated] = useState(false);
   const [firstName, setFirstName] = useState<string | null>(null);
@@ -55,28 +61,30 @@ export default function HomePage() {
 
         <div className="grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
           <div className="space-y-5">
-            <h1 className="text-4xl font-semibold tracking-tight text-slate-900 dark:text-slate-100 md:text-5xl">Premium health intelligence dashboard.</h1>
+            <h1 className="text-4xl font-semibold tracking-tight text-slate-900 dark:text-slate-100 md:text-5xl">
+              AI-assisted health workspace built for clear, confident next steps.
+            </h1>
             <p className="max-w-2xl text-sm leading-relaxed text-slate-600 dark:text-slate-300 md:text-base">
-              HealthSignal AI keeps your overview in focus while giving you fast launch access to your most-used workflows in one polished environment.
+              HealthSignal AI combines guided intake, profile intelligence, trend visibility, and report history into one premium clinical-style workflow.
             </p>
 
             {authenticated ? (
               <div className="space-y-4 rounded-2xl border border-emerald-200/70 bg-emerald-50/70 p-4 dark:border-emerald-400/30 dark:bg-emerald-900/20">
                 <p className="text-sm font-medium text-emerald-800 dark:text-emerald-100">
-                  {firstName ? `Welcome back, ${firstName}.` : "Welcome back."} Your dashboard is ready.
+                  {firstName ? `Welcome back, ${firstName}.` : "Welcome back."} Use your dashboard to launch core health workflows.
                 </p>
                 <div className="flex flex-wrap gap-3">
                   <Link
-                    href="/"
+                    href="/profile"
                     className="rounded-lg bg-brand-700 px-4 py-2 text-sm font-medium text-white shadow-md shadow-brand-700/25 transition hover:-translate-y-0.5 hover:bg-brand-600"
                   >
-                    Open Dashboard
+                    Open My Health
                   </Link>
                   <Link
-                    href="/profile"
+                    href="/health-trends"
                     className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:-translate-y-0.5 hover:border-slate-400 hover:shadow-sm dark:border-slate-600 dark:bg-slate-900/80 dark:text-slate-200 dark:hover:border-slate-500"
                   >
-                    Open My Health
+                    Open Health Trends
                   </Link>
                 </div>
               </div>
@@ -99,11 +107,11 @@ export default function HomePage() {
           </div>
 
           <div className="frosted-panel animate-fade-up space-y-3 rounded-2xl p-5 [--stagger:100ms]">
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">Dashboard Launchpad</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">Why teams choose HealthSignal</p>
             <div className="space-y-2 text-sm text-slate-600 dark:text-slate-300">
-              <p>• Symptom Analyzer starts a guided intake in under a minute.</p>
-              <p>• Note Interpreter translates complex clinical notes into plain language.</p>
-              <p>• Use top navigation to move between My Health, Health Trends, and Reports.</p>
+              <p>• Capture symptom risk context and structured follow-up in minutes.</p>
+              <p>• Translate clinical notes into plain language for better understanding.</p>
+              <p>• Track profile signals and revisit prior reports for longitudinal continuity.</p>
             </div>
           </div>
         </div>
@@ -123,6 +131,16 @@ export default function HomePage() {
             <p className="mt-2 text-sm leading-relaxed text-slate-600 dark:text-slate-300">{card.description}</p>
             <p className="mt-4 text-sm font-medium text-brand-700 transition group-hover:translate-x-1 dark:text-brand-300">{card.cta} →</p>
           </Link>
+        ))}
+      </div>
+
+      <div className="grid gap-3 md:grid-cols-3">
+        {productSignals.map((item) => (
+          <article key={item.label} className="premium-card p-4">
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">{item.label}</p>
+            <p className="mt-2 text-lg font-semibold text-slate-900 dark:text-slate-100">{item.value}</p>
+            <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">{item.detail}</p>
+          </article>
         ))}
       </div>
     </section>

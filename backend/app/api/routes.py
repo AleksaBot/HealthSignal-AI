@@ -1,3 +1,7 @@
+import hashlib
+import secrets
+from datetime import datetime, timedelta
+
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 from sqlalchemy.orm import Session
 
@@ -16,7 +20,16 @@ from app.schemas.analyze import (
     RiskInsightRequest,
     SymptomAnalyzeRequest,
 )
-from app.schemas.auth import AuthLoginRequest, AuthSignupRequest, AuthTokenResponse
+from app.schemas.auth import (
+    AuthActionResponse,
+    AuthLoginRequest,
+    AuthSignupRequest,
+    AuthTokenResponse,
+    EmailVerificationConfirmRequest,
+    ForgotPasswordRequest,
+    ForgotPasswordResponse,
+    ResetPasswordConfirmRequest,
+)
 from app.schemas.health_profile import (
     HealthProfileRead,
     HealthProfileUpdateRequest,
@@ -26,7 +39,7 @@ from app.schemas.health_profile import (
 from app.schemas.symptom_intelligence import SymptomInput, SymptomIntakeUpdateRequest, SymptomIntakeUpdateResult
 
 from app.schemas.report import ReportCreate, ReportRead, ReportSaveRequest
-from app.schemas.user import UserRead
+from app.schemas.user import UserEmailUpdateRequest, UserNameUpdateRequest, UserPasswordUpdateRequest, UserRead
 from app.services.health_profile_service import (
     get_health_profile_for_user,
     update_health_profile_for_user,
@@ -55,6 +68,22 @@ from app.services.symptom_intelligence_pipeline import build_symptom_answer_plan
 
 router = APIRouter(prefix="/api", tags=["healthsignal"])
 
+EMAIL_VERIFICATION_TOKEN_TTL_HOURS = 24
+PASSWORD_RESET_TOKEN_TTL_MINUTES = 30
+
+
+def utc_now() -> datetime:
+    return datetime.utcnow()
+
+
+def hash_token(token: str) -> str:
+    return hashlib.sha256(token.encode("utf-8")).hexdigest()
+
+
+def build_frontend_link(path: str, token: str) -> str:
+    base = settings.app_public_base_url.rstrip("/")
+    return f"{base}{path}?token={token}"
+
 
 @router.get("/health")
 def health_check():
@@ -77,10 +106,17 @@ def auth_signup(payload: AuthSignupRequest, db: Session = Depends(get_db)):
             detail="Unable to process signup request",
         ) from exc
 
+    verification_token = secrets.token_urlsafe(32)
+    verification_expires_at = utc_now() + timedelta(hours=EMAIL_VERIFICATION_TOKEN_TTL_HOURS)
+
     user = User(
         first_name=payload.first_name,
         email=payload.email.lower(),
         hashed_password=hashed_password,
+        email_verified=False,
+        email_verification_token_hash=hash_token(verification_token),
+        email_verification_sent_at=utc_now(),
+        email_verification_expires_at=verification_expires_at,
     )
     db.add(user)
     db.commit()
@@ -112,6 +148,167 @@ def auth_login(payload: AuthLoginRequest, db: Session = Depends(get_db)):
 @router.get("/auth/me", response_model=UserRead)
 def auth_me(current_user: User = Depends(get_current_user)):
     return current_user
+
+
+@router.post("/auth/forgot-password", response_model=ForgotPasswordResponse)
+def forgot_password(payload: ForgotPasswordRequest, db: Session = Depends(get_db)):
+    normalized_email = payload.email.lower()
+    user = db.query(User).filter(User.email == normalized_email).first()
+    token = secrets.token_urlsafe(32)
+    dev_reset_link: str | None = None
+
+    if user:
+        user.password_reset_token_hash = hash_token(token)
+        user.password_reset_sent_at = utc_now()
+        user.password_reset_expires_at = utc_now() + timedelta(minutes=PASSWORD_RESET_TOKEN_TTL_MINUTES)
+        db.add(user)
+        db.commit()
+        if settings.enable_dev_auth_link_preview:
+            dev_reset_link = build_frontend_link("/auth/reset-password", token)
+    elif settings.enable_dev_auth_link_preview:
+        # Keep dev UX usable without leaking account existence through response shape.
+        dev_reset_link = build_frontend_link("/auth/reset-password", token)
+
+    return ForgotPasswordResponse(
+        message="If an account exists for that email, a password reset link has been sent.",
+        dev_reset_link=dev_reset_link,
+    )
+
+
+@router.post("/auth/reset-password", response_model=AuthActionResponse)
+def reset_password(payload: ResetPasswordConfirmRequest, db: Session = Depends(get_db)):
+    token_hash = hash_token(payload.token)
+    user = db.query(User).filter(User.password_reset_token_hash == token_hash).first()
+    now = utc_now()
+    if not user or not user.password_reset_expires_at or user.password_reset_expires_at < now:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Reset link is invalid or expired")
+
+    try:
+        hashed_password = hash_password(payload.new_password)
+    except PasswordValidationError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+
+    user.hashed_password = hashed_password
+    user.password_reset_token_hash = None
+    user.password_reset_sent_at = None
+    user.password_reset_expires_at = None
+    db.add(user)
+    db.commit()
+
+    return AuthActionResponse(message="Password updated successfully. Please sign in again.")
+
+
+@router.post("/auth/verify-email", response_model=AuthActionResponse)
+def verify_email(payload: EmailVerificationConfirmRequest, db: Session = Depends(get_db)):
+    token_hash = hash_token(payload.token)
+    user = db.query(User).filter(User.email_verification_token_hash == token_hash).first()
+    now = utc_now()
+    if not user or not user.email_verification_expires_at or user.email_verification_expires_at < now:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Verification link is invalid or expired")
+
+    user.email_verified = True
+    user.email_verification_token_hash = None
+    user.email_verification_sent_at = None
+    user.email_verification_expires_at = None
+    db.add(user)
+    db.commit()
+
+    return AuthActionResponse(message="Email verified successfully. You can continue using your account.")
+
+
+@router.post("/auth/verification/resend", response_model=AuthActionResponse)
+def resend_verification(payload: ForgotPasswordRequest, db: Session = Depends(get_db)):
+    normalized_email = payload.email.lower()
+    user = db.query(User).filter(User.email == normalized_email).first()
+    token = secrets.token_urlsafe(32)
+    dev_verification_link: str | None = None
+
+    if user and not user.email_verified:
+        user.email_verification_token_hash = hash_token(token)
+        user.email_verification_sent_at = utc_now()
+        user.email_verification_expires_at = utc_now() + timedelta(hours=EMAIL_VERIFICATION_TOKEN_TTL_HOURS)
+        db.add(user)
+        db.commit()
+        if settings.enable_dev_auth_link_preview:
+            dev_verification_link = build_frontend_link("/auth/verify-email", token)
+    elif settings.enable_dev_auth_link_preview:
+        dev_verification_link = build_frontend_link("/auth/verify-email", token)
+
+    return AuthActionResponse(
+        message="If your account needs verification, a confirmation link has been sent.",
+        dev_verification_link=dev_verification_link,
+    )
+
+
+@router.put("/auth/me/name", response_model=UserRead)
+def update_current_user_name(
+    payload: UserNameUpdateRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    current_user.first_name = payload.first_name
+    db.add(current_user)
+    db.commit()
+    db.refresh(current_user)
+    return current_user
+
+
+@router.put("/auth/me/email", response_model=UserRead)
+def update_current_user_email(
+    payload: UserEmailUpdateRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    try:
+        validate_password_for_bcrypt(payload.current_password)
+        password_is_valid = verify_password(payload.current_password, current_user.hashed_password)
+    except PasswordValidationError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+
+    if not password_is_valid:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Current password is incorrect")
+
+    normalized_email = payload.new_email.lower()
+    existing_user = db.query(User).filter(User.email == normalized_email, User.id != current_user.id).first()
+    if existing_user:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Email is already registered")
+
+    current_user.email = normalized_email
+    db.add(current_user)
+    db.commit()
+    db.refresh(current_user)
+    return current_user
+
+
+@router.put("/auth/me/password", status_code=status.HTTP_204_NO_CONTENT)
+def update_current_user_password(
+    payload: UserPasswordUpdateRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    try:
+        validate_password_for_bcrypt(payload.current_password)
+        current_password_is_valid = verify_password(payload.current_password, current_user.hashed_password)
+    except PasswordValidationError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+
+    if not current_password_is_valid:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Current password is incorrect")
+
+    if payload.current_password == payload.new_password:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="New password must be different from current password",
+        )
+
+    try:
+        hashed_password = hash_password(payload.new_password)
+    except PasswordValidationError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+
+    current_user.hashed_password = hashed_password
+    db.add(current_user)
+    db.commit()
 
 
 
