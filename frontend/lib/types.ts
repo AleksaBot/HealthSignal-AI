@@ -180,6 +180,8 @@ export type RiskInsightRequest = {
   ldl_cholesterol: number;
 };
 
+export type UserTier = "free" | "premium";
+
 export type HealthProfile = {
   age: number | null;
   sex: "female" | "male" | "non_binary" | "other" | "prefer_not_to_say" | null;
