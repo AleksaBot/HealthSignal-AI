@@ -16,6 +16,8 @@ class Settings(BaseSettings):
     llm_base_url: str = Field(default="https://api.openai.com/v1", alias="OPENAI_BASE_URL")
     intent_classifier_backend: str = Field(default="rule", alias="INTENT_CLASSIFIER_BACKEND")
     intent_classifier_model_path: str = Field(default="data/intent_classifier.joblib", alias="INTENT_CLASSIFIER_MODEL_PATH")
+    app_public_base_url: str = Field(default="http://localhost:3000", alias="APP_PUBLIC_BASE_URL")
+    enable_dev_auth_link_preview: bool = Field(default=True, alias="ENABLE_DEV_AUTH_LINK_PREVIEW")
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
 

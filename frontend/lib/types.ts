@@ -12,12 +12,46 @@ export type UserRead = {
   id: number;
   first_name: string;
   email: string;
+  email_verified: boolean;
   created_at: string;
 };
 
 export type AuthLoginRequest = {
   email: string;
   password: string;
+};
+
+export type UpdateNameRequest = {
+  first_name: string;
+};
+
+export type UpdateEmailRequest = {
+  new_email: string;
+  current_password: string;
+};
+
+export type UpdatePasswordRequest = {
+  current_password: string;
+  new_password: string;
+};
+
+export type ForgotPasswordRequest = {
+  email: string;
+};
+
+export type ForgotPasswordResponse = {
+  message: string;
+  dev_reset_link?: string | null;
+};
+
+export type ResetPasswordConfirmRequest = {
+  token: string;
+  new_password: string;
+};
+
+export type AuthActionResponse = {
+  message: string;
+  dev_verification_link?: string | null;
 };
 
 export type AuthTokenResponse = {

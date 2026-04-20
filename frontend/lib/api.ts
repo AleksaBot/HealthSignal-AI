@@ -1,8 +1,11 @@
 import {
   AnalysisResponse,
+  AuthActionResponse,
   AuthLoginRequest,
   AuthTokenResponse,
   AuthSignupRequest,
+  ForgotPasswordRequest,
+  ForgotPasswordResponse,
   HealthProfile,
   HealthRiskInsightsResponse,
   MedicationAdherenceStatus,
@@ -13,11 +16,15 @@ import {
   NoteInterpretationResponse,
   ReportRead,
   ReportSavePayload,
+  ResetPasswordConfirmRequest,
   RiskInsightRequest,
   SymptomAnalyzeRequest,
   SymptomIntakeInitialResponse,
   SymptomIntakeUpdateRequest,
-  UserRead
+  UserRead,
+  UpdateEmailRequest,
+  UpdateNameRequest,
+  UpdatePasswordRequest
 } from "@/lib/types";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
@@ -151,6 +158,10 @@ async function request<TResponse>(path: string, init?: RequestOptions): Promise<
     throw new ApiError(message, response.status);
   }
 
+  if (response.status === 204) {
+    return undefined as TResponse;
+  }
+
   return (await response.json()) as TResponse;
 }
 
@@ -228,8 +239,48 @@ export function login(payload: AuthLoginRequest) {
   return postJSON<AuthLoginRequest, AuthTokenResponse>("/api/auth/login", payload);
 }
 
+export function forgotPassword(payload: ForgotPasswordRequest) {
+  return postJSON<ForgotPasswordRequest, ForgotPasswordResponse>("/api/auth/forgot-password", payload);
+}
+
+export function resetPassword(payload: ResetPasswordConfirmRequest) {
+  return postJSON<ResetPasswordConfirmRequest, AuthActionResponse>("/api/auth/reset-password", payload);
+}
+
+export function verifyEmailToken(token: string) {
+  return postJSON<{ token: string }, AuthActionResponse>("/api/auth/verify-email", { token });
+}
+
+export function resendVerificationEmail(payload: ForgotPasswordRequest) {
+  return postJSON<ForgotPasswordRequest, AuthActionResponse>("/api/auth/verification/resend", payload);
+}
+
 export function getCurrentUser() {
   return getAuthJSON<UserRead>("/api/auth/me");
+}
+
+export function updateCurrentUserName(payload: UpdateNameRequest) {
+  return request<UserRead>("/api/auth/me/name", {
+    method: "PUT",
+    body: JSON.stringify(payload),
+    authRequired: true
+  });
+}
+
+export function updateCurrentUserEmail(payload: UpdateEmailRequest) {
+  return request<UserRead>("/api/auth/me/email", {
+    method: "PUT",
+    body: JSON.stringify(payload),
+    authRequired: true
+  });
+}
+
+export function updateCurrentUserPassword(payload: UpdatePasswordRequest) {
+  return request<void>("/api/auth/me/password", {
+    method: "PUT",
+    body: JSON.stringify(payload),
+    authRequired: true
+  });
 }
 
 export function analyzeSymptoms(payload: SymptomAnalyzeRequest) {

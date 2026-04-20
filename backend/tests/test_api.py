@@ -79,6 +79,104 @@ def test_auth_flow(client: TestClient):
     assert me.json()["first_name"] == "User"
 
 
+def test_auth_profile_security_updates(client: TestClient):
+    signup = client.post(
+        "/api/auth/signup",
+        json={"first_name": "Profile", "email": "profile@example.com", "password": "MySecure123"},
+    )
+    assert signup.status_code == 201
+
+    login = client.post(
+        "/api/auth/login",
+        json={"email": "profile@example.com", "password": "MySecure123"},
+    )
+    token = login.json()["access_token"]
+    auth_headers = {"Authorization": f"Bearer {token}"}
+
+    name_update = client.put("/api/auth/me/name", json={"first_name": "Profile Updated"}, headers=auth_headers)
+    assert name_update.status_code == 200
+    assert name_update.json()["first_name"] == "Profile Updated"
+
+    bad_email_update = client.put(
+        "/api/auth/me/email",
+        json={"new_email": "new-email@example.com", "current_password": "wrong-password"},
+        headers=auth_headers,
+    )
+    assert bad_email_update.status_code == 401
+
+    email_update = client.put(
+        "/api/auth/me/email",
+        json={"new_email": "new-email@example.com", "current_password": "MySecure123"},
+        headers=auth_headers,
+    )
+    assert email_update.status_code == 200
+    assert email_update.json()["email"] == "new-email@example.com"
+
+    password_update = client.put(
+        "/api/auth/me/password",
+        json={"current_password": "MySecure123", "new_password": "MySecure456"},
+        headers=auth_headers,
+    )
+    assert password_update.status_code == 204
+
+    old_login = client.post(
+        "/api/auth/login",
+        json={"email": "new-email@example.com", "password": "MySecure123"},
+    )
+    assert old_login.status_code == 401
+
+    new_login = client.post(
+        "/api/auth/login",
+        json={"email": "new-email@example.com", "password": "MySecure456"},
+    )
+    assert new_login.status_code == 200
+
+
+def test_forgot_reset_password_flow(client: TestClient):
+    client.post(
+        "/api/auth/signup",
+        json={"first_name": "Reset", "email": "reset@example.com", "password": "MySecure123"},
+    )
+
+    forgot = client.post("/api/auth/forgot-password", json={"email": "reset@example.com"})
+    assert forgot.status_code == 200
+    payload = forgot.json()
+    assert payload["message"]
+    assert "dev_reset_link" in payload
+
+    token = payload["dev_reset_link"].split("token=")[-1]
+    reset = client.post("/api/auth/reset-password", json={"token": token, "new_password": "MySecure999"})
+    assert reset.status_code == 200
+    assert "Please sign in again" in reset.json()["message"]
+
+    old_login = client.post("/api/auth/login", json={"email": "reset@example.com", "password": "MySecure123"})
+    assert old_login.status_code == 401
+    new_login = client.post("/api/auth/login", json={"email": "reset@example.com", "password": "MySecure999"})
+    assert new_login.status_code == 200
+
+
+def test_verify_email_flow(client: TestClient):
+    signup = client.post(
+        "/api/auth/signup",
+        json={"first_name": "Verify", "email": "verify@example.com", "password": "MySecure123"},
+    )
+    assert signup.status_code == 201
+    assert signup.json()["email_verified"] is False
+
+    resend = client.post("/api/auth/verification/resend", json={"email": "verify@example.com"})
+    assert resend.status_code == 200
+    resend_payload = resend.json()
+    token = resend_payload["dev_verification_link"].split("token=")[-1]
+
+    verify = client.post("/api/auth/verify-email", json={"token": token})
+    assert verify.status_code == 200
+
+    login = client.post("/api/auth/login", json={"email": "verify@example.com", "password": "MySecure123"})
+    me = client.get("/api/auth/me", headers={"Authorization": f"Bearer {login.json()['access_token']}"})
+    assert me.status_code == 200
+    assert me.json()["email_verified"] is True
+
+
 def test_signup_rejects_password_too_long(client: TestClient):
     long_password = "a" * 73
     signup = client.post(
