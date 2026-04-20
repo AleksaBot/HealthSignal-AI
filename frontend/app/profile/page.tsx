@@ -364,17 +364,17 @@ export default function ProfilePage() {
 
     try {
       const response = await updateTodayMedicationStatus({ medication_id: medicationId, status });
-      setProfile({
+      const normalizedResponse = {
         ...response,
         medications: response.medications ?? [],
         current_medications: normalizeMedicationNames(response.medications ?? [])
-      });
+      };
+      setProfile(normalizedResponse);
       setSaveMessage("Medication adherence saved for today.");
-      setGuidance(buildGuidance({
-        ...response,
-        medications: response.medications ?? [],
-        current_medications: normalizeMedicationNames(response.medications ?? [])
-      }));
+      setGuidance(buildGuidance(normalizedResponse));
+      const [historyResponse, summaryResponse] = await Promise.all([getMomentumHistory(), getMomentumSummary()]);
+      setMomentumHistory(historyResponse.snapshots);
+      setMomentumSummary(summaryResponse);
     } catch (err) {
       setError(getUserErrorMessage(err, "Unable to update medication status."));
     } finally {
