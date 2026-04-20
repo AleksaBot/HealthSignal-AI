@@ -30,22 +30,26 @@ from app.schemas.auth import (
     ForgotPasswordResponse,
     ResetPasswordConfirmRequest,
 )
+from app.schemas.coach import CoachQueryRequest, CoachQueryResponse
 from app.schemas.health_profile import (
     HealthProfileRead,
     HealthProfileUpdateRequest,
     HealthRiskInsightsResponse,
     MedicationAdherenceUpdateRequest,
 )
+from app.schemas.momentum import MomentumHistoryResponse, MomentumLatestResponse, MomentumSummaryResponse
 from app.schemas.symptom_intelligence import SymptomInput, SymptomIntakeUpdateRequest, SymptomIntakeUpdateResult
 
 from app.schemas.report import ReportCreate, ReportRead, ReportSaveRequest
 from app.schemas.user import UserEmailUpdateRequest, UserNameUpdateRequest, UserPasswordUpdateRequest, UserRead
+from app.services.coach_service import answer_with_context
 from app.services.health_profile_service import (
     get_health_profile_for_user,
     update_health_profile_for_user,
     upsert_medication_adherence_for_today,
 )
 from app.services.health_risk_insights import build_health_risk_insights
+from app.services.momentum_service import calculate_momentum_score, get_history, get_latest, momentum_label, summarize_history
 from app.services.note_interpreter import answer_note_follow_up, interpret_note
 from app.services.note_file_parser import FileParsingError, extract_text_from_upload
 from app.services.report_service import (
@@ -349,6 +353,48 @@ def generate_health_profile_insights(current_user: User = Depends(get_current_us
             detail="Complete age, height, and weight in your Health Profile before generating insights.",
         )
     return build_health_risk_insights(profile)
+
+
+@router.get("/momentum/history", response_model=MomentumHistoryResponse)
+def get_momentum_history(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    snapshots = get_history(db, current_user.id, limit=30)
+    return MomentumHistoryResponse(snapshots=snapshots)
+
+
+@router.get("/momentum/latest", response_model=MomentumLatestResponse)
+def get_momentum_latest(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    return MomentumLatestResponse(snapshot=get_latest(db, current_user.id))
+
+
+@router.get("/momentum/summary", response_model=MomentumSummaryResponse)
+def get_momentum_summary(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    snapshots = get_history(db, current_user.id, limit=30)
+    return MomentumSummaryResponse(**summarize_history(snapshots))
+
+
+@router.post("/coach/query", response_model=CoachQueryResponse)
+def query_personal_coach(
+    payload: CoachQueryRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    profile = get_health_profile_for_user(current_user, db)
+    guidance = build_health_risk_insights(profile)
+
+    score = calculate_momentum_score(profile)
+    history = get_history(db, current_user.id, limit=14)
+    trend = summarize_history(history).get("trend_direction", "Stable")
+
+    answer = answer_with_context(
+        question=payload.question,
+        momentum_score=score,
+        momentum_label=momentum_label(score),
+        trend_direction=trend,
+        weekly_focus=guidance.top_priorities_for_improvement[0] if guidance.top_priorities_for_improvement else "consistency",
+        profile=profile,
+        watchlist=guidance.lifestyle_risk_factors,
+    )
+    return CoachQueryResponse(answer=answer)
 
 
 @router.put("/profile/health/medications/today", response_model=HealthProfileRead)

@@ -3,8 +3,26 @@
 import Link from "next/link";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { RequireAuth } from "@/components/RequireAuth";
-import { getHealthProfile, getUserErrorMessage, updateTodayMedicationStatus, upsertHealthProfile } from "@/lib/api";
-import { HealthProfile, MedicationAdherenceStatus, MedicationEntry, MedicationFrequency, MedicationTimeOfDay, UserTier } from "@/lib/types";
+import {
+  getHealthProfile,
+  getMomentumHistory,
+  getMomentumSummary,
+  getUserErrorMessage,
+  queryCoach,
+  updateTodayMedicationStatus,
+  upsertHealthProfile
+} from "@/lib/api";
+import {
+  CoachQueryResponse,
+  HealthProfile,
+  MedicationAdherenceStatus,
+  MedicationEntry,
+  MedicationFrequency,
+  MedicationTimeOfDay,
+  MomentumSnapshot,
+  MomentumSummaryResponse,
+  UserTier
+} from "@/lib/types";
 
 const EMPTY_PROFILE: HealthProfile = {
   age: null,

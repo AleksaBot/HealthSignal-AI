@@ -393,3 +393,73 @@ def test_medication_tracker_v2_today_status_and_history(client: TestClient, auth
     payload = adherence_update.json()
     assert payload["todays_medication_status"][0]["status"] == "taken"
     assert payload["recent_medication_events"][0]["status"] == "taken"
+
+
+def test_momentum_history_and_summary(client: TestClient, auth_headers: dict[str, str]):
+    payload = {
+        "age": 38,
+        "sex": "female",
+        "height_cm": 170,
+        "weight_kg": 72,
+        "activity_level": "moderate",
+        "smoking_vaping_status": "none",
+        "alcohol_frequency": "monthly",
+        "sleep_average_hours": 7.2,
+        "stress_level": "moderate",
+        "known_conditions": [],
+        "current_medications": [],
+        "medications": [],
+        "family_history": [],
+        "systolic_bp": 122,
+        "diastolic_bp": 78,
+        "total_cholesterol": 182,
+        "medication_reminders_enabled": False,
+        "medication_reminder_time": "08:00",
+        "weekly_health_summary_enabled": True,
+    }
+    save = client.put("/api/profile/health", json=payload, headers=auth_headers)
+    assert save.status_code == 200
+
+    history = client.get("/api/momentum/history", headers=auth_headers)
+    assert history.status_code == 200
+    history_payload = history.json()
+    assert len(history_payload["snapshots"]) >= 1
+    assert "score" in history_payload["snapshots"][0]
+
+    latest = client.get("/api/momentum/latest", headers=auth_headers)
+    assert latest.status_code == 200
+    assert latest.json()["snapshot"] is not None
+
+    summary = client.get("/api/momentum/summary", headers=auth_headers)
+    assert summary.status_code == 200
+    assert summary.json()["trend_direction"] in {"Improving", "Stable", "Declining"}
+
+
+def test_coach_query_returns_personalized_answer(client: TestClient, auth_headers: dict[str, str]):
+    payload = {
+        "age": 42,
+        "sex": "male",
+        "height_cm": 178,
+        "weight_kg": 88,
+        "activity_level": "low",
+        "smoking_vaping_status": "none",
+        "alcohol_frequency": "weekly",
+        "sleep_average_hours": 5.8,
+        "stress_level": "high",
+        "known_conditions": ["hypertension"],
+        "current_medications": [],
+        "medications": [],
+        "family_history": ["heart disease"],
+        "systolic_bp": 138,
+        "diastolic_bp": 86,
+        "total_cholesterol": 210,
+        "medication_reminders_enabled": False,
+        "medication_reminder_time": "08:00",
+        "weekly_health_summary_enabled": False,
+    }
+    client.put("/api/profile/health", json=payload, headers=auth_headers)
+    response = client.post("/api/coach/query", json={"question": "How do I improve my score?"}, headers=auth_headers)
+    assert response.status_code == 200
+    answer = response.json()["answer"].lower()
+    assert "momentum" in answer
+    assert "score" in answer
