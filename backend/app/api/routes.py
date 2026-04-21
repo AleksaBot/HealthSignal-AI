@@ -31,6 +31,7 @@ from app.schemas.auth import (
     ResetPasswordConfirmRequest,
 )
 from app.schemas.coach import CoachQueryRequest, CoachQueryResponse
+from app.schemas.daily_checkin import DailyCheckInRead, DailyCheckInRecentResponse, DailyCheckInUpsertRequest
 from app.schemas.health_profile import (
     HealthProfileRead,
     HealthProfileUpdateRequest,
@@ -43,6 +44,7 @@ from app.schemas.symptom_intelligence import SymptomInput, SymptomIntakeUpdateRe
 from app.schemas.report import ReportCreate, ReportRead, ReportSaveRequest
 from app.schemas.user import UserEmailUpdateRequest, UserNameUpdateRequest, UserPasswordUpdateRequest, UserRead
 from app.services.coach_service import answer_with_context
+from app.services.daily_checkin_service import get_recent_checkins, get_today_checkin, upsert_today_checkin
 from app.services.health_profile_service import (
     get_health_profile_for_user,
     update_health_profile_for_user,
@@ -372,6 +374,32 @@ def get_momentum_summary(current_user: User = Depends(get_current_user), db: Ses
     return MomentumSummaryResponse(**summarize_history(snapshots))
 
 
+@router.get("/checkins/today", response_model=DailyCheckInRead | None)
+def get_today_daily_checkin(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    return get_today_checkin(db=db, user=current_user)
+
+
+@router.put("/checkins/today", response_model=DailyCheckInRead)
+def put_today_daily_checkin(
+    payload: DailyCheckInUpsertRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    return upsert_today_checkin(db=db, user=current_user, payload=payload)
+
+
+@router.get("/checkins/recent", response_model=DailyCheckInRecentResponse)
+def get_recent_daily_checkins(
+    days: int = 7,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    return DailyCheckInRecentResponse(items=get_recent_checkins(db=db, user=current_user, days=days))
+
+
 @router.post("/coach/query", response_model=CoachQueryResponse)
 def query_personal_coach(
     payload: CoachQueryRequest,
@@ -385,6 +413,13 @@ def query_personal_coach(
     history = get_history(db, current_user.id, limit=14)
     trend = summarize_history(history).get("trend_direction", "Stable")
 
+    recent_checkins = get_recent_checkins(db=db, user=current_user, days=7)
+    medication_summary = "No medications configured."
+    if profile.medications:
+        today_status = {entry.medication_id: entry.status for entry in (profile.todays_medication_status or [])}
+        taken_today = sum(1 for med in profile.medications if today_status.get(med.id) == "taken")
+        medication_summary = f"{len(profile.medications)} medication(s) configured; {taken_today} marked taken today."
+
     answer = answer_with_context(
         question=payload.question,
         momentum_score=score,
@@ -393,6 +428,10 @@ def query_personal_coach(
         weekly_focus=guidance.top_priorities_for_improvement[0] if guidance.top_priorities_for_improvement else "consistency",
         profile=profile,
         watchlist=guidance.lifestyle_risk_factors,
+        medication_summary=medication_summary,
+        recent_trend_summary=f"Momentum trend is {trend} with weekly delta {summarize_history(history).get('weekly_delta', 0)}.",
+        recent_checkins=recent_checkins,
+        history=[entry.model_dump() for entry in payload.history],
     )
     return CoachQueryResponse(answer=answer)
 

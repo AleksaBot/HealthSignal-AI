@@ -463,3 +463,95 @@ def test_coach_query_returns_personalized_answer(client: TestClient, auth_header
     answer = response.json()["answer"].lower()
     assert "momentum" in answer
     assert "score" in answer
+
+
+def test_daily_checkin_upsert_and_read(client: TestClient, auth_headers: dict[str, str]):
+    read_empty = client.get("/api/checkins/today", headers=auth_headers)
+    assert read_empty.status_code == 200
+    assert read_empty.json() is None
+
+    payload = {
+        "sleep_hours": 6.5,
+        "energy_level": 4,
+        "stress_level": "high",
+        "exercised_today": False,
+        "note": "Busy deadline today",
+    }
+    saved = client.put("/api/checkins/today", json=payload, headers=auth_headers)
+    assert saved.status_code == 200
+    assert saved.json()["energy_level"] == 4
+
+    updated = client.put(
+        "/api/checkins/today",
+        json={
+            "sleep_hours": 7.2,
+            "energy_level": 6,
+            "stress_level": "moderate",
+            "exercised_today": True,
+            "note": "Walked at lunch",
+        },
+        headers=auth_headers,
+    )
+    assert updated.status_code == 200
+    assert updated.json()["energy_level"] == 6
+
+    read_today = client.get("/api/checkins/today", headers=auth_headers)
+    assert read_today.status_code == 200
+    assert read_today.json()["exercised_today"] is True
+
+    recent = client.get("/api/checkins/recent?days=7", headers=auth_headers)
+    assert recent.status_code == 200
+    assert len(recent.json()["items"]) >= 1
+
+
+def test_coach_query_accepts_history_and_returns_disclaimer(client: TestClient, auth_headers: dict[str, str]):
+    client.put(
+        "/api/profile/health",
+        json={
+            "age": 35,
+            "sex": "female",
+            "height_cm": 168,
+            "weight_kg": 70,
+            "activity_level": "moderate",
+            "smoking_vaping_status": "none",
+            "alcohol_frequency": "monthly",
+            "sleep_average_hours": 7.0,
+            "stress_level": "moderate",
+            "known_conditions": [],
+            "current_medications": [],
+            "medications": [],
+            "family_history": [],
+            "systolic_bp": 118,
+            "diastolic_bp": 76,
+            "total_cholesterol": 180,
+            "medication_reminders_enabled": False,
+            "medication_reminder_time": "08:00",
+            "weekly_health_summary_enabled": True,
+        },
+        headers=auth_headers,
+    )
+
+    client.put(
+        "/api/checkins/today",
+        json={
+            "sleep_hours": 5.9,
+            "energy_level": 4,
+            "stress_level": "high",
+            "exercised_today": False,
+            "note": "Poor sleep",
+        },
+        headers=auth_headers,
+    )
+
+    response = client.post(
+        "/api/coach/query",
+        json={
+            "question": "Why is my energy low?",
+            "history": [{"role": "user", "content": "I felt tired yesterday"}],
+        },
+        headers=auth_headers,
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert "answer" in body
+    assert "disclaimer" in body

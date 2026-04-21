@@ -298,11 +298,43 @@ export type MomentumSummaryResponse = {
   stats: MomentumSummaryStats;
 };
 
+export type DailyCheckIn = {
+  id: number;
+  user_id: number;
+  date: string;
+  sleep_hours: number | null;
+  energy_level: number | null;
+  stress_level: "low" | "moderate" | "high" | null;
+  exercised_today: boolean | null;
+  note: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type DailyCheckInUpsertRequest = {
+  sleep_hours: number | null;
+  energy_level: number | null;
+  stress_level: "low" | "moderate" | "high" | null;
+  exercised_today: boolean | null;
+  note: string | null;
+};
+
+export type DailyCheckInRecentResponse = {
+  items: DailyCheckIn[];
+};
+
+export type CoachMessage = {
+  role: "user" | "coach";
+  content: string;
+};
+
 export type CoachQueryRequest = {
   question: string;
+  history?: CoachMessage[];
 };
 
 export type CoachQueryResponse = {
   answer: string;
   based_on: string;
+  disclaimer: string;
 };
