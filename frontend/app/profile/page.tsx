@@ -392,6 +392,62 @@ function checkInCompletionLabel(checkIn: DailyCheckIn | null) {
   return checkIn ? "Completed" : "Not completed yet";
 }
 
+function calculateCheckInStreak(recentCheckIns: DailyCheckIn[]) {
+  if (!recentCheckIns.length) return 0;
+  const checkInDays = new Set(
+    recentCheckIns.map((entry) => new Date(entry.date).toISOString().slice(0, 10))
+  );
+  const cursor = new Date();
+  cursor.setHours(0, 0, 0, 0);
+
+  let streak = 0;
+  while (checkInDays.has(cursor.toISOString().slice(0, 10))) {
+    streak += 1;
+    cursor.setDate(cursor.getDate() - 1);
+  }
+  return streak;
+}
+
+function calculateSleepStreak(recentCheckIns: DailyCheckIn[], targetHours = 7) {
+  if (!recentCheckIns.length) return 0;
+  const ordered = [...recentCheckIns]
+    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+  let streak = 0;
+  for (const entry of ordered) {
+    if ((entry.sleep_hours ?? 0) >= targetHours) {
+      streak += 1;
+      continue;
+    }
+    break;
+  }
+  return streak;
+}
+
+function calculateMedicationStreak(profile: HealthProfile) {
+  const events = profile.recent_medication_events ?? [];
+  if (!events.length) return 0;
+  const byDay = new Map<string, MedicationAdherenceStatus[]>();
+  for (const event of events) {
+    const day = new Date(event.event_date).toISOString().slice(0, 10);
+    const existing = byDay.get(day) ?? [];
+    existing.push(event.status);
+    byDay.set(day, existing);
+  }
+
+  const orderedDays = [...byDay.keys()].sort((a, b) => (a < b ? 1 : -1));
+  let streak = 0;
+  for (const day of orderedDays) {
+    const statuses = byDay.get(day) ?? [];
+    if (statuses.length > 0 && statuses.every((status) => status !== "skipped")) {
+      streak += 1;
+      continue;
+    }
+    break;
+  }
+  return streak;
+}
+
 export default function ProfilePage() {
 
   const [profile, setProfile] = useState<HealthProfile>(EMPTY_PROFILE);
@@ -432,6 +488,16 @@ export default function ProfilePage() {
           : "Momentum is early-stage; focus on one foundational routine this week.",
     [momentum.score]
   );
+  const checkInStreak = useMemo(() => calculateCheckInStreak(recentCheckIns), [recentCheckIns]);
+  const sleepStreak = useMemo(() => calculateSleepStreak(recentCheckIns), [recentCheckIns]);
+  const medicationStreak = useMemo(() => calculateMedicationStreak(profile), [profile]);
+  const todaysFocus = guidance?.todaysSmallWin ?? "Complete your baseline to unlock today’s focus.";
+  const miniInsight =
+    profile.sleep_average_hours && profile.sleep_average_hours < 7
+      ? "Sleep consistency is your biggest lever this week."
+      : profile.stress_level === "high" || profile.stress_level === "very_high"
+        ? "Reducing stress spikes can quickly improve daily momentum."
+        : "Protecting your strongest routine compounds progress week to week.";
   const isPremium = userTier === "premium";
 
   useEffect(() => {
@@ -582,6 +648,11 @@ export default function ProfilePage() {
     }, 250);
   }
 
+  function jumpToCoach() {
+    setCoachQuestion((current) => current || "What should I prioritize today?");
+    document.getElementById("coach-workspace")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
   async function onAskCoach(event?: FormEvent) {
     event?.preventDefault();
     const question = coachQuestion.trim();
@@ -636,7 +707,7 @@ export default function ProfilePage() {
 
   return (
     <RequireAuth>
-      <section className="section-shell space-y-6 p-6 md:p-8">
+      <section className="section-shell space-y-6 overflow-x-hidden p-4 sm:p-6 md:p-8">
         <div className="ambient-orb -right-16 -top-12 h-40 w-40 bg-brand-300/25" />
         <div className="ambient-orb -bottom-20 left-0 h-56 w-56 bg-cyan-200/20" />
 
@@ -658,6 +729,8 @@ export default function ProfilePage() {
         {saveMessage ? <p className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800 dark:border-emerald-900 dark:bg-emerald-950/20 dark:text-emerald-200">{saveMessage}</p> : null}
         {error ? <p className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700 dark:border-rose-900 dark:bg-rose-950/20 dark:text-rose-200">{error}</p> : null}
 
+        <div className="grid min-w-0 gap-6 xl:grid-cols-[minmax(0,1fr)_300px] xl:items-start">
+          <div className="min-w-0 space-y-6">
         <section className="premium-card space-y-4 p-5">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
@@ -829,7 +902,7 @@ export default function ProfilePage() {
             </article>
           </div>
 
-          <article className="premium-card p-5">
+          <article id="coach-workspace" className="premium-card min-w-0 p-5">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
                 <p className="text-xs font-semibold uppercase tracking-[0.16em] text-brand-700">Ask AI Health Coach</p>
@@ -848,10 +921,10 @@ export default function ProfilePage() {
                 </button>
               ))}
             </div>
-            <div className="mt-4 max-h-80 space-y-3 overflow-y-auto rounded-xl border border-slate-200/80 bg-slate-50/60 p-3 dark:border-slate-700 dark:bg-slate-900/60">
+            <div className="mt-4 max-h-80 space-y-3 overflow-x-hidden overflow-y-auto rounded-xl border border-slate-200/80 bg-slate-50/60 p-3 dark:border-slate-700 dark:bg-slate-900/60">
               {coachMessages.length === 0 ? <p className="text-sm text-slate-500 dark:text-slate-400">Start a conversation with your coach. Ask about this week, low energy patterns, stress, or momentum score changes.</p> : null}
               {coachMessages.map((message, index) => (
-                <div key={`${message.role}-${index}`} className={`rounded-xl p-3 text-sm ${message.role === "user" ? "ml-8 bg-brand-700/90 text-white" : "mr-8 border border-cyan-200/70 bg-cyan-50/60 text-slate-800 dark:border-cyan-900/60 dark:bg-cyan-950/20 dark:text-slate-100"}`}>
+                <div key={`${message.role}-${index}`} className={`max-w-full break-words rounded-xl p-3 text-sm ${message.role === "user" ? "bg-brand-700/90 text-white md:ml-8" : "border border-cyan-200/70 bg-cyan-50/60 text-slate-800 dark:border-cyan-900/60 dark:bg-cyan-950/20 dark:text-slate-100 md:mr-8"}`}>
                   <p className="text-[11px] font-semibold uppercase tracking-[0.12em] opacity-70">{message.role === "user" ? "You" : "Coach"}</p>
                   <p className="mt-1 whitespace-pre-wrap">{message.content}</p>
                 </div>
@@ -960,6 +1033,50 @@ export default function ProfilePage() {
 
           <div className="mt-5 flex flex-wrap gap-3"><button className="rounded-lg bg-amber-300 px-4 py-2 text-sm font-semibold text-slate-900 hover:bg-amber-200">Upgrade to Premium</button><button className="rounded-lg border border-slate-500 bg-transparent px-4 py-2 text-sm font-medium text-slate-100 hover:bg-slate-800">Learn More</button></div>
         </section>
+          </div>
+
+          <aside className="hidden xl:block xl:sticky xl:top-24">
+            <div className="space-y-4">
+              <section className="rounded-2xl border border-slate-700/80 bg-slate-900/80 p-4 backdrop-blur">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-cyan-300">Momentum snapshot</p>
+                <p className="mt-2 text-4xl font-semibold text-white">{momentum.score}</p>
+                <p className="mt-2 inline-flex rounded-full border border-cyan-500/50 bg-cyan-500/10 px-2.5 py-1 text-xs font-semibold text-cyan-200">{momentum.label}</p>
+                <div className="mt-3 h-2 rounded-full bg-slate-700">
+                  <div className="h-2 rounded-full bg-gradient-to-r from-cyan-400 to-blue-500" style={{ width: `${momentum.score}%` }} />
+                </div>
+                <p className="mt-2 text-xs text-slate-300">{trendSignal}</p>
+              </section>
+
+              <section className="rounded-2xl border border-slate-700/80 bg-slate-900/70 p-4">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-300">Streaks</p>
+                <div className="mt-3 space-y-2 text-sm">
+                  <div className="flex items-center justify-between text-slate-200"><span>Daily check-ins</span><span className="font-semibold">{checkInStreak}d</span></div>
+                  <div className="flex items-center justify-between text-slate-200"><span>Sleep target (7h+)</span><span className="font-semibold">{sleepStreak}d</span></div>
+                  <div className="flex items-center justify-between text-slate-200"><span>Medication adherence</span><span className="font-semibold">{medicationStreak}d</span></div>
+                </div>
+              </section>
+
+              <section className="rounded-2xl border border-slate-700/80 bg-slate-900/70 p-4">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-300">Today&apos;s focus</p>
+                <p className="mt-2 text-sm text-slate-100">{todaysFocus}</p>
+              </section>
+
+              <section className="rounded-2xl border border-slate-700/80 bg-slate-900/70 p-4">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-300">Quick actions</p>
+                <div className="mt-3 grid gap-2">
+                  <button type="button" onClick={() => setCheckInOpen(true)} className="rounded-lg bg-brand-700 px-3 py-2 text-xs font-medium text-white">Complete Check-In</button>
+                  <button type="button" onClick={jumpToCoach} className="rounded-lg border border-slate-600 bg-slate-800 px-3 py-2 text-xs font-medium text-slate-100">Ask Coach</button>
+                  <Link href="/health-trends" className="rounded-lg border border-slate-600 bg-slate-800 px-3 py-2 text-center text-xs font-medium text-slate-100">View Trends</Link>
+                </div>
+              </section>
+
+              <section className="rounded-2xl border border-cyan-900/70 bg-cyan-950/30 p-4">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-cyan-200">Mini insight</p>
+                <p className="mt-2 text-sm text-cyan-100">{miniInsight}</p>
+              </section>
+            </div>
+          </aside>
+        </div>
       </section>
     </RequireAuth>
   );
