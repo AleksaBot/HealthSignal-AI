@@ -1,4 +1,8 @@
+from __future__ import annotations
+
+from app.schemas.daily_checkin import DailyCheckInRead
 from app.schemas.health_profile import HealthProfileRead
+from app.services.ai_provider import get_ai_provider
 
 
 def _profile_signals(profile: HealthProfileRead) -> tuple[list[str], list[str]]:
@@ -29,36 +33,74 @@ def _profile_signals(profile: HealthProfileRead) -> tuple[list[str], list[str]]:
     return drags[:3], positives[:3]
 
 
-def answer_with_context(*, question: str, momentum_score: int, momentum_label: str, trend_direction: str, weekly_focus: str, profile: HealthProfileRead, watchlist: list[str]) -> str:
-    q = question.lower()
+def _build_checkin_summary(checkins: list[DailyCheckInRead]) -> str:
+    if not checkins:
+        return "No daily check-ins available yet."
+
+    latest = checkins[0]
+    summaries = [
+        f"Latest check-in ({latest.date.isoformat()}): sleep={latest.sleep_hours or 'n/a'}h, energy={latest.energy_level or 'n/a'}/10, stress={latest.stress_level or 'n/a'}, exercised={latest.exercised_today if latest.exercised_today is not None else 'n/a'}."
+    ]
+    sleep_values = [item.sleep_hours for item in checkins if item.sleep_hours is not None]
+    energy_values = [item.energy_level for item in checkins if item.energy_level is not None]
+    if sleep_values:
+        summaries.append(f"Recent avg sleep: {sum(sleep_values) / len(sleep_values):.1f}h.")
+    if energy_values:
+        summaries.append(f"Recent avg energy: {sum(energy_values) / len(energy_values):.1f}/10.")
+    high_stress_count = sum(1 for item in checkins if item.stress_level == "high")
+    summaries.append(f"High-stress check-ins in recent window: {high_stress_count}.")
+    return " ".join(summaries)
+
+
+def answer_with_context(
+    *,
+    question: str,
+    momentum_score: int,
+    momentum_label: str,
+    trend_direction: str,
+    weekly_focus: str,
+    profile: HealthProfileRead,
+    watchlist: list[str],
+    medication_summary: str,
+    recent_trend_summary: str,
+    recent_checkins: list[DailyCheckInRead],
+    history: list[dict[str, str]] | None = None,
+) -> str:
     drags, positives = _profile_signals(profile)
-    meds = [m.name for m in profile.medications][:3]
 
-    if "doctor" in q or "clinician" in q:
-        topic = watchlist[0] if watchlist else (drags[0] if drags else "overall risk trends")
-        meds_text = f" Mention medications like {', '.join(meds)} during that discussion." if meds else ""
-        return (
-            f"Your current momentum is {momentum_score}/100 ({momentum_label}) with a {trend_direction.lower()} trend. "
-            f"Ask your doctor about {topic}, what to monitor this month, and what threshold should trigger follow-up.{meds_text}"
-        )
+    system_prompt = (
+        "You are HealthSignal AI Coach. "
+        "Provide concise, practical, supportive, educational guidance. "
+        "Never diagnose, never replace emergency care, and avoid fear language. "
+        "When data is missing, acknowledge it and suggest one action. "
+        "Keep response under 140 words and include 2-3 actionable steps when possible."
+    )
 
-    if "focus" in q or "this week" in q:
-        primary_drag = drags[0] if drags else "consistency"
-        return (
-            f"Based on your trend ({trend_direction}) and current momentum ({momentum_score}/100), focus this week on {weekly_focus}. "
-            f"Your highest leverage area is {primary_drag}. Keep one supporting strength active: {positives[0] if positives else 'your adherence habits'}."
-        )
+    conversation = "\n".join([f"{entry.get('role', 'user')}: {entry.get('content', '')}" for entry in (history or [])[-6:]])
 
-    if "improve" in q or "score" in q:
-        drag_text = ", ".join(drags) if drags else "consistency"
-        positive_text = ", ".join(positives) if positives else "baseline engagement"
-        return (
-            f"To lift your momentum score from {momentum_score}, prioritize {drag_text}. "
-            f"You can likely gain 4-8 points by tightening those areas while preserving {positive_text}. "
-            f"Start with one concrete action today and repeat it for 7 days."
-        )
+    user_prompt = (
+        f"User question: {question}\n"
+        f"Momentum: {momentum_score}/100 ({momentum_label}), trend={trend_direction}.\n"
+        f"Weekly focus: {weekly_focus}.\n"
+        f"Top profile drags: {', '.join(drags) if drags else 'none identified'}.\n"
+        f"Top strengths: {', '.join(positives) if positives else 'none identified'}.\n"
+        f"Watchlist: {', '.join(watchlist) if watchlist else 'none'}.\n"
+        f"Medication context: {medication_summary}.\n"
+        f"Trend summary: {recent_trend_summary}.\n"
+        f"Check-in context: {_build_checkin_summary(recent_checkins)}\n"
+        f"Recent conversation:\n{conversation if conversation else 'No prior chat in this session.'}\n"
+        "Include a one-line educational disclaimer at the end."
+    )
 
+    ai_answer = get_ai_provider().generate_text(system_prompt=system_prompt, user_prompt=user_prompt)
+    if ai_answer:
+        return ai_answer
+
+    # safe fallback when AI provider is unavailable
+    primary_drag = drags[0] if drags else weekly_focus
+    strength = positives[0] if positives else "your current routine"
     return (
-        f"Your profile shows a momentum score of {momentum_score}/100 ({momentum_label}) and a {trend_direction.lower()} trend. "
-        f"Right now I would prioritize {drags[0] if drags else weekly_focus}, then reinforce {positives[0] if positives else 'your current routine'}."
+        f"Your momentum score is {momentum_score}/100 ({momentum_label}) with a {trend_direction.lower()} trend. "
+        f"Prioritize {primary_drag} this week, keep {strength} steady, and use one daily check-in to track sleep/energy/stress changes. "
+        "Educational support only, not medical diagnosis or emergency care."
     )

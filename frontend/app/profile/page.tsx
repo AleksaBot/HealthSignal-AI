@@ -5,22 +5,23 @@ import { FormEvent, useEffect, useMemo, useState } from "react";
 import { RequireAuth } from "@/components/RequireAuth";
 import {
   getHealthProfile,
-  getMomentumHistory,
-  getMomentumSummary,
+  getRecentCheckIns,
+  getTodayCheckIn,
   getUserErrorMessage,
   queryCoach,
   updateTodayMedicationStatus,
-  upsertHealthProfile
+  upsertHealthProfile,
+  upsertTodayCheckIn
 } from "@/lib/api";
 import {
-  CoachQueryResponse,
+  CoachMessage,
+  DailyCheckIn,
+  DailyCheckInUpsertRequest,
   HealthProfile,
   MedicationAdherenceStatus,
   MedicationEntry,
   MedicationFrequency,
   MedicationTimeOfDay,
-  MomentumSnapshot,
-  MomentumSummaryResponse,
   UserTier
 } from "@/lib/types";
 
@@ -377,34 +378,22 @@ function buildGuidance(profile: HealthProfile, momentum: MomentumScore): Guidanc
   };
 }
 
-function generateCoachResponse(question: string, profile: HealthProfile, guidance: GuidancePlan | null, momentum: MomentumScore): string {
-  const normalized = question.toLowerCase();
+function emptyCheckInDraft(): DailyCheckInUpsertRequest {
+  return {
+    sleep_hours: null,
+    energy_level: null,
+    stress_level: null,
+    exercised_today: null,
+    note: null
+  };
+}
 
-  if (normalized.includes("focus") || normalized.includes("week")) {
-    return `This week, center on ${guidance?.focus ?? "your core baseline habits"}. Start with today's small win: ${guidance?.todaysSmallWin ?? "take one short movement break"}. Keep your top priorities to 1-2 habits for better consistency.`;
-  }
-
-  if (normalized.includes("priorit")) {
-    const priorityList = [
-      momentum.draggingSignals[0] ?? "improving sleep consistency",
-      guidance?.goals[0] ?? "tracking one daily health action",
-      profile.medications.length > 0 ? "maintaining medication adherence" : "keeping your weekly summary enabled"
-    ];
-    return `Your biggest priorities right now are: 1) ${priorityList[0].toLowerCase()}, 2) ${priorityList[1].toLowerCase()}, and 3) ${priorityList[2].toLowerCase()}. Focus on repeatable actions, not perfection.`;
-  }
-
-  if (normalized.includes("momentum")) {
-    return `To improve your momentum score, target the biggest drag first: ${momentum.draggingSignals[0] ?? "baseline completeness"}. Then reinforce one strong signal you already have: ${momentum.improvingSignals[0] ?? "weekly structure"}. This mix usually improves score stability.`;
-  }
-
-  if (normalized.includes("doctor")) {
-    return "Bring a concise update: your recent symptoms, medication adherence pattern, stress/sleep changes, and one clear goal you want support with. Ask which metrics matter most for your risk profile and what follow-up timeline is recommended.";
-  }
-
-  return "I can help you turn your profile into an educational weekly action plan. Try asking about this week’s focus, momentum score improvements, or doctor discussion prep.";
+function checkInCompletionLabel(checkIn: DailyCheckIn | null) {
+  return checkIn ? "Completed" : "Not completed yet";
 }
 
 export default function ProfilePage() {
+
   const [profile, setProfile] = useState<HealthProfile>(EMPTY_PROFILE);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -415,7 +404,13 @@ export default function ProfilePage() {
   const [guidance, setGuidance] = useState<GuidancePlan | null>(null);
   const [refreshingGuidance, setRefreshingGuidance] = useState(false);
   const [coachQuestion, setCoachQuestion] = useState("");
-  const [coachAnswer, setCoachAnswer] = useState<string | null>(null);
+  const [coachLoading, setCoachLoading] = useState(false);
+  const [coachMessages, setCoachMessages] = useState<CoachMessage[]>([]);
+  const [todayCheckIn, setTodayCheckIn] = useState<DailyCheckIn | null>(null);
+  const [recentCheckIns, setRecentCheckIns] = useState<DailyCheckIn[]>([]);
+  const [checkInDraft, setCheckInDraft] = useState<DailyCheckInUpsertRequest>(emptyCheckInDraft());
+  const [checkInSaving, setCheckInSaving] = useState(false);
+  const [checkInOpen, setCheckInOpen] = useState(false);
 
   const [userTier] = useState<UserTier>("free");
   const completionPercent = useMemo(() => profileCompletion(profile), [profile]);
@@ -462,6 +457,18 @@ export default function ProfilePage() {
         };
         setProfile(hydratedProfile);
         setGuidance(buildGuidance(hydratedProfile, calculateMomentumScore(hydratedProfile)));
+        const [todayResponse, recentResponse] = await Promise.all([getTodayCheckIn(), getRecentCheckIns(7)]);
+        setTodayCheckIn(todayResponse);
+        setRecentCheckIns(recentResponse.items);
+        if (todayResponse) {
+          setCheckInDraft({
+            sleep_hours: todayResponse.sleep_hours,
+            energy_level: todayResponse.energy_level,
+            stress_level: todayResponse.stress_level,
+            exercised_today: todayResponse.exercised_today,
+            note: todayResponse.note
+          });
+        }
       } catch (err) {
         setError(getUserErrorMessage(err, "Unable to load your health profile."));
       } finally {
@@ -575,11 +582,46 @@ export default function ProfilePage() {
     }, 250);
   }
 
-  function onAskCoach(event?: FormEvent) {
+  async function onAskCoach(event?: FormEvent) {
     event?.preventDefault();
     const question = coachQuestion.trim();
-    if (!question) return;
-    setCoachAnswer(generateCoachResponse(question, profile, guidance, momentum));
+    if (!question || coachLoading) return;
+
+    const nextMessages: CoachMessage[] = [...coachMessages, { role: "user", content: question }];
+    setCoachMessages(nextMessages);
+    setCoachQuestion("");
+    setCoachLoading(true);
+
+    try {
+      const response = await queryCoach({ question, history: nextMessages });
+      setCoachMessages((current) => [...current, { role: "coach", content: response.answer }]);
+    } catch (err) {
+      setCoachMessages((current) => [
+        ...current,
+        { role: "coach", content: getUserErrorMessage(err, "Coach is temporarily unavailable. Please try again in a moment.") }
+      ]);
+    } finally {
+      setCoachLoading(false);
+    }
+  }
+
+  async function onSaveTodayCheckIn(event?: FormEvent) {
+    event?.preventDefault();
+    setCheckInSaving(true);
+    setError(null);
+
+    try {
+      const saved = await upsertTodayCheckIn(checkInDraft);
+      setTodayCheckIn(saved);
+      const recents = await getRecentCheckIns(7);
+      setRecentCheckIns(recents.items);
+      setSaveMessage("Today’s check-in saved.");
+      setCheckInOpen(false);
+    } catch (err) {
+      setError(getUserErrorMessage(err, "Unable to save today’s check-in."));
+    } finally {
+      setCheckInSaving(false);
+    }
   }
 
   if (loading) {
@@ -615,6 +657,40 @@ export default function ProfilePage() {
 
         {saveMessage ? <p className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800 dark:border-emerald-900 dark:bg-emerald-950/20 dark:text-emerald-200">{saveMessage}</p> : null}
         {error ? <p className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700 dark:border-rose-900 dark:bg-rose-950/20 dark:text-rose-200">{error}</p> : null}
+
+        <section className="premium-card space-y-4 p-5">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-brand-700">Today’s Check-In</p>
+              <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100">Daily pulse</h2>
+              <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">Capture today’s sleep, energy, stress, and activity in under a minute.</p>
+            </div>
+            <div className="text-right">
+              <p className="text-xs uppercase tracking-[0.15em] text-slate-500 dark:text-slate-400">Status</p>
+              <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">{checkInCompletionLabel(todayCheckIn)}</p>
+              <button type="button" onClick={() => setCheckInOpen((current) => !current)} className="mt-2 rounded-lg bg-brand-700 px-3 py-2 text-xs font-medium text-white">{todayCheckIn ? "Update Today’s Check-In" : "Complete Today’s Check-In"}</button>
+            </div>
+          </div>
+          {checkInOpen ? (
+            <form onSubmit={onSaveTodayCheckIn} className="grid gap-3 rounded-xl border border-slate-200/80 bg-slate-50/60 p-4 dark:border-slate-700 dark:bg-slate-800/40 md:grid-cols-2">
+              <label className="space-y-1 text-sm"><span>Sleep hours last night</span><input type="number" min={0} max={16} step="0.5" className="w-full rounded-lg border border-slate-300 bg-white p-2 dark:border-slate-600 dark:bg-slate-900" value={checkInDraft.sleep_hours ?? ""} onChange={(event) => setCheckInDraft((current) => ({ ...current, sleep_hours: event.target.value ? Number(event.target.value) : null }))} /></label>
+              <label className="space-y-1 text-sm"><span>Energy today (1-10)</span><input type="number" min={1} max={10} className="w-full rounded-lg border border-slate-300 bg-white p-2 dark:border-slate-600 dark:bg-slate-900" value={checkInDraft.energy_level ?? ""} onChange={(event) => setCheckInDraft((current) => ({ ...current, energy_level: event.target.value ? Number(event.target.value) : null }))} /></label>
+              <label className="space-y-1 text-sm"><span>Stress today</span><select className="w-full rounded-lg border border-slate-300 bg-white p-2 dark:border-slate-600 dark:bg-slate-900" value={checkInDraft.stress_level ?? ""} onChange={(event) => setCheckInDraft((current) => ({ ...current, stress_level: (event.target.value || null) as DailyCheckInUpsertRequest["stress_level"] }))}><option value="">Select</option><option value="low">Low</option><option value="moderate">Moderate</option><option value="high">High</option></select></label>
+              <label className="space-y-1 text-sm"><span>Exercise today</span><select className="w-full rounded-lg border border-slate-300 bg-white p-2 dark:border-slate-600 dark:bg-slate-900" value={checkInDraft.exercised_today === null ? "" : checkInDraft.exercised_today ? "yes" : "no"} onChange={(event) => setCheckInDraft((current) => ({ ...current, exercised_today: event.target.value === "" ? null : event.target.value === "yes" }))}><option value="">Select</option><option value="yes">Yes</option><option value="no">No</option></select></label>
+              <label className="space-y-1 text-sm md:col-span-2"><span>Note (optional)</span><textarea rows={2} maxLength={300} className="w-full rounded-lg border border-slate-300 bg-white p-2 dark:border-slate-600 dark:bg-slate-900" value={checkInDraft.note ?? ""} onChange={(event) => setCheckInDraft((current) => ({ ...current, note: event.target.value || null }))} /></label>
+              <div className="md:col-span-2"><button type="submit" disabled={checkInSaving} className="rounded-lg bg-brand-700 px-4 py-2 text-sm font-medium text-white disabled:opacity-60">{checkInSaving ? "Saving..." : "Save check-in"}</button></div>
+            </form>
+          ) : null}
+          <div className="grid gap-2 md:grid-cols-3">
+            {recentCheckIns.slice(0, 3).map((entry) => (
+              <div key={entry.id} className="rounded-lg border border-slate-200/80 bg-white/70 p-3 text-xs dark:border-slate-700 dark:bg-slate-900/50">
+                <p className="font-semibold text-slate-800 dark:text-slate-200">{new Date(entry.date).toLocaleDateString()}</p>
+                <p className="mt-1 text-slate-600 dark:text-slate-300">Sleep {entry.sleep_hours ?? "—"}h · Energy {entry.energy_level ?? "—"}/10 · Stress {entry.stress_level ?? "—"}</p>
+              </div>
+            ))}
+            {recentCheckIns.length === 0 ? <p className="text-xs text-slate-500 dark:text-slate-400">No check-ins yet. Add today’s entry to start trend tracking.</p> : null}
+          </div>
+        </section>
 
         <section className="space-y-4">
           <div>
@@ -757,8 +833,8 @@ export default function ProfilePage() {
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
                 <p className="text-xs font-semibold uppercase tracking-[0.16em] text-brand-700">Ask AI Health Coach</p>
-                <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Structured coaching Q&A</h3>
-                <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">Educational responses grounded in your baseline, weekly plan, and momentum score.</p>
+                <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Coach chat workspace</h3>
+                <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">Personalized, educational coaching grounded in your baseline, momentum, medications, and daily check-ins.</p>
               </div>
             </div>
             <div className="mt-4 flex flex-wrap gap-2">
@@ -766,14 +842,21 @@ export default function ProfilePage() {
                 <button
                   key={prompt}
                   className="rounded-full border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:hover:bg-slate-800"
-                  onClick={() => {
-                    setCoachQuestion(prompt);
-                    setCoachAnswer(generateCoachResponse(prompt, profile, guidance, momentum));
-                  }}
+                  onClick={() => setCoachQuestion(prompt)}
                 >
                   {prompt}
                 </button>
               ))}
+            </div>
+            <div className="mt-4 max-h-80 space-y-3 overflow-y-auto rounded-xl border border-slate-200/80 bg-slate-50/60 p-3 dark:border-slate-700 dark:bg-slate-900/60">
+              {coachMessages.length === 0 ? <p className="text-sm text-slate-500 dark:text-slate-400">Start a conversation with your coach. Ask about this week, low energy patterns, stress, or momentum score changes.</p> : null}
+              {coachMessages.map((message, index) => (
+                <div key={`${message.role}-${index}`} className={`rounded-xl p-3 text-sm ${message.role === "user" ? "ml-8 bg-brand-700/90 text-white" : "mr-8 border border-cyan-200/70 bg-cyan-50/60 text-slate-800 dark:border-cyan-900/60 dark:bg-cyan-950/20 dark:text-slate-100"}`}>
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.12em] opacity-70">{message.role === "user" ? "You" : "Coach"}</p>
+                  <p className="mt-1 whitespace-pre-wrap">{message.content}</p>
+                </div>
+              ))}
+              {coachLoading ? <p className="text-xs text-slate-500 dark:text-slate-400">Coach is thinking...</p> : null}
             </div>
             <form onSubmit={onAskCoach} className="mt-4 grid gap-3 md:grid-cols-[1fr_auto]">
               <input
@@ -782,11 +865,8 @@ export default function ProfilePage() {
                 placeholder="Ask a coaching question..."
                 className="w-full rounded-lg border border-slate-300 bg-white p-2.5 text-sm dark:border-slate-600 dark:bg-slate-900"
               />
-              <button type="submit" className="rounded-lg bg-brand-700 px-4 py-2 text-sm font-medium text-white">Ask Coach</button>
+              <button type="submit" disabled={coachLoading} className="rounded-lg bg-brand-700 px-4 py-2 text-sm font-medium text-white disabled:opacity-60">{coachLoading ? "Thinking..." : "Ask Coach"}</button>
             </form>
-            <div className="mt-3 rounded-xl border border-cyan-200/70 bg-cyan-50/50 p-3 text-sm text-slate-700 dark:border-cyan-900/60 dark:bg-cyan-950/20 dark:text-slate-200">
-              {coachAnswer ?? "Select a suggested question or type your own to get a focused coaching response."}
-            </div>
             <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">Educational only. Not medical diagnosis or emergency guidance.</p>
           </article>
         </section>

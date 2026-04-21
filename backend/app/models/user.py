@@ -28,3 +28,4 @@ class User(Base):
     medications = relationship("Medication", back_populates="user", cascade="all, delete-orphan")
     medication_logs = relationship("MedicationLog", back_populates="user", cascade="all, delete-orphan")
     momentum_snapshots = relationship("MomentumSnapshot", back_populates="user", cascade="all, delete-orphan")
+    daily_checkins = relationship("DailyCheckIn", back_populates="user", cascade="all, delete-orphan")

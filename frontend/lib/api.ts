@@ -13,6 +13,9 @@ import {
   MomentumSummaryResponse,
   CoachQueryRequest,
   CoachQueryResponse,
+  DailyCheckIn,
+  DailyCheckInRecentResponse,
+  DailyCheckInUpsertRequest,
   NoteFileAnalysisResponse,
   NoteFollowUpRequest,
   NoteFollowUpResponse,
@@ -367,6 +370,23 @@ export function getMomentumHistory() {
 
 export function getMomentumSummary() {
   return getAuthJSON<MomentumSummaryResponse>("/api/momentum/summary");
+}
+
+
+export function getTodayCheckIn() {
+  return getAuthJSON<DailyCheckIn | null>("/api/checkins/today");
+}
+
+export function upsertTodayCheckIn(payload: DailyCheckInUpsertRequest) {
+  return request<DailyCheckIn>("/api/checkins/today", {
+    method: "PUT",
+    body: JSON.stringify(payload),
+    authRequired: true
+  });
+}
+
+export function getRecentCheckIns(days = 7) {
+  return getAuthJSON<DailyCheckInRecentResponse>(`/api/checkins/recent?days=${days}`);
 }
 
 export function queryCoach(payload: CoachQueryRequest) {
