@@ -491,13 +491,60 @@ export default function ProfilePage() {
   const checkInStreak = useMemo(() => calculateCheckInStreak(recentCheckIns), [recentCheckIns]);
   const sleepStreak = useMemo(() => calculateSleepStreak(recentCheckIns), [recentCheckIns]);
   const medicationStreak = useMemo(() => calculateMedicationStreak(profile), [profile]);
+  const weeklySummary = useMemo(() => {
+    if (!recentCheckIns.length) {
+      return {
+        averageSleep: "No check-ins yet",
+        averageEnergy: "No check-ins yet",
+        stressPattern: "Not enough stress data yet",
+        exerciseSummary: "0 active days tracked",
+        completion: "0 of 7 days",
+        takeaway: "Start with a quick daily check-in to unlock a meaningful weekly pattern summary."
+      };
+    }
+
+    const withSleep = recentCheckIns.filter((entry) => typeof entry.sleep_hours === "number");
+    const withEnergy = recentCheckIns.filter((entry) => typeof entry.energy_level === "number");
+    const stressEntries = recentCheckIns.map((entry) => entry.stress_level).filter(Boolean);
+    const exerciseCount = recentCheckIns.filter((entry) => entry.exercised_today).length;
+    const averageSleepValue =
+      withSleep.length > 0 ? withSleep.reduce((sum, entry) => sum + (entry.sleep_hours ?? 0), 0) / withSleep.length : 0;
+    const averageEnergyValue =
+      withEnergy.length > 0 ? withEnergy.reduce((sum, entry) => sum + (entry.energy_level ?? 0), 0) / withEnergy.length : 0;
+    const stressPattern =
+      stressEntries.filter((level) => level === "high").length >= 2
+        ? "High stress appeared frequently"
+        : stressEntries.filter((level) => level === "moderate").length >= 2
+          ? "Mostly moderate stress days"
+          : "Mostly low-to-moderate stress days";
+
+    return {
+      averageSleep: withSleep.length > 0 ? `${averageSleepValue.toFixed(1)}h` : "No sleep logs",
+      averageEnergy: withEnergy.length > 0 ? `${averageEnergyValue.toFixed(1)}/10` : "No energy logs",
+      stressPattern,
+      exerciseSummary: `${exerciseCount} active day${exerciseCount === 1 ? "" : "s"} tracked`,
+      completion: `${recentCheckIns.length} of 7 days`,
+      takeaway:
+        averageSleepValue < 7 && averageEnergyValue < 7
+          ? "Energy softened on lower-sleep days this week. Protecting sleep consistency is your highest-leverage move."
+          : "This week shows stable routines with room to tighten one recovery habit for smoother daily energy."
+    };
+  }, [recentCheckIns]);
   const todaysFocus = guidance?.todaysSmallWin ?? "Complete your baseline to unlock today’s focus.";
+  const todaysNextAction = todayCheckIn
+    ? "Review your weekly plan and repeat your strongest routine."
+    : "Complete today’s check-in to keep your momentum and coaching context up to date.";
   const miniInsight =
     profile.sleep_average_hours && profile.sleep_average_hours < 7
       ? "Sleep consistency is your biggest lever this week."
       : profile.stress_level === "high" || profile.stress_level === "very_high"
         ? "Reducing stress spikes can quickly improve daily momentum."
         : "Protecting your strongest routine compounds progress week to week.";
+  const streakHighlights = [
+    { label: "Daily check-ins", value: `${checkInStreak} day streak` },
+    { label: "Sleep target", value: `${sleepStreak} strong night${sleepStreak === 1 ? "" : "s"}` },
+    { label: "Medication adherence", value: `${medicationStreak} day streak` }
+  ];
   const isPremium = userTier === "premium";
 
   useEffect(() => {
@@ -707,7 +754,7 @@ export default function ProfilePage() {
 
   return (
     <RequireAuth>
-      <section className="section-shell space-y-6 overflow-x-hidden p-4 sm:p-6 md:p-8">
+      <section className="section-shell mx-auto w-full max-w-[1120px] space-y-5 overflow-x-clip p-4 sm:p-6 md:p-7">
         <div className="ambient-orb -right-16 -top-12 h-40 w-40 bg-brand-300/25" />
         <div className="ambient-orb -bottom-20 left-0 h-56 w-56 bg-cyan-200/20" />
 
@@ -729,12 +776,12 @@ export default function ProfilePage() {
         {saveMessage ? <p className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800 dark:border-emerald-900 dark:bg-emerald-950/20 dark:text-emerald-200">{saveMessage}</p> : null}
         {error ? <p className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700 dark:border-rose-900 dark:bg-rose-950/20 dark:text-rose-200">{error}</p> : null}
 
-        <div className="grid min-w-0 gap-6 xl:grid-cols-[minmax(0,1fr)_300px] xl:items-start">
-          <div className="min-w-0 space-y-6">
-        <section className="premium-card space-y-4 p-5">
+        <div className="grid min-w-0 gap-5 2xl:grid-cols-[minmax(0,1fr)_300px] 2xl:items-start">
+          <div className="min-w-0 space-y-5">
+        <section className="premium-card min-w-0 space-y-4 p-5">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-brand-700">Today’s Check-In</p>
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-brand-700">1. Today Snapshot</p>
               <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100">Daily pulse</h2>
               <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">Capture today’s sleep, energy, stress, and activity in under a minute.</p>
             </div>
@@ -743,6 +790,20 @@ export default function ProfilePage() {
               <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">{checkInCompletionLabel(todayCheckIn)}</p>
               <button type="button" onClick={() => setCheckInOpen((current) => !current)} className="mt-2 rounded-lg bg-brand-700 px-3 py-2 text-xs font-medium text-white">{todayCheckIn ? "Update Today’s Check-In" : "Complete Today’s Check-In"}</button>
             </div>
+          </div>
+          <div className="grid min-w-0 gap-3 lg:grid-cols-3">
+            <article className="rounded-2xl border border-brand-200/90 bg-gradient-to-br from-brand-50/90 to-cyan-50/70 p-4 dark:border-brand-900/60 dark:from-slate-900 dark:to-slate-900/70">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-brand-700 dark:text-brand-300">Today&apos;s focus</p>
+              <p className="mt-1 text-base font-semibold text-slate-900 dark:text-slate-100">{guidance?.focus ?? "Protect your routine"}</p>
+            </article>
+            <article className="rounded-xl border border-slate-200/90 bg-white/80 p-4 dark:border-slate-700 dark:bg-slate-900/65">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400">Today&apos;s next action</p>
+              <p className="mt-1 text-sm font-medium text-slate-900 dark:text-slate-100">{todaysNextAction}</p>
+            </article>
+            <article className="rounded-xl border border-cyan-200/80 bg-cyan-50/60 p-4 dark:border-cyan-900/70 dark:bg-cyan-950/20">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-cyan-700 dark:text-cyan-200">Today&apos;s signal</p>
+              <p className="mt-1 text-sm font-medium text-cyan-900 dark:text-cyan-100">{miniInsight}</p>
+            </article>
           </div>
           {checkInOpen ? (
             <form onSubmit={onSaveTodayCheckIn} className="grid gap-3 rounded-xl border border-slate-200/80 bg-slate-50/60 p-4 dark:border-slate-700 dark:bg-slate-800/40 md:grid-cols-2">
@@ -754,7 +815,7 @@ export default function ProfilePage() {
               <div className="md:col-span-2"><button type="submit" disabled={checkInSaving} className="rounded-lg bg-brand-700 px-4 py-2 text-sm font-medium text-white disabled:opacity-60">{checkInSaving ? "Saving..." : "Save check-in"}</button></div>
             </form>
           ) : null}
-          <div className="grid gap-2 md:grid-cols-3">
+          <div className="grid min-w-0 gap-2 md:grid-cols-3">
             {recentCheckIns.slice(0, 3).map((entry) => (
               <div key={entry.id} className="rounded-lg border border-slate-200/80 bg-white/70 p-3 text-xs dark:border-slate-700 dark:bg-slate-900/50">
                 <p className="font-semibold text-slate-800 dark:text-slate-200">{new Date(entry.date).toLocaleDateString()}</p>
@@ -765,13 +826,39 @@ export default function ProfilePage() {
           </div>
         </section>
 
+        <section className="grid min-w-0 gap-4 lg:grid-cols-[1.1fr_0.9fr]">
+          <article className="premium-card min-w-0 p-5">
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-brand-700">2. Momentum / Streak rail</p>
+            <div className="mt-3 flex flex-wrap items-end justify-between gap-3">
+              <div>
+                <p className="text-xs uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400">Momentum score</p>
+                <p className="mt-1 text-4xl font-semibold text-slate-900 dark:text-slate-100">{momentum.score}</p>
+              </div>
+              <span className="rounded-full border border-cyan-300/70 bg-cyan-50 px-3 py-1 text-xs font-semibold text-cyan-800 dark:border-cyan-800 dark:bg-cyan-950/30 dark:text-cyan-200">{momentum.label}</span>
+            </div>
+            <div className="mt-3 h-2 rounded-full bg-slate-200 dark:bg-slate-800"><div className="h-2 rounded-full bg-gradient-to-r from-cyan-500 to-blue-500" style={{ width: `${momentum.score}%` }} /></div>
+            <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">{trendSignal}</p>
+          </article>
+          <article className="premium-card min-w-0 p-5">
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">Streak highlights</p>
+            <div className="mt-3 space-y-3">
+              {streakHighlights.map((item) => (
+                <div key={item.label} className="flex items-center justify-between gap-3 rounded-xl border border-slate-200/80 bg-slate-50/70 px-3 py-2 dark:border-slate-700 dark:bg-slate-900/60">
+                  <p className="text-sm font-medium text-slate-900 dark:text-slate-100">{item.label}</p>
+                  <p className="text-sm font-semibold text-slate-800 dark:text-slate-200">{item.value}</p>
+                </div>
+              ))}
+            </div>
+          </article>
+        </section>
+
         <section className="space-y-4">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-brand-700">1. Health Baseline</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-brand-700">3. Health Baseline</p>
             <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100">Profile foundation</h2>
           </div>
 
-          <div className="grid gap-4 md:grid-cols-3">
+          <div className="grid min-w-0 gap-4 md:grid-cols-3">
             <article className="premium-card p-4 md:col-span-2">
               <p className="text-xs uppercase tracking-[0.15em] text-slate-500 dark:text-slate-400">Profile completion</p>
               <p className="mt-2 text-3xl font-semibold text-slate-900 dark:text-slate-100">{completionPercent}%</p>
@@ -788,7 +875,7 @@ export default function ProfilePage() {
             </article>
           </div>
 
-          <div className="grid gap-4 md:grid-cols-2">
+          <div className="grid min-w-0 gap-4 md:grid-cols-2">
             <article className="premium-card space-y-4 p-5">
               <p className="text-xs font-semibold uppercase tracking-[0.16em] text-brand-700">Health Baseline Inputs</p>
               <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Core profile</h3>
@@ -832,14 +919,14 @@ export default function ProfilePage() {
         <section className="space-y-4 rounded-2xl border border-brand-200/70 bg-gradient-to-br from-brand-50/80 to-cyan-50/70 p-5 dark:border-brand-900/50 dark:from-slate-900 dark:to-slate-900/80">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-brand-700">2. AI Guidance / Plan</p>
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-brand-700">4. Weekly Coaching Plan</p>
               <h2 className="mt-1 text-xl font-semibold text-slate-900 dark:text-slate-100">Weekly coaching plan</h2>
               <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">Actionable guidance from your current baseline and momentum context.</p>
             </div>
             <p className="rounded-full border border-slate-300/70 bg-white/70 px-3 py-1 text-xs text-slate-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200">Refreshed {guidance?.refreshedAt ? new Date(guidance.refreshedAt).toLocaleString() : "Not yet"}</p>
           </div>
 
-          <div className="grid gap-4 lg:grid-cols-2">
+          <div className="grid min-w-0 gap-4 lg:grid-cols-2">
             <article className="premium-card p-4">
               <h3 className="text-sm font-semibold uppercase tracking-[0.12em] text-slate-700 dark:text-slate-300">Snapshot Summary</h3>
               <p className="mt-2 text-sm text-slate-700 dark:text-slate-200">{guidance?.snapshot ?? "Save your profile to generate your first personalized snapshot."}</p>
@@ -858,6 +945,19 @@ export default function ProfilePage() {
               {(guidance?.watchlist?.length ?? 0) > 0 ? <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-slate-700 dark:text-slate-200">{guidance?.watchlist.map((risk) => <li key={risk}>{risk}</li>)}</ul> : <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">No major watchlist flags from current profile data.</p>}
             </article>
           </div>
+          <article className="premium-card min-w-0 p-4">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <h3 className="text-sm font-semibold uppercase tracking-[0.12em] text-slate-700 dark:text-slate-300">This Week Summary</h3>
+              <p className="rounded-full border border-slate-300/80 bg-white/80 px-3 py-1 text-xs text-slate-600 dark:border-slate-700 dark:bg-slate-900/70 dark:text-slate-200">{weeklySummary.completion}</p>
+            </div>
+            <div className="mt-3 grid min-w-0 gap-3 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+              <div className="rounded-lg border border-slate-200/80 bg-slate-50/70 p-3 dark:border-slate-700 dark:bg-slate-900/60"><p className="text-[11px] uppercase tracking-[0.13em] text-slate-500 dark:text-slate-400">Avg sleep</p><p className="mt-1 text-sm font-semibold text-slate-900 dark:text-slate-100">{weeklySummary.averageSleep}</p></div>
+              <div className="rounded-lg border border-slate-200/80 bg-slate-50/70 p-3 dark:border-slate-700 dark:bg-slate-900/60"><p className="text-[11px] uppercase tracking-[0.13em] text-slate-500 dark:text-slate-400">Avg energy</p><p className="mt-1 text-sm font-semibold text-slate-900 dark:text-slate-100">{weeklySummary.averageEnergy}</p></div>
+              <div className="rounded-lg border border-slate-200/80 bg-slate-50/70 p-3 dark:border-slate-700 dark:bg-slate-900/60"><p className="text-[11px] uppercase tracking-[0.13em] text-slate-500 dark:text-slate-400">Stress pattern</p><p className="mt-1 text-sm font-semibold text-slate-900 dark:text-slate-100">{weeklySummary.stressPattern}</p></div>
+              <div className="rounded-lg border border-slate-200/80 bg-slate-50/70 p-3 dark:border-slate-700 dark:bg-slate-900/60"><p className="text-[11px] uppercase tracking-[0.13em] text-slate-500 dark:text-slate-400">Exercise</p><p className="mt-1 text-sm font-semibold text-slate-900 dark:text-slate-100">{weeklySummary.exerciseSummary}</p></div>
+              <div className="rounded-xl border border-brand-200/90 bg-gradient-to-r from-brand-50/90 to-cyan-50/80 p-4 md:col-span-2 lg:col-span-3 xl:col-span-5 dark:border-brand-900/60 dark:from-slate-900 dark:to-slate-900/70"><p className="text-[11px] uppercase tracking-[0.13em] text-brand-700 dark:text-brand-300">Takeaway</p><p className="mt-1 text-sm font-semibold text-slate-900 dark:text-slate-100">{weeklySummary.takeaway}</p></div>
+            </div>
+          </article>
           <article className="premium-card p-4">
             <h3 className="text-sm font-semibold uppercase tracking-[0.12em] text-slate-700 dark:text-slate-300">Recommended Goals</h3>
             <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-slate-700 dark:text-slate-200">{(guidance?.goals ?? []).map((goal) => <li key={goal}>{goal}</li>)}</ul>
@@ -866,37 +966,27 @@ export default function ProfilePage() {
 
         <section className="space-y-4">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-brand-700">3. Momentum / Progress</p>
-            <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100">Momentum Score</h2>
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-brand-700">5. AI Coach</p>
+            <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100">Coach workspace</h2>
           </div>
-          <div className="grid gap-4 lg:grid-cols-3">
-            <article className="premium-card lg:col-span-2 p-5">
-              <div className="flex items-end justify-between gap-4">
-                <div>
-                  <p className="text-xs uppercase tracking-[0.15em] text-slate-500 dark:text-slate-400">Score (0-100)</p>
-                  <p className="mt-2 text-4xl font-semibold text-slate-900 dark:text-slate-100">{momentum.score}</p>
-                  <p className="mt-2 inline-flex rounded-full border border-cyan-300/70 bg-cyan-50 px-3 py-1 text-xs font-semibold text-cyan-800 dark:border-cyan-800 dark:bg-cyan-950/30 dark:text-cyan-200">{momentum.label}</p>
-                </div>
-                <div className="h-24 w-24 rounded-full border-8 border-slate-200 dark:border-slate-700 relative">
-                  <div className="absolute inset-0 rounded-full border-8 border-transparent border-t-cyan-400 border-r-blue-500" style={{ transform: `rotate(${(momentum.score / 100) * 360}deg)` }} />
-                  <div className="absolute inset-0 flex items-center justify-center text-xs font-semibold text-slate-600 dark:text-slate-300">{momentum.score}%</div>
-                </div>
-              </div>
-              <div className="mt-4 h-2 rounded-full bg-slate-200 dark:bg-slate-800"><div className="h-2 rounded-full bg-gradient-to-r from-cyan-500 to-blue-500" style={{ width: `${momentum.score}%` }} /></div>
-              <p className="mt-3 text-sm text-slate-700 dark:text-slate-200">{momentum.explanation}</p>
-            </article>
-            <article className="premium-card p-5">
-              <h3 className="text-sm font-semibold uppercase tracking-[0.12em] text-slate-700 dark:text-slate-300">Progress over time</h3>
+          <div className="grid min-w-0 gap-4 lg:grid-cols-3">
+            <article className="premium-card min-w-0 lg:col-span-2 p-5">
+              <h3 className="text-sm font-semibold uppercase tracking-[0.12em] text-slate-700 dark:text-slate-300">Coaching context</h3>
+              <p className="mt-2 text-sm text-slate-700 dark:text-slate-200">{momentum.explanation}</p>
               <p className="mt-2 text-sm text-slate-700 dark:text-slate-200">{trendSignal}</p>
+            </article>
+            <article className="premium-card min-w-0 p-5">
+              <h3 className="text-sm font-semibold uppercase tracking-[0.12em] text-slate-700 dark:text-slate-300">Progress over time</h3>
+              <p className="mt-2 text-sm text-slate-700 dark:text-slate-200">Explore long-range patterns and prepare better coaching questions from trend history.</p>
               <Link href="/health-trends" className="mt-3 inline-flex rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-medium text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100">Open Trends Workspace</Link>
             </article>
           </div>
-          <div className="grid gap-4 md:grid-cols-2">
-            <article className="premium-card p-4">
+          <div className="grid min-w-0 gap-4 md:grid-cols-2">
+            <article className="premium-card min-w-0 p-4">
               <h3 className="text-sm font-semibold uppercase tracking-[0.12em] text-emerald-700 dark:text-emerald-300">What&apos;s helping</h3>
               <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-slate-700 dark:text-slate-200">{momentum.improvingSignals.map((signal) => <li key={signal}>{signal}</li>)}</ul>
             </article>
-            <article className="premium-card p-4">
+            <article className="premium-card min-w-0 p-4">
               <h3 className="text-sm font-semibold uppercase tracking-[0.12em] text-amber-700 dark:text-amber-300">What&apos;s dragging score</h3>
               <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-slate-700 dark:text-slate-200">{momentum.draggingSignals.map((signal) => <li key={signal}>{signal}</li>)}</ul>
             </article>
@@ -921,10 +1011,10 @@ export default function ProfilePage() {
                 </button>
               ))}
             </div>
-            <div className="mt-4 max-h-80 space-y-3 overflow-x-hidden overflow-y-auto rounded-xl border border-slate-200/80 bg-slate-50/60 p-3 dark:border-slate-700 dark:bg-slate-900/60">
+            <div className="mt-4 max-h-80 space-y-4 overflow-x-hidden overflow-y-auto rounded-xl border border-slate-200/80 bg-slate-50/60 p-4 dark:border-slate-700 dark:bg-slate-900/60">
               {coachMessages.length === 0 ? <p className="text-sm text-slate-500 dark:text-slate-400">Start a conversation with your coach. Ask about this week, low energy patterns, stress, or momentum score changes.</p> : null}
               {coachMessages.map((message, index) => (
-                <div key={`${message.role}-${index}`} className={`max-w-full break-words rounded-xl p-3 text-sm ${message.role === "user" ? "bg-brand-700/90 text-white md:ml-8" : "border border-cyan-200/70 bg-cyan-50/60 text-slate-800 dark:border-cyan-900/60 dark:bg-cyan-950/20 dark:text-slate-100 md:mr-8"}`}>
+                <div key={`${message.role}-${index}`} className={`max-w-full break-words rounded-xl p-3.5 text-sm ${message.role === "user" ? "bg-brand-700 text-white shadow-sm md:ml-10" : "border border-cyan-200/80 bg-cyan-50/80 text-slate-800 dark:border-cyan-900/60 dark:bg-cyan-950/30 dark:text-slate-100 md:mr-10"}`}>
                   <p className="text-[11px] font-semibold uppercase tracking-[0.12em] opacity-70">{message.role === "user" ? "You" : "Coach"}</p>
                   <p className="mt-1 whitespace-pre-wrap">{message.content}</p>
                 </div>
@@ -940,13 +1030,14 @@ export default function ProfilePage() {
               />
               <button type="submit" disabled={coachLoading} className="rounded-lg bg-brand-700 px-4 py-2 text-sm font-medium text-white disabled:opacity-60">{coachLoading ? "Thinking..." : "Ask Coach"}</button>
             </form>
+            <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">Suggestion: Ask about energy, sleep, or this week’s plan.</p>
             <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">Educational only. Not medical diagnosis or emergency guidance.</p>
           </article>
         </section>
 
         <section className="space-y-4 rounded-2xl border border-slate-200/80 bg-white/80 p-5 dark:border-slate-700 dark:bg-slate-900/70">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-brand-700">4. Medication / Reminders</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-brand-700">6. Medication / Reminders</p>
             <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100">Medication tracker + reminders</h2>
             <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">Keep your medication routine and reminder preferences aligned with your weekly coaching plan.</p>
           </div>
@@ -1019,7 +1110,7 @@ export default function ProfilePage() {
         <section className="rounded-2xl border border-amber-300/60 bg-gradient-to-br from-slate-900 to-slate-800 p-5 text-slate-100">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-amber-300">5. Premium Upgrade Preview</p>
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-amber-300">7. Premium Upgrade Preview</p>
               <h2 className="mt-1 text-xl font-semibold">Unlock deeper coaching automation</h2>
               <p className="mt-1 max-w-2xl text-sm text-slate-300">Your current workspace remains fully usable on free. Premium adds long-range coaching depth without changing your baseline workflow.</p>
             </div>
@@ -1035,7 +1126,7 @@ export default function ProfilePage() {
         </section>
           </div>
 
-          <aside className="hidden xl:block xl:sticky xl:top-24">
+          <aside className="hidden 2xl:block 2xl:sticky 2xl:top-24">
             <div className="space-y-4">
               <section className="rounded-2xl border border-slate-700/80 bg-slate-900/80 p-4 backdrop-blur">
                 <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-cyan-300">Momentum snapshot</p>
@@ -1050,9 +1141,12 @@ export default function ProfilePage() {
               <section className="rounded-2xl border border-slate-700/80 bg-slate-900/70 p-4">
                 <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-300">Streaks</p>
                 <div className="mt-3 space-y-2 text-sm">
-                  <div className="flex items-center justify-between text-slate-200"><span>Daily check-ins</span><span className="font-semibold">{checkInStreak}d</span></div>
-                  <div className="flex items-center justify-between text-slate-200"><span>Sleep target (7h+)</span><span className="font-semibold">{sleepStreak}d</span></div>
-                  <div className="flex items-center justify-between text-slate-200"><span>Medication adherence</span><span className="font-semibold">{medicationStreak}d</span></div>
+                  {streakHighlights.map((item) => (
+                    <div key={`rail-${item.label}`} className="rounded-lg border border-slate-700 bg-slate-800/80 px-2.5 py-2">
+                      <p className="text-xs font-medium text-slate-200">{item.label}</p>
+                      <p className="mt-1 text-sm font-semibold text-white">{item.value}</p>
+                    </div>
+                  ))}
                 </div>
               </section>
 

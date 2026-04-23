@@ -220,7 +220,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         </div>
       </header>
 
-      <main className="mx-auto max-w-6xl space-y-8 px-6 py-8">{children}</main>
+      <main className="mx-auto w-full max-w-[1180px] space-y-8 overflow-x-clip px-4 py-8 sm:px-6">{children}</main>
       <footer className="border-t border-slate-200/70 bg-white/60 backdrop-blur dark:border-slate-700/60 dark:bg-slate-950/60">
         <div className="mx-auto flex max-w-6xl flex-col justify-between gap-3 px-6 py-5 text-xs text-slate-600 md:flex-row md:items-center dark:text-slate-300">
           <p>HealthSignal AI provides educational health guidance and is not a medical diagnosis tool.</p>

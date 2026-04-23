@@ -46,7 +46,7 @@ const plans = [
 
 export default function PricingPage() {
   return (
-    <section className="section-shell space-y-8 p-6 md:p-8">
+    <section className="section-shell mx-auto w-full max-w-[1040px] space-y-6 overflow-x-clip p-5 md:p-7">
       <div className="space-y-3 border-b border-slate-200/80 pb-5 dark:border-slate-700/70">
         <p className="text-xs font-semibold uppercase tracking-[0.22em] text-brand-700">Pricing</p>
         <h1 className="text-3xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">Premium plans for a smarter health workflow</h1>
@@ -55,11 +55,11 @@ export default function PricingPage() {
         </p>
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-3">
+      <div className="grid min-w-0 gap-4 lg:grid-cols-3">
         {plans.map((plan) => (
           <article
             key={plan.name}
-            className={`premium-card flex h-full flex-col p-5 ${
+            className={`premium-card min-w-0 flex h-full flex-col p-5 ${
               plan.highlight ? "border-brand-400/60 shadow-brand-500/20 dark:border-brand-400/50" : ""
             }`}
           >
@@ -78,7 +78,7 @@ export default function PricingPage() {
               className={`mt-6 rounded-lg px-4 py-2 text-sm font-medium transition ${
                 plan.highlight
                   ? "bg-brand-700 text-white shadow-md shadow-brand-700/30 hover:-translate-y-0.5 hover:bg-brand-600"
-                  : "border border-slate-300 bg-white text-slate-700 hover:border-slate-400 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100"
+                  : "border border-slate-300 bg-white text-slate-700 hover:border-slate-400 hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100"
               }`}
             >
               {plan.cta}
