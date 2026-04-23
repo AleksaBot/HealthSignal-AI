@@ -95,6 +95,8 @@ const COACH_SUGGESTED_PROMPTS = [
   "What should I ask my doctor next?"
 ];
 
+const COACH_INPUT_SUGGESTIONS = ["Why is my energy low?", "What should I focus on this week?"];
+
 function parseList(value: string) {
   return value
     .split(",")
@@ -540,11 +542,34 @@ export default function ProfilePage() {
       : profile.stress_level === "high" || profile.stress_level === "very_high"
         ? "Reducing stress spikes can quickly improve daily momentum."
         : "Protecting your strongest routine compounds progress week to week.";
-  const streakHighlights = [
-    { label: "Daily check-ins", value: `${checkInStreak} day streak` },
-    { label: "Sleep target", value: `${sleepStreak} strong night${sleepStreak === 1 ? "" : "s"}` },
-    { label: "Medication adherence", value: `${medicationStreak} day streak` }
-  ];
+  const streakHighlights = useMemo(
+    () => [
+      { label: "Daily check-ins", value: `${checkInStreak} day streak` },
+      { label: "Sleep target", value: `${sleepStreak} strong night${sleepStreak === 1 ? "" : "s"}` },
+      { label: "Medication adherence", value: `${medicationStreak} day streak` }
+    ],
+    [checkInStreak, medicationStreak, sleepStreak]
+  );
+  const coachContextPayload = useMemo(
+    () => ({
+      weeklySummary,
+      momentum: {
+        score: momentum.score,
+        label: momentum.label,
+        explanation: momentum.explanation
+      },
+      streakHighlights,
+      recentCheckIns: recentCheckIns.slice(0, 3).map((entry) => ({
+        date: entry.date,
+        sleep_hours: entry.sleep_hours,
+        energy_level: entry.energy_level,
+        stress_level: entry.stress_level,
+        exercised_today: entry.exercised_today,
+        note: entry.note
+      }))
+    }),
+    [momentum.explanation, momentum.label, momentum.score, recentCheckIns, streakHighlights, weeklySummary]
+  );
   const isPremium = userTier === "premium";
 
   useEffect(() => {
@@ -711,7 +736,7 @@ export default function ProfilePage() {
     setCoachLoading(true);
 
     try {
-      const response = await queryCoach({ question, history: nextMessages });
+      const response = await queryCoach({ question, history: nextMessages, context: coachContextPayload });
       setCoachMessages((current) => [...current, { role: "coach", content: response.answer }]);
     } catch (err) {
       setCoachMessages((current) => [
@@ -1011,15 +1036,15 @@ export default function ProfilePage() {
                 </button>
               ))}
             </div>
-            <div className="mt-4 max-h-80 space-y-4 overflow-x-hidden overflow-y-auto rounded-xl border border-slate-200/80 bg-slate-50/60 p-4 dark:border-slate-700 dark:bg-slate-900/60">
+            <div className="mt-4 max-h-80 space-y-5 overflow-x-hidden overflow-y-auto rounded-xl border border-slate-200/80 bg-slate-50/60 p-4 dark:border-slate-700 dark:bg-slate-900/60">
               {coachMessages.length === 0 ? <p className="text-sm text-slate-500 dark:text-slate-400">Start a conversation with your coach. Ask about this week, low energy patterns, stress, or momentum score changes.</p> : null}
               {coachMessages.map((message, index) => (
-                <div key={`${message.role}-${index}`} className={`max-w-full break-words rounded-xl p-3.5 text-sm ${message.role === "user" ? "bg-brand-700 text-white shadow-sm md:ml-10" : "border border-cyan-200/80 bg-cyan-50/80 text-slate-800 dark:border-cyan-900/60 dark:bg-cyan-950/30 dark:text-slate-100 md:mr-10"}`}>
+                <div key={`${message.role}-${index}`} className={`max-w-full break-words rounded-xl p-3.5 text-sm ${message.role === "user" ? "bg-brand-700/95 text-white shadow-sm md:ml-10" : "border border-cyan-200/80 bg-cyan-50/90 text-slate-800 dark:border-cyan-900/60 dark:bg-cyan-950/35 dark:text-slate-100 md:mr-10"}`}>
                   <p className="text-[11px] font-semibold uppercase tracking-[0.12em] opacity-70">{message.role === "user" ? "You" : "Coach"}</p>
                   <p className="mt-1 whitespace-pre-wrap">{message.content}</p>
                 </div>
               ))}
-              {coachLoading ? <p className="text-xs text-slate-500 dark:text-slate-400">Coach is thinking...</p> : null}
+              {coachLoading ? <p className="rounded-lg border border-slate-200/80 bg-white/70 px-3 py-2 text-xs text-slate-500 dark:border-slate-700 dark:bg-slate-800/70 dark:text-slate-300">Coach is thinking...</p> : null}
             </div>
             <form onSubmit={onAskCoach} className="mt-4 grid gap-3 md:grid-cols-[1fr_auto]">
               <input
@@ -1030,7 +1055,18 @@ export default function ProfilePage() {
               />
               <button type="submit" disabled={coachLoading} className="rounded-lg bg-brand-700 px-4 py-2 text-sm font-medium text-white disabled:opacity-60">{coachLoading ? "Thinking..." : "Ask Coach"}</button>
             </form>
-            <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">Suggestion: Ask about energy, sleep, or this week’s plan.</p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {COACH_INPUT_SUGGESTIONS.map((suggestion) => (
+                <button
+                  key={suggestion}
+                  type="button"
+                  onClick={() => setCoachQuestion(suggestion)}
+                  className="rounded-full border border-slate-300/90 bg-white/90 px-3 py-1.5 text-xs font-medium text-slate-700 transition hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:hover:bg-slate-800"
+                >
+                  {suggestion}
+                </button>
+              ))}
+            </div>
             <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">Educational only. Not medical diagnosis or emergency guidance.</p>
           </article>
         </section>

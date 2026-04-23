@@ -64,16 +64,23 @@ def answer_with_context(
     medication_summary: str,
     recent_trend_summary: str,
     recent_checkins: list[DailyCheckInRead],
+    context: dict | None = None,
     history: list[dict[str, str]] | None = None,
 ) -> str:
     drags, positives = _profile_signals(profile)
 
+    weekly_summary = context.get("weeklySummary") if isinstance(context, dict) else None
+    momentum_context = context.get("momentum") if isinstance(context, dict) else None
+    streak_highlights = context.get("streakHighlights") if isinstance(context, dict) else None
+    context_checkins = context.get("recentCheckIns") if isinstance(context, dict) else None
+
     system_prompt = (
         "You are HealthSignal AI Coach. "
-        "Provide concise, practical, supportive, educational guidance. "
+        "Provide concise, practical, confident, educational guidance. "
         "Never diagnose, never replace emergency care, and avoid fear language. "
         "When data is missing, acknowledge it and suggest one action. "
-        "Keep response under 140 words and include 2-3 actionable steps when possible."
+        "Reference concrete patterns and trends from provided context whenever relevant. "
+        "Keep response under 120 words, natural tone, and include 2-3 actionable steps."
     )
 
     conversation = "\n".join([f"{entry.get('role', 'user')}: {entry.get('content', '')}" for entry in (history or [])[-6:]])
@@ -81,14 +88,19 @@ def answer_with_context(
     user_prompt = (
         f"User question: {question}\n"
         f"Momentum: {momentum_score}/100 ({momentum_label}), trend={trend_direction}.\n"
+        f"Client momentum context: {momentum_context or 'not available yet'}.\n"
         f"Weekly focus: {weekly_focus}.\n"
+        f"Client weekly summary: {weekly_summary or 'not available yet'}.\n"
+        f"Streak highlights: {streak_highlights or 'not available yet'}.\n"
         f"Top profile drags: {', '.join(drags) if drags else 'none identified'}.\n"
         f"Top strengths: {', '.join(positives) if positives else 'none identified'}.\n"
         f"Watchlist: {', '.join(watchlist) if watchlist else 'none'}.\n"
         f"Medication context: {medication_summary}.\n"
         f"Trend summary: {recent_trend_summary}.\n"
         f"Check-in context: {_build_checkin_summary(recent_checkins)}\n"
+        f"Client provided recent 3 check-ins: {context_checkins or 'not available yet'}.\n"
         f"Recent conversation:\n{conversation if conversation else 'No prior chat in this session.'}\n"
+        "If asked about tiredness/low energy, explicitly connect sleep trend + energy trend before advice.\n"
         "Include a one-line educational disclaimer at the end."
     )
 

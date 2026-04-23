@@ -331,6 +331,30 @@ export type CoachMessage = {
 export type CoachQueryRequest = {
   question: string;
   history?: CoachMessage[];
+  context?: {
+    weeklySummary?: {
+      averageSleep: string;
+      averageEnergy: string;
+      stressPattern: string;
+      exerciseSummary: string;
+      completion: string;
+      takeaway: string;
+    };
+    momentum?: {
+      score: number;
+      label: string;
+      explanation: string;
+    };
+    streakHighlights?: Array<{ label: string; value: string }>;
+    recentCheckIns?: Array<{
+      date: string;
+      sleep_hours: number | null;
+      energy_level: number | null;
+      stress_level: "low" | "moderate" | "high" | null;
+      exercised_today: boolean | null;
+      note: string | null;
+    }>;
+  };
 };
 
 export type CoachQueryResponse = {

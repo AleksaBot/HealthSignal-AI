@@ -411,7 +411,8 @@ def query_personal_coach(
 
     score = calculate_momentum_score(profile)
     history = get_history(db, current_user.id, limit=14)
-    trend = summarize_history(history).get("trend_direction", "Stable")
+    trend_summary = summarize_history(history)
+    trend = trend_summary.get("trend_direction", "Stable")
 
     recent_checkins = get_recent_checkins(db=db, user=current_user, days=7)
     medication_summary = "No medications configured."
@@ -429,8 +430,9 @@ def query_personal_coach(
         profile=profile,
         watchlist=guidance.lifestyle_risk_factors,
         medication_summary=medication_summary,
-        recent_trend_summary=f"Momentum trend is {trend} with weekly delta {summarize_history(history).get('weekly_delta', 0)}.",
+        recent_trend_summary=f"Momentum trend is {trend} with weekly delta {trend_summary.get('weekly_delta', 0)}.",
         recent_checkins=recent_checkins,
+        context=payload.context,
         history=[entry.model_dump() for entry in payload.history],
     )
     return CoachQueryResponse(answer=answer)

@@ -11,6 +11,7 @@ class CoachChatMessage(BaseModel):
 class CoachQueryRequest(BaseModel):
     question: str = Field(min_length=2, max_length=500)
     history: list[CoachChatMessage] = Field(default_factory=list, max_length=20)
+    context: dict | None = None
 
 
 class CoachQueryResponse(BaseModel):
