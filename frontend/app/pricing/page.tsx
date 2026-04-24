@@ -63,7 +63,12 @@ export default function PricingPage() {
               plan.highlight ? "border-brand-400/60 shadow-brand-500/20 dark:border-brand-400/50" : ""
             }`}
           >
-            <div className="space-y-2">
+            <div className="space-y-2 min-w-0">
+              {plan.highlight ? (
+                <span className="inline-flex w-fit rounded-full border border-brand-300/80 bg-brand-50 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-brand-700 dark:border-brand-500/60 dark:bg-brand-900/45 dark:text-brand-200">
+                  Most popular
+                </span>
+              ) : null}
               <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400">{plan.name}</p>
               <p className="text-3xl font-semibold text-slate-900 dark:text-slate-100">{plan.price}</p>
               <p className="text-sm text-slate-600 dark:text-slate-300">{plan.description}</p>
@@ -73,8 +78,8 @@ export default function PricingPage() {
                 <li key={feature}>{feature}</li>
               ))}
             </ul>
-            <button
-              type="button"
+            <Link
+              href="/auth"
               className={`mt-6 rounded-lg px-4 py-2 text-sm font-medium transition ${
                 plan.highlight
                   ? "bg-brand-700 text-white shadow-md shadow-brand-700/30 hover:-translate-y-0.5 hover:bg-brand-600"
@@ -82,7 +87,7 @@ export default function PricingPage() {
               }`}
             >
               {plan.cta}
-            </button>
+            </Link>
           </article>
         ))}
       </div>
