@@ -779,7 +779,7 @@ export default function ProfilePage() {
 
   return (
     <RequireAuth>
-      <section className="section-shell mx-auto w-full max-w-[1120px] space-y-5 overflow-x-clip p-4 sm:p-6 md:p-7">
+      <section className="section-shell mx-auto w-full max-w-[1120px] space-y-4 overflow-x-clip px-4 pb-5 pt-4 sm:px-6 sm:pb-6 sm:pt-5 md:px-7 md:pb-7 md:pt-6">
         <div className="ambient-orb -right-16 -top-12 h-40 w-40 bg-brand-300/25" />
         <div className="ambient-orb -bottom-20 left-0 h-56 w-56 bg-cyan-200/20" />
 
@@ -801,8 +801,8 @@ export default function ProfilePage() {
         {saveMessage ? <p className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800 dark:border-emerald-900 dark:bg-emerald-950/20 dark:text-emerald-200">{saveMessage}</p> : null}
         {error ? <p className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700 dark:border-rose-900 dark:bg-rose-950/20 dark:text-rose-200">{error}</p> : null}
 
-        <div className="grid min-w-0 gap-5 2xl:grid-cols-[minmax(0,1fr)_300px] 2xl:items-start">
-          <div className="min-w-0 space-y-5">
+        <div className="grid min-w-0 gap-4 2xl:grid-cols-[minmax(0,1fr)_300px] 2xl:items-start">
+          <div className="min-w-0 space-y-4">
         <section className="premium-card min-w-0 space-y-4 p-5">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
@@ -1078,7 +1078,7 @@ export default function ProfilePage() {
             <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">Keep your medication routine and reminder preferences aligned with your weekly coaching plan.</p>
           </div>
 
-          <div className="grid gap-4 lg:grid-cols-2">
+          <div className="grid min-w-0 gap-4 lg:grid-cols-2">
             <article className="rounded-xl border border-cyan-200/70 bg-cyan-50/60 p-4 dark:border-cyan-900/70 dark:bg-cyan-950/20">
               <h3 className="text-sm font-semibold uppercase tracking-[0.12em] text-cyan-800 dark:text-cyan-200">Today&apos;s Medications</h3>
               <p className="mt-1 text-xs text-cyan-900/80 dark:text-cyan-200/80">Mark each scheduled medication as taken or skipped for {new Date().toLocaleDateString()}.</p>
@@ -1113,7 +1113,7 @@ export default function ProfilePage() {
             </article>
           </div>
 
-          <article className="premium-card p-4">
+          <article className="premium-card min-w-0 p-4">
             <h3 className="text-sm font-semibold uppercase tracking-[0.12em] text-slate-700 dark:text-slate-300">Reminder preferences</h3>
             <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">Reminders support medication routines, weekly summaries, and upcoming coaching prompts.</p>
             <div className="mt-3 grid gap-4 md:grid-cols-2">
@@ -1129,7 +1129,7 @@ export default function ProfilePage() {
             </div>
           </article>
 
-          <div className="grid gap-3 md:grid-cols-2">
+          <div className="grid min-w-0 gap-3 md:grid-cols-2">
             <label className="space-y-1 text-sm"><span>Medication name</span><input className="w-full rounded-lg border border-slate-300 bg-white p-2 dark:border-slate-600 dark:bg-slate-900" placeholder="e.g. Metformin" value={medicationDraft.name} onChange={(event) => setMedicationDraft((current) => ({ ...current, name: event.target.value }))} /></label>
             <label className="space-y-1 text-sm"><span>Dosage (optional)</span><input className="w-full rounded-lg border border-slate-300 bg-white p-2 dark:border-slate-600 dark:bg-slate-900" placeholder="e.g. 500mg" value={medicationDraft.dosage} onChange={(event) => setMedicationDraft((current) => ({ ...current, dosage: event.target.value }))} /></label>
             <label className="space-y-1 text-sm"><span>Frequency</span><select className="w-full rounded-lg border border-slate-300 bg-white p-2 dark:border-slate-600 dark:bg-slate-900" value={medicationDraft.frequency} onChange={(event) => setMedicationDraft((current) => ({ ...current, frequency: event.target.value as MedicationFrequency }))}><option value="daily">Daily</option><option value="weekly">Weekly</option><option value="as_needed">As needed</option><option value="custom">Custom</option></select></label>
@@ -1140,10 +1140,10 @@ export default function ProfilePage() {
           <div><button className="rounded-lg border border-brand-300/80 bg-brand-50/90 px-4 py-2 text-sm font-medium text-brand-800 transition hover:-translate-y-0.5 hover:bg-brand-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700" onClick={onAddMedication}>Add medication</button></div>
 
           <h3 className="text-sm font-semibold uppercase tracking-[0.12em] text-slate-700 dark:text-slate-300">Active Medications</h3>
-          {profile.medications.length > 0 ? <div className="grid gap-3 md:grid-cols-2">{profile.medications.map((medication) => (<article key={medication.id} className="rounded-xl border border-slate-200/90 bg-slate-50/70 p-4 dark:border-slate-700 dark:bg-slate-800/55"><div className="flex items-start justify-between gap-2"><div><h3 className="text-base font-semibold text-slate-900 dark:text-slate-100">{medication.name}</h3><p className="text-xs text-slate-500 dark:text-slate-400">{(medication.frequency === "custom" ? medication.custom_frequency : medication.frequency)?.replaceAll("_", " ") || "No frequency"}{medication.time_of_day ? ` • ${medication.time_of_day}` : ""}</p></div><button className="text-xs font-medium text-rose-600 hover:text-rose-500" onClick={() => onRemoveMedication(medication.id)}>Remove</button></div>{medication.dosage ? <p className="mt-2 text-sm text-slate-700 dark:text-slate-200">Dosage: {medication.dosage}</p> : null}{medication.notes ? <p className="mt-1 text-xs text-slate-500 dark:text-slate-300">{medication.notes}</p> : null}</article>))}</div> : <p className="rounded-xl border border-dashed border-slate-300/90 bg-slate-50/50 p-4 text-sm text-slate-600 dark:border-slate-700 dark:bg-slate-800/45 dark:text-slate-300">No medications added yet. Add your first medication above.</p>}
+          {profile.medications.length > 0 ? <div className="grid min-w-0 gap-3 md:grid-cols-2">{profile.medications.map((medication) => (<article key={medication.id} className="min-w-0 rounded-xl border border-slate-200/90 bg-slate-50/70 p-4 dark:border-slate-700 dark:bg-slate-800/55"><div className="flex items-start justify-between gap-2"><div><h3 className="text-base font-semibold text-slate-900 dark:text-slate-100">{medication.name}</h3><p className="text-xs text-slate-500 dark:text-slate-400">{(medication.frequency === "custom" ? medication.custom_frequency : medication.frequency)?.replaceAll("_", " ") || "No frequency"}{medication.time_of_day ? ` • ${medication.time_of_day}` : ""}</p></div><button className="text-xs font-medium text-rose-600 hover:text-rose-500" onClick={() => onRemoveMedication(medication.id)}>Remove</button></div>{medication.dosage ? <p className="mt-2 text-sm text-slate-700 dark:text-slate-200">Dosage: {medication.dosage}</p> : null}{medication.notes ? <p className="mt-1 text-xs text-slate-500 dark:text-slate-300">{medication.notes}</p> : null}</article>))}</div> : <p className="rounded-xl border border-dashed border-slate-300/90 bg-slate-50/50 p-4 text-sm text-slate-600 dark:border-slate-700 dark:bg-slate-800/45 dark:text-slate-300">No medications added yet. Add your first medication above.</p>}
         </section>
 
-        <section className="rounded-2xl border border-amber-300/60 bg-gradient-to-br from-slate-900 to-slate-800 p-5 text-slate-100">
+        <section className="rounded-2xl border border-amber-300/60 bg-gradient-to-br from-slate-900 to-slate-800 p-5 text-slate-100 2xl:mb-1">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.16em] text-amber-300">7. Premium Upgrade Preview</p>
@@ -1158,11 +1158,11 @@ export default function ProfilePage() {
             <article className="rounded-xl border border-amber-300/40 bg-amber-100/10 p-4"><h3 className="text-sm font-semibold uppercase tracking-[0.12em] text-amber-200">Premium adds</h3><ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-amber-100">{PREMIUM_FEATURES.map((feature) => <li key={feature}>{feature}</li>)}</ul></article>
           </div>
 
-          <div className="mt-5 flex flex-wrap gap-3"><button className="rounded-lg bg-amber-300 px-4 py-2 text-sm font-semibold text-slate-900 hover:bg-amber-200">Upgrade to Premium</button><button className="rounded-lg border border-slate-500 bg-transparent px-4 py-2 text-sm font-medium text-slate-100 hover:bg-slate-800">Learn More</button></div>
+          <div className="mt-5 flex flex-wrap gap-3"><Link href="/pricing" className="rounded-lg bg-amber-300 px-4 py-2 text-sm font-semibold text-slate-900 transition hover:-translate-y-0.5 hover:bg-amber-200">Upgrade to Premium</Link><Link href="/pricing" className="rounded-lg border border-slate-500 bg-transparent px-4 py-2 text-sm font-medium text-slate-100 transition hover:-translate-y-0.5 hover:bg-slate-800">Learn More</Link></div>
         </section>
           </div>
 
-          <aside className="hidden 2xl:block 2xl:sticky 2xl:top-24">
+          <aside className="hidden min-w-0 self-start 2xl:block 2xl:sticky 2xl:top-24">
             <div className="space-y-4">
               <section className="rounded-2xl border border-slate-700/80 bg-slate-900/80 p-4 backdrop-blur">
                 <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-cyan-300">Momentum snapshot</p>

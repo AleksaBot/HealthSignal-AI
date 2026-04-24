@@ -126,7 +126,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const profileLabel = displayName ?? "Account";
 
   return (
-    <div className="site-backdrop">
+    <div className="site-backdrop flex min-h-dvh flex-col">
       <header className="sticky top-0 z-30 border-b border-white/50 bg-white/70 backdrop-blur-xl dark:border-slate-700/60 dark:bg-slate-950/70">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-6 py-4">
           <div className="flex items-center gap-3">
@@ -220,9 +220,9 @@ export function AppShell({ children }: { children: ReactNode }) {
         </div>
       </header>
 
-      <main className="mx-auto w-full max-w-[1180px] space-y-8 overflow-x-clip px-4 py-8 sm:px-6">{children}</main>
+      <main className="mx-auto w-full max-w-[1180px] min-w-0 flex-1 space-y-7 overflow-x-clip px-4 pb-5 pt-6 sm:px-6 sm:pb-6 sm:pt-7">{children}</main>
       <footer className="border-t border-slate-200/70 bg-white/60 backdrop-blur dark:border-slate-700/60 dark:bg-slate-950/60">
-        <div className="mx-auto flex max-w-6xl flex-col justify-between gap-3 px-6 py-5 text-xs text-slate-600 md:flex-row md:items-center dark:text-slate-300">
+        <div className="mx-auto flex max-w-6xl flex-col justify-between gap-3 px-6 py-4 text-xs text-slate-600 md:flex-row md:items-center dark:text-slate-300">
           <p>HealthSignal AI provides educational health guidance and is not a medical diagnosis tool.</p>
           <div className="flex flex-wrap gap-3">
             <Link href="/pricing" className="font-medium text-slate-700 hover:text-brand-700 dark:text-slate-200 dark:hover:text-brand-300">Pricing</Link>

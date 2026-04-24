@@ -87,7 +87,7 @@ body::after {
   }
 
   .site-backdrop {
-    @apply relative isolate min-h-screen text-slate-900 transition-colors dark:text-slate-100;
+    @apply relative isolate min-h-dvh text-slate-900 transition-colors dark:text-slate-100;
     background:
       radial-gradient(circle at 12% 16%, rgba(191, 219, 254, 0.22), transparent 38%),
       radial-gradient(circle at 88% 84%, rgba(186, 230, 253, 0.2), transparent 42%),
