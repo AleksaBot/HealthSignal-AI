@@ -80,6 +80,40 @@ export default function SymptomAnalyzerPage() {
     return `max(${asPercent(progress)}, 0.5rem)`;
   }, [progress]);
 
+  const finalSummaryPoints = useMemo(() => {
+    if (!session || !isComplete) return [];
+
+    const normalizedPlanPoints = summaryPoints
+      .map((point) => point.trim())
+      .filter((point) => point.length > 0);
+    if (normalizedPlanPoints.length > 0) return normalizedPlanPoints;
+
+    const extracted = session.extracted;
+    const chiefConcern =
+      extracted.primary_symptoms.length > 0
+        ? extracted.primary_symptoms.join(", ")
+        : session.input.symptom_text.trim() || "reported symptoms";
+    const associatedSymptoms = extracted.associated_symptoms.length > 0 ? extracted.associated_symptoms.join(", ") : null;
+    const redFlags = extracted.red_flags.length > 0 ? extracted.red_flags.join(", ") : null;
+    const likelyCategories = categories.length > 0 ? categories.join(", ") : null;
+    const riskLevelLabel = session.risk_assessment.risk_level.charAt(0).toUpperCase() + session.risk_assessment.risk_level.slice(1);
+    const nextSteps = triageRecommendation?.trim() || "Follow up with a licensed clinician for personalized guidance.";
+
+    return [
+      `Chief concern: ${chiefConcern}.`,
+      extracted.duration ? `Duration/onset: ${extracted.duration}.` : null,
+      extracted.severity ? `Reported severity: ${extracted.severity}.` : null,
+      associatedSymptoms ? `Associated symptoms: ${associatedSymptoms}.` : "Associated symptoms: none clearly reported.",
+      redFlags ? `Red flags noted: ${redFlags}.` : "Red flags noted: none clearly reported.",
+      likelyCategories ? `Likely category/categories: ${likelyCategories}.` : "Likely category/categories: still broad and should be clinically reviewed.",
+      `Risk/triage level: ${riskLevelLabel}.`,
+      `Recommended next steps: ${nextSteps}`,
+      "Educational guidance only and not a medical diagnosis—seek urgent care or emergency services if symptoms worsen."
+    ].filter((point): point is string => Boolean(point));
+  }, [session, isComplete, summaryPoints, categories, triageRecommendation]);
+
+  const hasFinalSummary = finalSummaryPoints.length > 0;
+
   async function onStartIntake(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!canStart) return;
@@ -149,19 +183,16 @@ export default function SymptomAnalyzerPage() {
     setError(null);
     setSaveSuccess(null);
     setSavedReportId(null);
+    setSummaryFocused(false);
   }
 
   function viewFinalSummary() {
+    if (!hasFinalSummary) return;
     const summaryEl = finalSummaryRef.current;
     if (!summaryEl) return;
 
-    const rect = summaryEl.getBoundingClientRect();
-    const isVisible = rect.top >= 0 && rect.bottom <= window.innerHeight;
-
     summaryEl.scrollIntoView({ behavior: "smooth", block: "start" });
-    if (isVisible) {
-      setSummaryFocused(true);
-    }
+    setSummaryFocused(true);
   }
 
   useEffect(() => {
@@ -188,7 +219,7 @@ export default function SymptomAnalyzerPage() {
         outputs: {
           risk_assessment: session.risk_assessment,
           triage_recommendation: triageRecommendation,
-          summary_points: summaryPoints,
+          summary_points: finalSummaryPoints,
           completion_reason: session.completion_reason
         }
       });
@@ -358,6 +389,7 @@ export default function SymptomAnalyzerPage() {
                         <button
                           type="button"
                           onClick={viewFinalSummary}
+                          disabled={!hasFinalSummary}
                           className="rounded-lg bg-slate-900 px-3 py-2 text-sm font-medium text-white transition hover:bg-slate-700 dark:bg-slate-200 dark:text-slate-900 dark:hover:bg-slate-300"
                         >
                           View Final Summary
@@ -448,9 +480,9 @@ export default function SymptomAnalyzerPage() {
               <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
                 Structured Summary
               </h2>
-              {summaryPoints.length > 0 ? (
+              {hasFinalSummary ? (
                 <ul className="mt-3 space-y-2 text-sm text-slate-700 dark:text-slate-200">
-                  {summaryPoints.map((point) => (
+                  {finalSummaryPoints.map((point) => (
                     <li key={point} className="rounded-lg bg-slate-50 px-3 py-2 dark:bg-slate-800/70">
                       {point}
                     </li>
@@ -458,7 +490,9 @@ export default function SymptomAnalyzerPage() {
                 </ul>
               ) : (
                 <p className="mt-3 text-sm text-slate-500 dark:text-slate-400">
-                  We&apos;ll build your extracted signal summary as you complete intake.
+                  {isComplete
+                    ? "Final summary is preparing from your completed intake."
+                    : "We&apos;ll build your extracted signal summary as you complete intake."}
                 </p>
               )}
             </section>

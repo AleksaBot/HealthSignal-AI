@@ -660,7 +660,7 @@ export default function HistoryPage() {
               <h2 className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">Report list</h2>
               <Link
                 href="/symptom-analyzer"
-                className="inline-flex items-center justify-center rounded-lg border border-brand-300/70 bg-brand-50 px-3 py-1.5 text-xs font-semibold text-brand-800 transition hover:-translate-y-0.5 hover:bg-brand-100 dark:border-brand-400/45 dark:bg-brand-950/40 dark:text-brand-200 dark:hover:bg-brand-900/55"
+                className="inline-flex items-center justify-center rounded-lg border border-brand-300/70 bg-brand-50 px-3 py-1.5 text-xs font-semibold text-brand-800 transition hover:-translate-y-0.5 hover:bg-brand-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700 dark:disabled:border-slate-800 dark:disabled:bg-slate-900 dark:disabled:text-slate-500"
               >
                 Start New Check
               </Link>
@@ -758,7 +758,7 @@ export default function HistoryPage() {
                   </button>
                   <Link
                     href={isHealthProfileInsights ? "/profile" : "/symptom-analyzer"}
-                    className="rounded-lg bg-brand-700 px-3 py-1.5 text-xs font-semibold text-white shadow-sm shadow-brand-700/20 transition hover:-translate-y-0.5 hover:bg-brand-600"
+                    className="rounded-lg bg-brand-700 px-3 py-1.5 text-xs font-semibold text-white shadow-sm shadow-brand-700/20 transition hover:-translate-y-0.5 hover:bg-brand-600 dark:border dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700 dark:disabled:border-slate-800 dark:disabled:bg-slate-900 dark:disabled:text-slate-500"
                   >
                     {isHealthProfileInsights ? "Open Profile" : "Start New Check"}
                   </Link>
