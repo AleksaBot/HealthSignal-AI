@@ -191,8 +191,15 @@ export default function SymptomAnalyzerPage() {
     const summaryEl = finalSummaryRef.current;
     if (!summaryEl) return;
 
-    summaryEl.scrollIntoView({ behavior: "smooth", block: "start" });
-    setSummaryFocused(true);
+    const headerOffset = 104;
+    const summaryTop = summaryEl.getBoundingClientRect().top + window.scrollY;
+    const targetTop = Math.max(0, summaryTop - headerOffset);
+
+    window.scrollTo({ top: targetTop, behavior: "smooth" });
+    setSummaryFocused(false);
+    window.requestAnimationFrame(() => {
+      setSummaryFocused(true);
+    });
   }
 
   useEffect(() => {
@@ -473,7 +480,7 @@ export default function SymptomAnalyzerPage() {
 
             <section
               ref={finalSummaryRef}
-              className={`premium-card p-5 transition-all duration-300 ${
+              className={`premium-card scroll-mt-28 p-5 transition-all duration-300 ${
                 summaryFocused ? "ring-2 ring-brand-400/80 ring-offset-2 ring-offset-white dark:ring-brand-300/70 dark:ring-offset-slate-900" : ""
               }`}
             >
