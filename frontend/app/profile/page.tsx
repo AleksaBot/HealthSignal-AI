@@ -779,7 +779,7 @@ export default function ProfilePage() {
 
   return (
     <RequireAuth>
-      <section className="section-shell mx-auto w-full max-w-[1120px] space-y-4 overflow-x-clip px-4 pb-5 pt-4 sm:px-6 sm:pb-6 sm:pt-5 md:px-7 md:pb-7 md:pt-6">
+      <section className="section-shell mx-auto w-full max-w-6xl space-y-4 overflow-x-hidden px-4 pb-5 pt-4 md:px-6 md:pb-6 md:pt-5 lg:px-8 lg:pb-7 lg:pt-6">
         <div className="ambient-orb -right-16 -top-12 h-40 w-40 bg-brand-300/25" />
         <div className="ambient-orb -bottom-20 left-0 h-56 w-56 bg-cyan-200/20" />
 
@@ -803,7 +803,7 @@ export default function ProfilePage() {
 
         <div className="grid min-w-0 gap-4 2xl:grid-cols-[minmax(0,1fr)_300px] 2xl:items-start">
           <div className="min-w-0 space-y-4">
-        <section className="premium-card min-w-0 space-y-4 p-5">
+        <section className="premium-card min-w-0 max-w-full overflow-x-hidden space-y-4 p-5">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.16em] text-brand-700">1. Today Snapshot</p>

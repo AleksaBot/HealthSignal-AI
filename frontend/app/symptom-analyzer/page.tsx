@@ -236,7 +236,7 @@ export default function SymptomAnalyzerPage() {
 
   return (
     <RequireAuth>
-      <section className="space-y-6">
+      <section className="max-w-full overflow-x-hidden space-y-6">
         <header className="section-shell p-6 md:p-8">
           <h1 className="text-2xl font-bold tracking-tight text-slate-950 dark:text-slate-50 md:text-3xl">
             Symptom Analyzer
@@ -250,7 +250,7 @@ export default function SymptomAnalyzerPage() {
           </div>
         </header>
 
-        <section className="frosted-panel space-y-4 rounded-2xl p-5">
+        <section className="frosted-panel min-w-0 max-w-full overflow-x-hidden space-y-4 rounded-2xl p-5">
           <div className="flex items-center justify-between gap-3">
             <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
               Session Progress
@@ -275,11 +275,11 @@ export default function SymptomAnalyzerPage() {
           )}
         </section>
 
-        <div className="grid gap-5 xl:grid-cols-[1.4fr_1fr]">
-          <div className="space-y-5">
+        <div className="grid min-w-0 max-w-full gap-5 xl:grid-cols-[1.4fr_1fr]">
+          <div className="min-w-0 space-y-5">
             {!started ? (
               <form
-                className="space-y-4 rounded-2xl border border-slate-200/80 bg-white/85 p-5 shadow-sm backdrop-blur-sm dark:border-slate-700/70 dark:bg-slate-900/75"
+                className="min-w-0 max-w-full overflow-x-hidden space-y-4 rounded-2xl border border-slate-200/80 bg-white/85 p-5 shadow-sm backdrop-blur-sm dark:border-slate-700/70 dark:bg-slate-900/75"
                 onSubmit={onStartIntake}
               >
                 <div>
@@ -323,7 +323,7 @@ export default function SymptomAnalyzerPage() {
                 </button>
               </form>
             ) : (
-              <section className="frosted-panel space-y-4 rounded-2xl p-5">
+              <section className="frosted-panel min-w-0 max-w-full overflow-x-hidden space-y-4 rounded-2xl p-5">
                 <div>
                   <h2 className="text-base font-semibold text-slate-900 dark:text-slate-100">
                     Guided Follow-up Assistant
@@ -333,7 +333,7 @@ export default function SymptomAnalyzerPage() {
                   </p>
                 </div>
 
-                <div className="max-h-[28rem] space-y-3 overflow-y-auto rounded-xl border border-slate-200/80 bg-slate-50/70 p-4 dark:border-slate-700 dark:bg-slate-950/40">
+                <div className="max-h-[28rem] max-w-full space-y-3 overflow-x-hidden overflow-y-auto rounded-xl border border-slate-200/80 bg-slate-50/70 p-4 dark:border-slate-700 dark:bg-slate-950/40">
                   <div className="flex justify-start">
                     <div className={`${ASSISTANT_BUBBLE_BASE_CLASS} leading-6`}>
                       Thanks for sharing. I&apos;ll guide your intake and summarize your triage level.
