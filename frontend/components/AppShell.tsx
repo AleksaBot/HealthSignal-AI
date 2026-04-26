@@ -126,7 +126,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const profileLabel = displayName ?? "Account";
 
   return (
-    <div className="site-backdrop flex min-h-dvh flex-col">
+    <div className="site-backdrop flex min-h-dvh w-full max-w-full flex-col overflow-x-hidden">
       <header className="sticky top-0 z-30 border-b border-white/50 bg-white/70 backdrop-blur-xl dark:border-slate-700/60 dark:bg-slate-950/70">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-6 py-4">
           <div className="flex items-center gap-3">
@@ -220,7 +220,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         </div>
       </header>
 
-      <main className="mx-auto w-full max-w-[1180px] min-w-0 flex-1 space-y-7 overflow-x-clip px-4 pb-5 pt-6 sm:px-6 sm:pb-6 sm:pt-7">{children}</main>
+      <main className="mx-auto w-full max-w-6xl min-w-0 flex-1 space-y-7 overflow-x-hidden px-4 pb-5 pt-6 md:px-6 md:pb-6 md:pt-7 lg:px-8">{children}</main>
       <footer className="border-t border-slate-200/70 bg-white/60 backdrop-blur dark:border-slate-700/60 dark:bg-slate-950/60">
         <div className="mx-auto flex max-w-6xl flex-col justify-between gap-3 px-6 py-4 text-xs text-slate-600 md:flex-row md:items-center dark:text-slate-300">
           <p>HealthSignal AI provides educational health guidance and is not a medical diagnosis tool.</p>

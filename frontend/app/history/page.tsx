@@ -612,7 +612,7 @@ export default function HistoryPage() {
 
   return (
     <RequireAuth>
-      <section className="section-shell space-y-5 p-4 sm:p-5 md:space-y-6 md:p-7">
+      <section className="section-shell max-w-full overflow-x-hidden space-y-5 p-4 sm:p-5 md:space-y-6 md:p-7">
         <div className="ambient-orb -right-12 top-2 h-48 w-48 bg-brand-200/30" />
         <div className="ambient-orb -left-14 bottom-6 h-44 w-44 bg-cyan-200/30" />
 
@@ -685,7 +685,7 @@ export default function HistoryPage() {
                     }`}
                   >
                     <div className="flex flex-wrap items-start justify-between gap-3">
-                      <div className="space-y-2">
+                      <div className="min-w-0 space-y-2">
                         <p className="flex items-center gap-2 text-base font-semibold tracking-tight text-slate-900 dark:text-slate-100">
                           <span aria-hidden>{report.report_type === "note-interpreter-file" ? "📥" : isHealthProfileInsightsReport(report.report_type) ? "🧬" : "📄"}</span>
                           {title}
@@ -717,7 +717,7 @@ export default function HistoryPage() {
         )}
 
         {selectedReport && selectedContext && selectedTitle ? (
-          <article className="frosted-panel animate-fade-up relative space-y-3.5 rounded-2xl p-4 sm:p-5 [--stagger:120ms]">
+          <article className="frosted-panel animate-fade-up relative max-w-full overflow-x-hidden space-y-3.5 rounded-2xl p-4 sm:p-5 [--stagger:120ms]">
             <header className="space-y-2.5 rounded-2xl border border-brand-200/70 bg-gradient-to-br from-white/95 via-white/90 to-brand-50/80 p-3.5 shadow-sm shadow-brand-200/25 sm:p-4 dark:border-brand-500/30 dark:from-slate-900/80 dark:via-slate-900/70 dark:to-brand-950/30 dark:shadow-brand-900/20">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div className="space-y-1.5">
