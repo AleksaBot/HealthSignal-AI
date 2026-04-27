@@ -346,6 +346,8 @@ export type CoachQueryRequest = {
       explanation: string;
     };
     streakHighlights?: Array<{ label: string; value: string }>;
+    goals?: string[];
+    coachMemorySummary?: string;
     recentCheckIns?: Array<{
       date: string;
       sleep_hours: number | null;
