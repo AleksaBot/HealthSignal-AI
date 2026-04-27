@@ -1,5 +1,7 @@
 import json
 
+from sqlalchemy.orm import Session
+
 from app.services.security import BCRYPT_PASSWORD_LENGTH_ERROR_MESSAGE
 from fastapi.testclient import TestClient
 
@@ -555,3 +557,68 @@ def test_coach_query_accepts_history_and_returns_disclaimer(client: TestClient, 
     body = response.json()
     assert "answer" in body
     assert "disclaimer" in body
+
+
+def test_coach_history_empty_returns_safely(client: TestClient, auth_headers: dict[str, str]):
+    response = client.get("/api/coach/history", headers=auth_headers)
+    assert response.status_code == 200
+    body = response.json()
+    assert body["messages"] == []
+    assert body["memory_summary"] is None
+
+
+def test_coach_query_persists_messages_and_memory(client: TestClient, auth_headers: dict[str, str]):
+    response = client.post("/api/coach/query", json={"question": "How can I improve sleep consistency?"}, headers=auth_headers)
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["answer"]
+    assert payload["memory_summary"]
+    assert len(payload["memory_summary"]) <= 500
+
+    history = client.get("/api/coach/history", headers=auth_headers)
+    assert history.status_code == 200
+    messages = history.json()["messages"]
+    assert len(messages) >= 2
+    assert messages[-2]["role"] == "user"
+    assert messages[-1]["role"] == "coach"
+
+
+def test_coach_history_is_scoped_to_current_user(client: TestClient):
+    client.post(
+        "/api/auth/signup",
+        json={"first_name": "UserOne", "email": "one@example.com", "password": "StrongPass123"},
+    )
+    login_one = client.post("/api/auth/login", json={"email": "one@example.com", "password": "StrongPass123"})
+    headers_one = {"Authorization": f"Bearer {login_one.json()['access_token']}"}
+
+    client.post(
+        "/api/auth/signup",
+        json={"first_name": "UserTwo", "email": "two@example.com", "password": "StrongPass123"},
+    )
+    login_two = client.post("/api/auth/login", json={"email": "two@example.com", "password": "StrongPass123"})
+    headers_two = {"Authorization": f"Bearer {login_two.json()['access_token']}"}
+
+    client.post("/api/coach/query", json={"question": "I need help with stress"}, headers=headers_one)
+
+    response_two = client.get("/api/coach/history", headers=headers_two)
+    assert response_two.status_code == 200
+    assert response_two.json()["messages"] == []
+
+
+def test_coach_message_retention_cap_prunes_to_latest_200(
+    client: TestClient,
+    auth_headers: dict[str, str],
+    db_session: Session,
+):
+    from app.models.coach_message_log import CoachMessageLog
+    from app.models.user import User
+
+    for index in range(105):
+        response = client.post("/api/coach/query", json={"question": f"Retention test question {index}"}, headers=auth_headers)
+        assert response.status_code == 200
+
+    user = db_session.query(User).filter(User.email == "test@example.com").first()
+    assert user is not None
+
+    total_messages = db_session.query(CoachMessageLog).filter(CoachMessageLog.user_id == user.id).count()
+    assert total_messages == 200

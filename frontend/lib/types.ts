@@ -361,6 +361,13 @@ export type CoachQueryRequest = {
 
 export type CoachQueryResponse = {
   answer: string;
+  memory_summary: string | null;
   based_on: string;
   disclaimer: string;
 };
+
+export type CoachHistoryResponse = {
+  messages: CoachMessage[];
+  memory_summary: string | null;
+};
+

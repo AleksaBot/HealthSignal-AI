@@ -11,6 +11,7 @@ import {
   MedicationAdherenceStatus,
   MomentumHistoryResponse,
   MomentumSummaryResponse,
+  CoachHistoryResponse,
   CoachQueryRequest,
   CoachQueryResponse,
   DailyCheckIn,
@@ -387,6 +388,10 @@ export function upsertTodayCheckIn(payload: DailyCheckInUpsertRequest) {
 
 export function getRecentCheckIns(days = 7) {
   return getAuthJSON<DailyCheckInRecentResponse>(`/api/checkins/recent?days=${days}`);
+}
+
+export function getCoachHistory() {
+  return getAuthJSON<CoachHistoryResponse>("/api/coach/history");
 }
 
 export function queryCoach(payload: CoachQueryRequest) {

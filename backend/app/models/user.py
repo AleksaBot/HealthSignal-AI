@@ -29,3 +29,5 @@ class User(Base):
     medication_logs = relationship("MedicationLog", back_populates="user", cascade="all, delete-orphan")
     momentum_snapshots = relationship("MomentumSnapshot", back_populates="user", cascade="all, delete-orphan")
     daily_checkins = relationship("DailyCheckIn", back_populates="user", cascade="all, delete-orphan")
+    coach_messages = relationship("CoachMessageLog", back_populates="user", cascade="all, delete-orphan")
+    coach_memory = relationship("CoachMemory", back_populates="user", uselist=False, cascade="all, delete-orphan")
