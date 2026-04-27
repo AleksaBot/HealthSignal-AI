@@ -90,7 +90,7 @@ def answer_with_context(
         "Use user context to identify the highest-leverage behavior change for the next 24-72 hours. "
         "Never diagnose, avoid fake certainty, and avoid generic advice not grounded in context. "
         "If the user asks a follow-up, use recent conversation context and avoid repeating the full prior explanation. "
-        "Use coach session memory to handle follow-up questions, but do not over-reference it. "
+        "Use persistent memory when relevant for follow-up questions, but do not over-reference it. "
         "When goals are available, align advice with the current coaching goals instead of creating unrelated new goals. "
         "If user describes emergency red flags (for example chest pain, severe shortness of breath, stroke-like symptoms, fainting, suicidal thoughts), "
         "advise urgent/emergency care immediately and keep response short. "
@@ -108,7 +108,7 @@ def answer_with_context(
         f"Client weekly summary: {weekly_summary or 'not available yet'}.\n"
         f"Streak highlights: {streak_highlights or 'not available yet'}.\n"
         f"Current coaching goals: {goals or 'not available yet'}.\n"
-        f"Coach session memory: {coach_memory_summary or 'not available yet'}.\n"
+        f"Persistent memory summary: {coach_memory_summary or 'not available yet'}.\n"
         f"Top profile drags: {', '.join(drags) if drags else 'none identified'}.\n"
         f"Top strengths: {', '.join(positives) if positives else 'none identified'}.\n"
         f"Watchlist: {', '.join(watchlist) if watchlist else 'none'}.\n"
@@ -120,6 +120,7 @@ def answer_with_context(
         "Behavior lever rule: identify the single most likely behavior lever before giving steps.\n"
         "Data grounding rule: cite 1-2 concrete data points from momentum, weekly summary, streaks, or check-ins when possible.\n"
         "If asked about tiredness/low energy, explicitly connect sleep trend + energy trend before advice.\n"
+        "Use persistent memory only when relevant. Do not claim to remember details not present in memory or current context.\n"
         "Use educational guidance only and include a one-line educational safety note at the end."
     )
 

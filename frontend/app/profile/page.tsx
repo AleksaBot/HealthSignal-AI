@@ -4,6 +4,7 @@ import Link from "next/link";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { RequireAuth } from "@/components/RequireAuth";
 import {
+  getCoachHistory,
   getHealthProfile,
   getRecentCheckIns,
   getTodayCheckIn,
@@ -662,9 +663,15 @@ export default function ProfilePage() {
         };
         setProfile(hydratedProfile);
         setGuidance(buildGuidance(hydratedProfile, calculateMomentumScore(hydratedProfile)));
-        const [todayResponse, recentResponse] = await Promise.all([getTodayCheckIn(), getRecentCheckIns(7)]);
+        const [todayResponse, recentResponse, coachHistory] = await Promise.all([
+          getTodayCheckIn(),
+          getRecentCheckIns(7),
+          getCoachHistory()
+        ]);
         setTodayCheckIn(todayResponse);
         setRecentCheckIns(recentResponse.items);
+        setCoachMessages(coachHistory.messages ?? []);
+        setCoachMemorySummary(coachHistory.memory_summary ?? null);
         if (todayResponse) {
           setCheckInDraft({
             sleep_hours: todayResponse.sleep_hours,
@@ -805,7 +812,10 @@ export default function ProfilePage() {
     try {
       const response = await queryCoach({ question, history: nextMessages, context: coachContextPayload });
       setCoachMessages((current) => [...current, { role: "coach", content: response.answer }]);
-      setCoachMemorySummary(buildCoachMemorySummary(question, response.answer, weeklySummary.takeaway, momentum, recentCheckIns));
+      setCoachMemorySummary(
+        response.memory_summary ??
+          buildCoachMemorySummary(question, response.answer, weeklySummary.takeaway, momentum, recentCheckIns)
+      );
     } catch (err) {
       setCoachMessages((current) => [
         ...current,
@@ -1096,8 +1106,15 @@ export default function ProfilePage() {
                 <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Coach chat workspace</h3>
                 <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">Personalized, educational coaching grounded in your baseline, momentum, medications, and daily check-ins.</p>
                 <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Using your profile, weekly summary, streaks, and recent check-ins.</p>
+                <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{coachMemorySummary ? "Coach memory active • Using saved coaching context" : "Memory begins after your first coach conversation"}</p>
               </div>
             </div>
+            {coachMemorySummary ? (
+              <details className="mt-3 rounded-lg border border-slate-200/80 bg-white/80 px-3 py-2 text-xs text-slate-600 dark:border-slate-700 dark:bg-slate-900/70 dark:text-slate-300">
+                <summary className="cursor-pointer font-medium">What coach remembers</summary>
+                <p className="mt-2">{coachMemorySummary}</p>
+              </details>
+            ) : null}
             <div className="mt-4 flex flex-wrap gap-2">
               {COACH_SUGGESTED_PROMPTS.map((prompt) => (
                 <button

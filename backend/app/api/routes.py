@@ -30,7 +30,7 @@ from app.schemas.auth import (
     ForgotPasswordResponse,
     ResetPasswordConfirmRequest,
 )
-from app.schemas.coach import CoachQueryRequest, CoachQueryResponse
+from app.schemas.coach import CoachHistoryResponse, CoachQueryRequest, CoachQueryResponse
 from app.schemas.daily_checkin import DailyCheckInRead, DailyCheckInRecentResponse, DailyCheckInUpsertRequest
 from app.schemas.health_profile import (
     HealthProfileRead,
@@ -43,6 +43,12 @@ from app.schemas.symptom_intelligence import SymptomInput, SymptomIntakeUpdateRe
 
 from app.schemas.report import ReportCreate, ReportRead, ReportSaveRequest
 from app.schemas.user import UserEmailUpdateRequest, UserNameUpdateRequest, UserPasswordUpdateRequest, UserRead
+from app.services.coach_memory_service import (
+    get_or_create_coach_memory,
+    get_recent_coach_messages,
+    save_coach_message,
+    update_coach_memory_summary,
+)
 from app.services.coach_service import answer_with_context
 from app.services.daily_checkin_service import get_recent_checkins, get_today_checkin, upsert_today_checkin
 from app.services.health_profile_service import (
@@ -400,6 +406,22 @@ def get_recent_daily_checkins(
     return DailyCheckInRecentResponse(items=get_recent_checkins(db=db, user=current_user, days=days))
 
 
+
+
+@router.get("/coach/history", response_model=CoachHistoryResponse)
+def get_coach_history(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    messages = get_recent_coach_messages(db=db, user_id=current_user.id, limit=20)
+    memory = get_or_create_coach_memory(db=db, user_id=current_user.id)
+    db.commit()
+    return CoachHistoryResponse(
+        messages=[{"role": row.role, "content": row.content} for row in messages],
+        memory_summary=memory.summary or None,
+    )
+
+
 @router.post("/coach/query", response_model=CoachQueryResponse)
 def query_personal_coach(
     payload: CoachQueryRequest,
@@ -421,6 +443,13 @@ def query_personal_coach(
         taken_today = sum(1 for med in profile.medications if today_status.get(med.id) == "taken")
         medication_summary = f"{len(profile.medications)} medication(s) configured; {taken_today} marked taken today."
 
+    memory = get_or_create_coach_memory(db=db, user_id=current_user.id)
+    persisted_history = get_recent_coach_messages(db=db, user_id=current_user.id, limit=6)
+    merged_history = [
+        {"role": row.role, "content": row.content}
+        for row in persisted_history
+    ] + [entry.model_dump() for entry in payload.history]
+
     answer = answer_with_context(
         question=payload.question,
         momentum_score=score,
@@ -432,10 +461,24 @@ def query_personal_coach(
         medication_summary=medication_summary,
         recent_trend_summary=f"Momentum trend is {trend} with weekly delta {trend_summary.get('weekly_delta', 0)}.",
         recent_checkins=recent_checkins,
-        context=payload.context,
-        history=[entry.model_dump() for entry in payload.history],
+        context={**(payload.context or {}), "coachMemorySummary": memory.summary or None},
+        history=merged_history,
     )
-    return CoachQueryResponse(answer=answer)
+
+    save_coach_message(db=db, user_id=current_user.id, role="user", content=payload.question)
+    save_coach_message(db=db, user_id=current_user.id, role="coach", content=answer)
+    updated_memory_summary = update_coach_memory_summary(
+        db=db,
+        user_id=current_user.id,
+        existing_summary=memory.summary,
+        question=payload.question,
+        answer=answer,
+        recent_checkins=recent_checkins,
+        momentum_label=momentum_label(score),
+    )
+    db.commit()
+
+    return CoachQueryResponse(answer=answer, memory_summary=updated_memory_summary)
 
 
 @router.put("/profile/health/medications/today", response_model=HealthProfileRead)

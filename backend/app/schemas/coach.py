@@ -16,5 +16,11 @@ class CoachQueryRequest(BaseModel):
 
 class CoachQueryResponse(BaseModel):
     answer: str
+    memory_summary: str | None = None
     based_on: str = "Based on your profile, momentum, guidance plan, medications, and recent check-ins"
     disclaimer: str = "Educational guidance only. Not a medical diagnosis or emergency care replacement."
+
+
+class CoachHistoryResponse(BaseModel):
+    messages: list[CoachChatMessage]
+    memory_summary: str | None = None
