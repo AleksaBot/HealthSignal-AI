@@ -89,13 +89,14 @@ const FREE_FEATURES = ["Momentum Score", "Weekly coaching plan", "Medication tra
 const PREMIUM_FEATURES = ["Adaptive coaching routines", "Long-term momentum history", "Advanced reminder flows", "Deeper AI guidance personalization", "Expanded trend analytics"];
 
 const COACH_SUGGESTED_PROMPTS = [
-  "What should I focus on this week?",
-  "What are my biggest health priorities right now?",
+  "Why is my energy low?",
+  "What should I focus on tomorrow?",
   "How can I improve my momentum score?",
+  "Make this week’s plan easier",
   "What should I ask my doctor next?"
 ];
 
-const COACH_INPUT_SUGGESTIONS = ["Why is my energy low?", "What should I focus on this week?"];
+const COACH_QUICK_FILL_PROMPTS = ["What should I focus on tomorrow?", "Make this week’s plan easier"];
 
 function parseList(value: string) {
   return value
@@ -380,6 +381,65 @@ function buildGuidance(profile: HealthProfile, momentum: MomentumScore): Guidanc
   };
 }
 
+function deriveCoachInsight(
+  weeklySummary: {
+    averageSleep: string;
+    averageEnergy: string;
+    stressPattern: string;
+    exerciseSummary: string;
+    completion: string;
+    takeaway: string;
+  },
+  momentum: MomentumScore,
+  streakHighlights: { label: string; value: string }[],
+  recentCheckIns: DailyCheckIn[]
+) {
+  const hasLowSleepTakeaway = weeklySummary.takeaway.toLowerCase().includes("sleep");
+  const energySignals = recentCheckIns.filter((entry) => typeof entry.energy_level === "number").map((entry) => entry.energy_level as number);
+  const lowEnergyCount = energySignals.filter((value) => value <= 5).length;
+  const checkInStreakValue = streakHighlights.find((item) => item.label === "Daily check-ins")?.value ?? "0 day streak";
+
+  if (hasLowSleepTakeaway || lowEnergyCount >= 2) {
+    return "Coach Insight: Energy is softer on lower-recovery days—protect sleep consistency tonight for your fastest momentum gain.";
+  }
+
+  if (momentum.score < 60) {
+    return `Coach Insight: Momentum is ${momentum.label.toLowerCase()}; the fastest next win is keeping your check-in streak active (${checkInStreakValue}).`;
+  }
+
+  if (weeklySummary.stressPattern.toLowerCase().includes("high stress")) {
+    return "Coach Insight: Stress load looks elevated this week—keep tomorrow simple with one recovery block and one manageable priority.";
+  }
+
+  return "Coach Insight: Your routines are fairly steady; lock in one repeatable habit tomorrow to convert consistency into stronger momentum.";
+}
+
+function buildCoachMemorySummary(
+  question: string,
+  answer: string,
+  weeklyTakeaway: string,
+  momentum: MomentumScore,
+  recentCheckIns: DailyCheckIn[]
+) {
+  const lowerQuestion = question.toLowerCase();
+  const topic = lowerQuestion.includes("energy")
+    ? "low energy"
+    : lowerQuestion.includes("sleep")
+      ? "sleep"
+      : lowerQuestion.includes("stress")
+        ? "stress"
+        : lowerQuestion.includes("tomorrow")
+          ? "tomorrow's focus"
+          : "weekly priorities";
+  const withSleep = recentCheckIns.filter((entry) => typeof entry.sleep_hours === "number");
+  const averageSleep =
+    withSleep.length > 0 ? (withSleep.reduce((sum, entry) => sum + (entry.sleep_hours ?? 0), 0) / withSleep.length).toFixed(1) : null;
+  const answerLeansSleep = answer.toLowerCase().includes("sleep");
+  const primaryLever = answerLeansSleep || weeklyTakeaway.toLowerCase().includes("sleep") ? "sleep consistency" : "daily consistency";
+
+  return `User asked about ${topic}. Current coaching context points to ${primaryLever}, ${momentum.label.toLowerCase()} momentum (${momentum.score}/100)${averageSleep ? `, and recent sleep around ${averageSleep}h.` : "."}`;
+}
+
 function emptyCheckInDraft(): DailyCheckInUpsertRequest {
   return {
     sleep_hours: null,
@@ -464,6 +524,7 @@ export default function ProfilePage() {
   const [coachQuestion, setCoachQuestion] = useState("");
   const [coachLoading, setCoachLoading] = useState(false);
   const [coachMessages, setCoachMessages] = useState<CoachMessage[]>([]);
+  const [coachMemorySummary, setCoachMemorySummary] = useState<string | null>(null);
   const [todayCheckIn, setTodayCheckIn] = useState<DailyCheckIn | null>(null);
   const [recentCheckIns, setRecentCheckIns] = useState<DailyCheckIn[]>([]);
   const [checkInDraft, setCheckInDraft] = useState<DailyCheckInUpsertRequest>(emptyCheckInDraft());
@@ -559,6 +620,8 @@ export default function ProfilePage() {
         explanation: momentum.explanation
       },
       streakHighlights,
+      goals: guidance?.goals ?? [],
+      coachMemorySummary: coachMemorySummary ?? undefined,
       recentCheckIns: recentCheckIns.slice(0, 3).map((entry) => ({
         date: entry.date,
         sleep_hours: entry.sleep_hours,
@@ -568,9 +631,13 @@ export default function ProfilePage() {
         note: entry.note
       }))
     }),
-    [momentum.explanation, momentum.label, momentum.score, recentCheckIns, streakHighlights, weeklySummary]
+    [coachMemorySummary, guidance?.goals, momentum.explanation, momentum.label, momentum.score, recentCheckIns, streakHighlights, weeklySummary]
   );
   const isPremium = userTier === "premium";
+  const coachInsight = useMemo(
+    () => deriveCoachInsight(weeklySummary, momentum, streakHighlights, recentCheckIns),
+    [momentum, recentCheckIns, streakHighlights, weeklySummary]
+  );
 
   useEffect(() => {
     async function loadProfile() {
@@ -738,6 +805,7 @@ export default function ProfilePage() {
     try {
       const response = await queryCoach({ question, history: nextMessages, context: coachContextPayload });
       setCoachMessages((current) => [...current, { role: "coach", content: response.answer }]);
+      setCoachMemorySummary(buildCoachMemorySummary(question, response.answer, weeklySummary.takeaway, momentum, recentCheckIns));
     } catch (err) {
       setCoachMessages((current) => [
         ...current,
@@ -999,6 +1067,10 @@ export default function ProfilePage() {
               <h3 className="text-sm font-semibold uppercase tracking-[0.12em] text-slate-700 dark:text-slate-300">Coaching context</h3>
               <p className="mt-2 text-sm text-slate-700 dark:text-slate-200">{momentum.explanation}</p>
               <p className="mt-2 text-sm text-slate-700 dark:text-slate-200">{trendSignal}</p>
+              <div className="mt-3 rounded-lg border border-brand-200/90 bg-brand-50/70 p-3 dark:border-brand-900/60 dark:bg-slate-900/70">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.13em] text-brand-700 dark:text-brand-300">Coach Insight</p>
+                <p className="mt-1 text-sm font-medium text-slate-900 dark:text-slate-100">{coachInsight}</p>
+              </div>
             </article>
             <article className="premium-card min-w-0 p-5">
               <h3 className="text-sm font-semibold uppercase tracking-[0.12em] text-slate-700 dark:text-slate-300">Progress over time</h3>
@@ -1023,6 +1095,7 @@ export default function ProfilePage() {
                 <p className="text-xs font-semibold uppercase tracking-[0.16em] text-brand-700">Ask AI Health Coach</p>
                 <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Coach chat workspace</h3>
                 <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">Personalized, educational coaching grounded in your baseline, momentum, medications, and daily check-ins.</p>
+                <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Using your profile, weekly summary, streaks, and recent check-ins.</p>
               </div>
             </div>
             <div className="mt-4 flex flex-wrap gap-2">
@@ -1039,9 +1112,9 @@ export default function ProfilePage() {
             <div className="mt-4 max-h-80 space-y-5 overflow-x-hidden overflow-y-auto rounded-xl border border-slate-200/80 bg-slate-50/60 p-4 dark:border-slate-700 dark:bg-slate-900/60">
               {coachMessages.length === 0 ? <p className="text-sm text-slate-500 dark:text-slate-400">Start a conversation with your coach. Ask about this week, low energy patterns, stress, or momentum score changes.</p> : null}
               {coachMessages.map((message, index) => (
-                <div key={`${message.role}-${index}`} className={`max-w-full break-words rounded-xl p-3.5 text-sm ${message.role === "user" ? "bg-brand-700/95 text-white shadow-sm md:ml-10" : "border border-cyan-200/80 bg-cyan-50/90 text-slate-800 dark:border-cyan-900/60 dark:bg-cyan-950/35 dark:text-slate-100 md:mr-10"}`}>
+                <div key={`${message.role}-${index}`} className={`max-w-full break-words rounded-xl p-3.5 text-sm leading-relaxed ${message.role === "user" ? "bg-brand-700/95 text-white shadow-sm md:ml-10" : "border border-cyan-200/80 bg-cyan-50/90 text-slate-800 dark:border-cyan-900/60 dark:bg-cyan-950/35 dark:text-slate-100 md:mr-10"}`}>
                   <p className="text-[11px] font-semibold uppercase tracking-[0.12em] opacity-70">{message.role === "user" ? "You" : "Coach"}</p>
-                  <p className="mt-1 whitespace-pre-wrap">{message.content}</p>
+                  <p className="mt-2 whitespace-pre-wrap">{message.content}</p>
                 </div>
               ))}
               {coachLoading ? <p className="rounded-lg border border-slate-200/80 bg-white/70 px-3 py-2 text-xs text-slate-500 dark:border-slate-700 dark:bg-slate-800/70 dark:text-slate-300">Coach is thinking...</p> : null}
@@ -1056,7 +1129,7 @@ export default function ProfilePage() {
               <button type="submit" disabled={coachLoading} className="rounded-lg bg-brand-700 px-4 py-2 text-sm font-medium text-white disabled:opacity-60">{coachLoading ? "Thinking..." : "Ask Coach"}</button>
             </form>
             <div className="mt-3 flex flex-wrap gap-2">
-              {COACH_INPUT_SUGGESTIONS.map((suggestion) => (
+              {COACH_QUICK_FILL_PROMPTS.map((suggestion) => (
                 <button
                   key={suggestion}
                   type="button"

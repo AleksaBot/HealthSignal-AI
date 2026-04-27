@@ -72,15 +72,30 @@ def answer_with_context(
     weekly_summary = context.get("weeklySummary") if isinstance(context, dict) else None
     momentum_context = context.get("momentum") if isinstance(context, dict) else None
     streak_highlights = context.get("streakHighlights") if isinstance(context, dict) else None
+    goals = context.get("goals") if isinstance(context, dict) else None
+    coach_memory_summary = context.get("coachMemorySummary") if isinstance(context, dict) else None
     context_checkins = context.get("recentCheckIns") if isinstance(context, dict) else None
 
+    response_contract = (
+        "Format responses with this structure:\n"
+        "1) One short opening sentence that acknowledges the user's question directly.\n"
+        "2) 'What I'm seeing:' with 1-2 bullet points using concrete data points when available.\n"
+        "3) 'Next steps:' with 2-3 practical, behavior-focused bullets.\n"
+        "4) One short educational safety note line.\n"
+        "Keep it concise and avoid long paragraphs."
+    )
     system_prompt = (
         "You are HealthSignal AI Coach. "
-        "Provide concise, practical, confident, educational guidance. "
-        "Never diagnose, never replace emergency care, and avoid fear language. "
-        "When data is missing, acknowledge it and suggest one action. "
-        "Reference concrete patterns and trends from provided context whenever relevant. "
-        "Keep response under 120 words, natural tone, and include 2-3 actionable steps."
+        "Provide concise, direct, supportive, confident, educational coaching guidance. "
+        "Use user context to identify the highest-leverage behavior change for the next 24-72 hours. "
+        "Never diagnose, avoid fake certainty, and avoid generic advice not grounded in context. "
+        "If the user asks a follow-up, use recent conversation context and avoid repeating the full prior explanation. "
+        "Use coach session memory to handle follow-up questions, but do not over-reference it. "
+        "When goals are available, align advice with the current coaching goals instead of creating unrelated new goals. "
+        "If user describes emergency red flags (for example chest pain, severe shortness of breath, stroke-like symptoms, fainting, suicidal thoughts), "
+        "advise urgent/emergency care immediately and keep response short. "
+        "For non-emergencies, do not over-alarm.\n"
+        f"{response_contract}"
     )
 
     conversation = "\n".join([f"{entry.get('role', 'user')}: {entry.get('content', '')}" for entry in (history or [])[-6:]])
@@ -92,6 +107,8 @@ def answer_with_context(
         f"Weekly focus: {weekly_focus}.\n"
         f"Client weekly summary: {weekly_summary or 'not available yet'}.\n"
         f"Streak highlights: {streak_highlights or 'not available yet'}.\n"
+        f"Current coaching goals: {goals or 'not available yet'}.\n"
+        f"Coach session memory: {coach_memory_summary or 'not available yet'}.\n"
         f"Top profile drags: {', '.join(drags) if drags else 'none identified'}.\n"
         f"Top strengths: {', '.join(positives) if positives else 'none identified'}.\n"
         f"Watchlist: {', '.join(watchlist) if watchlist else 'none'}.\n"
@@ -100,8 +117,10 @@ def answer_with_context(
         f"Check-in context: {_build_checkin_summary(recent_checkins)}\n"
         f"Client provided recent 3 check-ins: {context_checkins or 'not available yet'}.\n"
         f"Recent conversation:\n{conversation if conversation else 'No prior chat in this session.'}\n"
+        "Behavior lever rule: identify the single most likely behavior lever before giving steps.\n"
+        "Data grounding rule: cite 1-2 concrete data points from momentum, weekly summary, streaks, or check-ins when possible.\n"
         "If asked about tiredness/low energy, explicitly connect sleep trend + energy trend before advice.\n"
-        "Include a one-line educational disclaimer at the end."
+        "Use educational guidance only and include a one-line educational safety note at the end."
     )
 
     ai_answer = get_ai_provider().generate_text(system_prompt=system_prompt, user_prompt=user_prompt)
@@ -111,8 +130,19 @@ def answer_with_context(
     # safe fallback when AI provider is unavailable
     primary_drag = drags[0] if drags else weekly_focus
     strength = positives[0] if positives else "your current routine"
+    latest_checkin_signal = (
+        f"Latest check-in sleep {recent_checkins[0].sleep_hours or 'n/a'}h and energy {recent_checkins[0].energy_level or 'n/a'}/10."
+        if recent_checkins
+        else "No recent check-ins available yet."
+    )
     return (
-        f"Your momentum score is {momentum_score}/100 ({momentum_label}) with a {trend_direction.lower()} trend. "
-        f"Prioritize {primary_drag} this week, keep {strength} steady, and use one daily check-in to track sleep/energy/stress changes. "
-        "Educational support only, not medical diagnosis or emergency care."
+        f"Quick read: Your momentum score is {momentum_score}/100 ({momentum_label}), and {primary_drag} looks like your most useful lever right now.\n\n"
+        "What I'm seeing:\n"
+        f"- Trend direction is {trend_direction.lower()} and weekly focus is {weekly_focus}.\n"
+        f"- {latest_checkin_signal}\n\n"
+        "Next steps:\n"
+        f"- Protect one specific daily action around {primary_drag} for the next 3 days.\n"
+        f"- Keep {strength} steady while tracking one signal in your next check-in.\n"
+        "- Bring your current coaching goal into your next coach question so advice stays aligned.\n\n"
+        "Educational note: This is educational guidance, not a diagnosis; seek medical care for severe, sudden, or worsening symptoms."
     )
