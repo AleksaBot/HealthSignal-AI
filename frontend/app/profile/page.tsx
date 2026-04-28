@@ -515,13 +515,11 @@ export default function ProfilePage() {
 
   const [profile, setProfile] = useState<HealthProfile>(EMPTY_PROFILE);
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [medicationDraft, setMedicationDraft] = useState<MedicationDraft>(EMPTY_MEDICATION_DRAFT);
   const [updatingMedicationId, setUpdatingMedicationId] = useState<string | null>(null);
   const [guidance, setGuidance] = useState<GuidancePlan | null>(null);
-  const [refreshingGuidance, setRefreshingGuidance] = useState(false);
   const [coachQuestion, setCoachQuestion] = useState("");
   const [coachLoading, setCoachLoading] = useState(false);
   const [coachMessages, setCoachMessages] = useState<CoachMessage[]>([]);
@@ -760,43 +758,14 @@ export default function ProfilePage() {
     }
   }
 
-  async function onSaveProfile() {
-    setSaving(true);
-    setError(null);
-
-    try {
-      const payload = {
-        ...profile,
-        current_medications: normalizeMedicationNames(profile.medications)
-      };
-      const response = await upsertHealthProfile(payload);
-      const normalizedResponse = {
-        ...response,
-        medications: response.medications ?? [],
-        current_medications: normalizeMedicationNames(response.medications ?? [])
-      };
-      setProfile(normalizedResponse);
-      setGuidance(buildGuidance(normalizedResponse, calculateMomentumScore(normalizedResponse)));
-      setSaveMessage("Plan updated. Guidance and momentum were refreshed.");
-    } catch (err) {
-      setError(getUserErrorMessage(err, "Unable to save health profile."));
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  function onRefreshGuidance() {
-    setRefreshingGuidance(true);
-    setError(null);
-    window.setTimeout(() => {
-      setGuidance(buildGuidance(profile, calculateMomentumScore(profile)));
-      setRefreshingGuidance(false);
-    }, 250);
-  }
-
   function jumpToCoach() {
     setCoachQuestion((current) => current || "What should I prioritize today?");
     document.getElementById("coach-workspace")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
+  function onStartCheckIn() {
+    setCheckInOpen(true);
+    document.getElementById("daily-pulse")?.scrollIntoView({ behavior: "smooth", block: "start" });
   }
 
   async function onAskCoach(event?: FormEvent) {
@@ -867,13 +836,12 @@ export default function ProfilePage() {
           <p className="max-w-3xl text-sm text-slate-600 dark:text-slate-300">
             Plan your week, track progress, and use AI coaching insights from one clean workspace.
           </p>
+          <p className="text-xs text-slate-500 dark:text-slate-400">Updated just now</p>
         </div>
 
         <div className="flex flex-wrap gap-3">
-          <button className="rounded-lg bg-brand-700 px-4 py-2 text-sm font-medium text-white disabled:opacity-60" onClick={onSaveProfile} disabled={saving}>{saving ? "Saving..." : "Save & Update Plan"}</button>
-          <button className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:-translate-y-0.5 hover:bg-slate-100 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700" onClick={onRefreshGuidance} disabled={refreshingGuidance}>{refreshingGuidance ? "Refreshing..." : "Refresh Guidance"}</button>
-          <Link href="/health-trends" className="rounded-lg border border-brand-300/80 bg-brand-50/90 px-4 py-2 text-sm font-medium text-brand-800 transition hover:-translate-y-0.5 hover:bg-brand-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700">View Trends</Link>
-          <Link href="/history" className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:-translate-y-0.5 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700">Reports History</Link>
+          <button type="button" onClick={jumpToCoach} className="rounded-lg bg-brand-700 px-4 py-2 text-sm font-medium text-white">Ask Coach</button>
+          <button type="button" onClick={onStartCheckIn} className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:-translate-y-0.5 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700">Complete Check-in</button>
         </div>
 
         {saveMessage ? <p className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800 dark:border-emerald-900 dark:bg-emerald-950/20 dark:text-emerald-200">{saveMessage}</p> : null}
@@ -881,195 +849,9 @@ export default function ProfilePage() {
 
         <div className="grid min-w-0 gap-4 2xl:grid-cols-[minmax(0,1fr)_300px] 2xl:items-start">
           <div className="min-w-0 space-y-4">
-        <section className="premium-card min-w-0 max-w-full overflow-x-hidden space-y-4 p-5">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-brand-700">1. Today Snapshot</p>
-              <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100">Daily pulse</h2>
-              <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">Capture today’s sleep, energy, stress, and activity in under a minute.</p>
-            </div>
-            <div className="text-right">
-              <p className="text-xs uppercase tracking-[0.15em] text-slate-500 dark:text-slate-400">Status</p>
-              <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">{checkInCompletionLabel(todayCheckIn)}</p>
-              <button type="button" onClick={() => setCheckInOpen((current) => !current)} className="mt-2 rounded-lg bg-brand-700 px-3 py-2 text-xs font-medium text-white">{todayCheckIn ? "Update Today’s Check-In" : "Complete Today’s Check-In"}</button>
-            </div>
-          </div>
-          <div className="grid min-w-0 gap-3 lg:grid-cols-3">
-            <article className="rounded-2xl border border-brand-200/90 bg-gradient-to-br from-brand-50/90 to-cyan-50/70 p-4 dark:border-brand-900/60 dark:from-slate-900 dark:to-slate-900/70">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-brand-700 dark:text-brand-300">Today&apos;s focus</p>
-              <p className="mt-1 text-base font-semibold text-slate-900 dark:text-slate-100">{guidance?.focus ?? "Protect your routine"}</p>
-            </article>
-            <article className="rounded-xl border border-slate-200/90 bg-white/80 p-4 dark:border-slate-700 dark:bg-slate-900/65">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400">Today&apos;s next action</p>
-              <p className="mt-1 text-sm font-medium text-slate-900 dark:text-slate-100">{todaysNextAction}</p>
-            </article>
-            <article className="rounded-xl border border-cyan-200/80 bg-cyan-50/60 p-4 dark:border-cyan-900/70 dark:bg-cyan-950/20">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-cyan-700 dark:text-cyan-200">Today&apos;s signal</p>
-              <p className="mt-1 text-sm font-medium text-cyan-900 dark:text-cyan-100">{miniInsight}</p>
-            </article>
-          </div>
-          {checkInOpen ? (
-            <form onSubmit={onSaveTodayCheckIn} className="grid gap-3 rounded-xl border border-slate-200/80 bg-slate-50/60 p-4 dark:border-slate-700 dark:bg-slate-800/40 md:grid-cols-2">
-              <label className="space-y-1 text-sm"><span>Sleep hours last night</span><input type="number" min={0} max={16} step="0.5" className="w-full rounded-lg border border-slate-300 bg-white p-2 dark:border-slate-600 dark:bg-slate-900" value={checkInDraft.sleep_hours ?? ""} onChange={(event) => setCheckInDraft((current) => ({ ...current, sleep_hours: event.target.value ? Number(event.target.value) : null }))} /></label>
-              <label className="space-y-1 text-sm"><span>Energy today (1-10)</span><input type="number" min={1} max={10} className="w-full rounded-lg border border-slate-300 bg-white p-2 dark:border-slate-600 dark:bg-slate-900" value={checkInDraft.energy_level ?? ""} onChange={(event) => setCheckInDraft((current) => ({ ...current, energy_level: event.target.value ? Number(event.target.value) : null }))} /></label>
-              <label className="space-y-1 text-sm"><span>Stress today</span><select className="w-full rounded-lg border border-slate-300 bg-white p-2 dark:border-slate-600 dark:bg-slate-900" value={checkInDraft.stress_level ?? ""} onChange={(event) => setCheckInDraft((current) => ({ ...current, stress_level: (event.target.value || null) as DailyCheckInUpsertRequest["stress_level"] }))}><option value="">Select</option><option value="low">Low</option><option value="moderate">Moderate</option><option value="high">High</option></select></label>
-              <label className="space-y-1 text-sm"><span>Exercise today</span><select className="w-full rounded-lg border border-slate-300 bg-white p-2 dark:border-slate-600 dark:bg-slate-900" value={checkInDraft.exercised_today === null ? "" : checkInDraft.exercised_today ? "yes" : "no"} onChange={(event) => setCheckInDraft((current) => ({ ...current, exercised_today: event.target.value === "" ? null : event.target.value === "yes" }))}><option value="">Select</option><option value="yes">Yes</option><option value="no">No</option></select></label>
-              <label className="space-y-1 text-sm md:col-span-2"><span>Note (optional)</span><textarea rows={2} maxLength={300} className="w-full rounded-lg border border-slate-300 bg-white p-2 dark:border-slate-600 dark:bg-slate-900" value={checkInDraft.note ?? ""} onChange={(event) => setCheckInDraft((current) => ({ ...current, note: event.target.value || null }))} /></label>
-              <div className="md:col-span-2"><button type="submit" disabled={checkInSaving} className="rounded-lg bg-brand-700 px-4 py-2 text-sm font-medium text-white disabled:opacity-60">{checkInSaving ? "Saving..." : "Save check-in"}</button></div>
-            </form>
-          ) : null}
-          <div className="grid min-w-0 gap-2 md:grid-cols-3">
-            {recentCheckIns.slice(0, 3).map((entry) => (
-              <div key={entry.id} className="rounded-lg border border-slate-200/80 bg-white/70 p-3 text-xs dark:border-slate-700 dark:bg-slate-900/50">
-                <p className="font-semibold text-slate-800 dark:text-slate-200">{new Date(entry.date).toLocaleDateString()}</p>
-                <p className="mt-1 text-slate-600 dark:text-slate-300">Sleep {entry.sleep_hours ?? "—"}h · Energy {entry.energy_level ?? "—"}/10 · Stress {entry.stress_level ?? "—"}</p>
-              </div>
-            ))}
-            {recentCheckIns.length === 0 ? <p className="text-xs text-slate-500 dark:text-slate-400">No check-ins yet. Add today’s entry to start trend tracking.</p> : null}
-          </div>
-        </section>
-
-        <section className="grid min-w-0 gap-4 lg:grid-cols-[1.1fr_0.9fr]">
-          <article className="premium-card min-w-0 p-5">
-            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-brand-700">2. Momentum / Streak rail</p>
-            <div className="mt-3 flex flex-wrap items-end justify-between gap-3">
-              <div>
-                <p className="text-xs uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400">Momentum score</p>
-                <p className="mt-1 text-4xl font-semibold text-slate-900 dark:text-slate-100">{momentum.score}</p>
-              </div>
-              <span className="rounded-full border border-cyan-300/70 bg-cyan-50 px-3 py-1 text-xs font-semibold text-cyan-800 dark:border-cyan-800 dark:bg-cyan-950/30 dark:text-cyan-200">{momentum.label}</span>
-            </div>
-            <div className="mt-3 h-2 rounded-full bg-slate-200 dark:bg-slate-800"><div className="h-2 rounded-full bg-gradient-to-r from-cyan-500 to-blue-500" style={{ width: `${momentum.score}%` }} /></div>
-            <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">{trendSignal}</p>
-          </article>
-          <article className="premium-card min-w-0 p-5">
-            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">Streak highlights</p>
-            <div className="mt-3 space-y-3">
-              {streakHighlights.map((item) => (
-                <div key={item.label} className="flex items-center justify-between gap-3 rounded-xl border border-slate-200/80 bg-slate-50/70 px-3 py-2 dark:border-slate-700 dark:bg-slate-900/60">
-                  <p className="text-sm font-medium text-slate-900 dark:text-slate-100">{item.label}</p>
-                  <p className="text-sm font-semibold text-slate-800 dark:text-slate-200">{item.value}</p>
-                </div>
-              ))}
-            </div>
-          </article>
-        </section>
-
         <section className="space-y-4">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-brand-700">3. Health Baseline</p>
-            <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100">Profile foundation</h2>
-          </div>
-
-          <div className="grid min-w-0 gap-4 md:grid-cols-3">
-            <article className="premium-card p-4 md:col-span-2">
-              <p className="text-xs uppercase tracking-[0.15em] text-slate-500 dark:text-slate-400">Profile completion</p>
-              <p className="mt-2 text-3xl font-semibold text-slate-900 dark:text-slate-100">{completionPercent}%</p>
-              <div className="mt-3 h-2 rounded-full bg-slate-200 dark:bg-slate-800">
-                <div className="h-2 rounded-full bg-gradient-to-r from-blue-500 to-cyan-400 transition-all duration-500 ease-out" style={{ width: `${completionPercent}%` }} />
-              </div>
-              <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">Complete key basics for better weekly coaching quality.</p>
-            </article>
-
-            <article className="premium-card p-4">
-              <p className="text-xs uppercase tracking-[0.15em] text-slate-500 dark:text-slate-400">Last updated</p>
-              <p className="mt-2 text-sm font-medium text-slate-900 dark:text-slate-100">{profile.updated_at ? new Date(profile.updated_at).toLocaleString() : "Not saved yet"}</p>
-              <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">Saved to your account for continuity across sessions.</p>
-            </article>
-          </div>
-
-          <div className="grid min-w-0 gap-4 md:grid-cols-2">
-            <article className="premium-card space-y-4 p-5">
-              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-brand-700">Health Baseline Inputs</p>
-              <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Core profile</h3>
-              <div className="grid gap-3 sm:grid-cols-2">
-                <label className="space-y-1 text-sm"><span>Age</span><input className="w-full rounded-lg border border-slate-300 bg-white p-2 dark:border-slate-600 dark:bg-slate-900" type="number" value={profile.age ?? ""} onChange={(event) => updateField("age", event.target.value ? Number(event.target.value) : null)} /></label>
-                <label className="space-y-1 text-sm"><span>Sex</span><select className="w-full rounded-lg border border-slate-300 bg-white p-2 dark:border-slate-600 dark:bg-slate-900" value={profile.sex ?? ""} onChange={(event) => updateField("sex", (event.target.value || null) as HealthProfile["sex"])}><option value="">Select</option><option value="female">Female</option><option value="male">Male</option><option value="non_binary">Non-binary</option><option value="other">Other</option><option value="prefer_not_to_say">Prefer not to say</option></select></label>
-                <label className="space-y-1 text-sm"><span>Height (cm)</span><input className="w-full rounded-lg border border-slate-300 bg-white p-2 dark:border-slate-600 dark:bg-slate-900" type="number" value={profile.height_cm ?? ""} onChange={(event) => updateField("height_cm", event.target.value ? Number(event.target.value) : null)} /></label>
-                <label className="space-y-1 text-sm"><span>Weight (kg)</span><input className="w-full rounded-lg border border-slate-300 bg-white p-2 dark:border-slate-600 dark:bg-slate-900" type="number" value={profile.weight_kg ?? ""} onChange={(event) => updateField("weight_kg", event.target.value ? Number(event.target.value) : null)} /></label>
-              </div>
-            </article>
-
-            <article className="premium-card space-y-4 p-5">
-              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-brand-700">Health Baseline Inputs</p>
-              <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Lifestyle snapshot</h3>
-              <div className="grid gap-3 sm:grid-cols-2">
-                <label className="space-y-1 text-sm"><span>Activity level</span><select className="w-full rounded-lg border border-slate-300 bg-white p-2 dark:border-slate-600 dark:bg-slate-900" value={profile.activity_level ?? ""} onChange={(event) => updateField("activity_level", (event.target.value || null) as HealthProfile["activity_level"])}><option value="">Select</option><option value="low">Low</option><option value="moderate">Moderate</option><option value="active">Active</option><option value="very_active">Very active</option></select></label>
-                <label className="space-y-1 text-sm"><span>Smoking / vaping</span><select className="w-full rounded-lg border border-slate-300 bg-white p-2 dark:border-slate-600 dark:bg-slate-900" value={profile.smoking_vaping_status ?? ""} onChange={(event) => updateField("smoking_vaping_status", (event.target.value || null) as HealthProfile["smoking_vaping_status"])}><option value="">Select</option><option value="none">None</option><option value="former">Former</option><option value="occasional">Occasional</option><option value="daily">Daily</option></select></label>
-                <label className="space-y-1 text-sm"><span>Alcohol frequency</span><select className="w-full rounded-lg border border-slate-300 bg-white p-2 dark:border-slate-600 dark:bg-slate-900" value={profile.alcohol_frequency ?? ""} onChange={(event) => updateField("alcohol_frequency", (event.target.value || null) as HealthProfile["alcohol_frequency"])}><option value="">Select</option><option value="never">Never</option><option value="monthly">Monthly</option><option value="weekly">Weekly</option><option value="several_times_weekly">Several times weekly</option><option value="daily">Daily</option></select></label>
-                <label className="space-y-1 text-sm"><span>Sleep average (hours)</span><input className="w-full rounded-lg border border-slate-300 bg-white p-2 dark:border-slate-600 dark:bg-slate-900" type="number" step="0.5" value={profile.sleep_average_hours ?? ""} onChange={(event) => updateField("sleep_average_hours", event.target.value ? Number(event.target.value) : null)} /></label>
-                <label className="space-y-1 text-sm sm:col-span-2"><span>Stress level</span><select className="w-full rounded-lg border border-slate-300 bg-white p-2 dark:border-slate-600 dark:bg-slate-900" value={profile.stress_level ?? ""} onChange={(event) => updateField("stress_level", (event.target.value || null) as HealthProfile["stress_level"])}><option value="">Select</option><option value="low">Low</option><option value="moderate">Moderate</option><option value="high">High</option><option value="very_high">Very high</option></select></label>
-              </div>
-            </article>
-
-            <article className="premium-card space-y-4 p-5 md:col-span-2">
-              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-brand-700">Health Baseline Inputs</p>
-              <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">History + optional metrics</h3>
-              <div className="grid gap-3 md:grid-cols-2">
-                <label className="space-y-1 text-sm"><span>Known conditions</span><input className="w-full rounded-lg border border-slate-300 bg-white p-2 dark:border-slate-600 dark:bg-slate-900" placeholder="e.g. hypertension, asthma" value={joinList(profile.known_conditions)} onChange={(event) => updateField("known_conditions", parseList(event.target.value))} /></label>
-                <div className="space-y-1 text-sm"><span>Current medications</span><div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600 dark:border-slate-700 dark:bg-slate-800/60 dark:text-slate-300">Managed below in Medication Tracker ({profile.medications.length} active).</div></div>
-                <label className="space-y-1 text-sm md:col-span-2"><span>Family history</span><input className="w-full rounded-lg border border-slate-300 bg-white p-2 dark:border-slate-600 dark:bg-slate-900" placeholder="e.g. heart disease, type 2 diabetes" value={joinList(profile.family_history)} onChange={(event) => updateField("family_history", parseList(event.target.value))} /></label>
-              </div>
-              <div className="grid gap-3 sm:grid-cols-3">
-                <label className="space-y-1 text-sm"><span>Systolic BP (optional)</span><input className="w-full rounded-lg border border-slate-300 bg-white p-2 dark:border-slate-600 dark:bg-slate-900" type="number" value={profile.systolic_bp ?? ""} onChange={(event) => updateField("systolic_bp", event.target.value ? Number(event.target.value) : null)} /></label>
-                <label className="space-y-1 text-sm"><span>Diastolic BP (optional)</span><input className="w-full rounded-lg border border-slate-300 bg-white p-2 dark:border-slate-600 dark:bg-slate-900" type="number" value={profile.diastolic_bp ?? ""} onChange={(event) => updateField("diastolic_bp", event.target.value ? Number(event.target.value) : null)} /></label>
-                <label className="space-y-1 text-sm"><span>Total cholesterol (optional)</span><input className="w-full rounded-lg border border-slate-300 bg-white p-2 dark:border-slate-600 dark:bg-slate-900" type="number" value={profile.total_cholesterol ?? ""} onChange={(event) => updateField("total_cholesterol", event.target.value ? Number(event.target.value) : null)} /></label>
-              </div>
-            </article>
-          </div>
-        </section>
-
-        <section className="space-y-4 rounded-2xl border border-brand-200/70 bg-gradient-to-br from-brand-50/80 to-cyan-50/70 p-5 dark:border-brand-900/50 dark:from-slate-900 dark:to-slate-900/80">
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-brand-700">4. Weekly Coaching Plan</p>
-              <h2 className="mt-1 text-xl font-semibold text-slate-900 dark:text-slate-100">Weekly coaching plan</h2>
-              <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">Actionable guidance from your current baseline and momentum context.</p>
-            </div>
-            <p className="rounded-full border border-slate-300/70 bg-white/70 px-3 py-1 text-xs text-slate-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200">Refreshed {guidance?.refreshedAt ? new Date(guidance.refreshedAt).toLocaleString() : "Not yet"}</p>
-          </div>
-
-          <div className="grid min-w-0 gap-4 lg:grid-cols-2">
-            <article className="premium-card p-4">
-              <h3 className="text-sm font-semibold uppercase tracking-[0.12em] text-slate-700 dark:text-slate-300">Snapshot Summary</h3>
-              <p className="mt-2 text-sm text-slate-700 dark:text-slate-200">{guidance?.snapshot ?? "Save your profile to generate your first personalized snapshot."}</p>
-            </article>
-            <article className="premium-card p-4">
-              <h3 className="text-sm font-semibold uppercase tracking-[0.12em] text-slate-700 dark:text-slate-300">This Week&apos;s Focus</h3>
-              <p className="mt-2 text-base font-semibold text-slate-900 dark:text-slate-100">{guidance?.focus ?? "Complete your baseline"}</p>
-            </article>
-            <article className="premium-card p-4">
-              <h3 className="text-sm font-semibold uppercase tracking-[0.12em] text-slate-700 dark:text-slate-300">Today&apos;s Small Win</h3>
-              <p className="mt-2 text-sm text-slate-700 dark:text-slate-200">{guidance?.todaysSmallWin ?? "Save your profile to generate today's small win."}</p>
-              <p className="mt-3 text-xs text-slate-500 dark:text-slate-400">Why this matters: {guidance?.whyThisMatters ?? "Small daily wins build weekly health momentum."}</p>
-            </article>
-            <article className="premium-card p-4">
-              <h3 className="text-sm font-semibold uppercase tracking-[0.12em] text-slate-700 dark:text-slate-300">Watchlist</h3>
-              {(guidance?.watchlist?.length ?? 0) > 0 ? <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-slate-700 dark:text-slate-200">{guidance?.watchlist.map((risk) => <li key={risk}>{risk}</li>)}</ul> : <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">No major watchlist flags from current profile data.</p>}
-            </article>
-          </div>
-          <article className="premium-card min-w-0 p-4">
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <h3 className="text-sm font-semibold uppercase tracking-[0.12em] text-slate-700 dark:text-slate-300">This Week Summary</h3>
-              <p className="rounded-full border border-slate-300/80 bg-white/80 px-3 py-1 text-xs text-slate-600 dark:border-slate-700 dark:bg-slate-900/70 dark:text-slate-200">{weeklySummary.completion}</p>
-            </div>
-            <div className="mt-3 grid min-w-0 gap-3 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
-              <div className="rounded-lg border border-slate-200/80 bg-slate-50/70 p-3 dark:border-slate-700 dark:bg-slate-900/60"><p className="text-[11px] uppercase tracking-[0.13em] text-slate-500 dark:text-slate-400">Avg sleep</p><p className="mt-1 text-sm font-semibold text-slate-900 dark:text-slate-100">{weeklySummary.averageSleep}</p></div>
-              <div className="rounded-lg border border-slate-200/80 bg-slate-50/70 p-3 dark:border-slate-700 dark:bg-slate-900/60"><p className="text-[11px] uppercase tracking-[0.13em] text-slate-500 dark:text-slate-400">Avg energy</p><p className="mt-1 text-sm font-semibold text-slate-900 dark:text-slate-100">{weeklySummary.averageEnergy}</p></div>
-              <div className="rounded-lg border border-slate-200/80 bg-slate-50/70 p-3 dark:border-slate-700 dark:bg-slate-900/60"><p className="text-[11px] uppercase tracking-[0.13em] text-slate-500 dark:text-slate-400">Stress pattern</p><p className="mt-1 text-sm font-semibold text-slate-900 dark:text-slate-100">{weeklySummary.stressPattern}</p></div>
-              <div className="rounded-lg border border-slate-200/80 bg-slate-50/70 p-3 dark:border-slate-700 dark:bg-slate-900/60"><p className="text-[11px] uppercase tracking-[0.13em] text-slate-500 dark:text-slate-400">Exercise</p><p className="mt-1 text-sm font-semibold text-slate-900 dark:text-slate-100">{weeklySummary.exerciseSummary}</p></div>
-              <div className="rounded-xl border border-brand-200/90 bg-gradient-to-r from-brand-50/90 to-cyan-50/80 p-4 md:col-span-2 lg:col-span-3 xl:col-span-5 dark:border-brand-900/60 dark:from-slate-900 dark:to-slate-900/70"><p className="text-[11px] uppercase tracking-[0.13em] text-brand-700 dark:text-brand-300">Takeaway</p><p className="mt-1 text-sm font-semibold text-slate-900 dark:text-slate-100">{weeklySummary.takeaway}</p></div>
-            </div>
-          </article>
-          <article className="premium-card p-4">
-            <h3 className="text-sm font-semibold uppercase tracking-[0.12em] text-slate-700 dark:text-slate-300">Recommended Goals</h3>
-            <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-slate-700 dark:text-slate-200">{(guidance?.goals ?? []).map((goal) => <li key={goal}>{goal}</li>)}</ul>
-          </article>
-        </section>
-
-        <section className="space-y-4">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-brand-700">5. AI Coach</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-brand-700">1. AI Coach</p>
             <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100">Coach workspace</h2>
           </div>
           <div className="grid min-w-0 gap-4 lg:grid-cols-3">
@@ -1160,6 +942,191 @@ export default function ProfilePage() {
             <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">Educational only. Not medical diagnosis or emergency guidance.</p>
           </article>
         </section>
+        <section id="daily-pulse" className="premium-card min-w-0 max-w-full overflow-x-hidden space-y-4 p-5">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-brand-700">2. Daily Pulse</p>
+              <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100">Daily pulse</h2>
+              <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">Track your daily focus, next action, and signal.</p>
+            </div>
+            <div className="text-right">
+              <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">{checkInCompletionLabel(todayCheckIn)}</p>
+              <button type="button" onClick={() => setCheckInOpen((current) => !current)} className="mt-2 rounded-lg bg-brand-700 px-3 py-2 text-xs font-medium text-white">{todayCheckIn ? "Update Today’s Check-In" : "Complete Today’s Check-In"}</button>
+            </div>
+          </div>
+          <div className="grid min-w-0 gap-3 lg:grid-cols-3">
+            <article className="rounded-2xl border border-brand-200/90 bg-gradient-to-br from-brand-50/90 to-cyan-50/70 p-4 dark:border-brand-900/60 dark:from-slate-900 dark:to-slate-900/70">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-brand-700 dark:text-brand-300">Today&apos;s focus</p>
+              <p className="mt-1 text-base font-semibold text-slate-900 dark:text-slate-100">{guidance?.focus ?? "Protect your routine"}</p>
+            </article>
+            <article className="rounded-xl border border-slate-200/90 bg-white/80 p-4 dark:border-slate-700 dark:bg-slate-900/65">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400">Next action</p>
+              <p className="mt-1 text-sm font-medium text-slate-900 dark:text-slate-100">{todaysNextAction}</p>
+            </article>
+            <article className="rounded-xl border border-cyan-200/80 bg-cyan-50/60 p-4 dark:border-cyan-900/70 dark:bg-cyan-950/20">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-cyan-700 dark:text-cyan-200">Today&apos;s signal</p>
+              <p className="mt-1 text-sm font-medium text-cyan-900 dark:text-cyan-100">{miniInsight}</p>
+            </article>
+          </div>
+          {checkInOpen ? (
+            <form onSubmit={onSaveTodayCheckIn} className="grid gap-3 rounded-xl border border-slate-200/80 bg-slate-50/60 p-4 dark:border-slate-700 dark:bg-slate-800/40 md:grid-cols-2">
+              <label className="space-y-1 text-sm"><span>Sleep hours last night</span><input type="number" min={0} max={16} step="0.5" className="w-full rounded-lg border border-slate-300 bg-white p-2 dark:border-slate-600 dark:bg-slate-900" value={checkInDraft.sleep_hours ?? ""} onChange={(event) => setCheckInDraft((current) => ({ ...current, sleep_hours: event.target.value ? Number(event.target.value) : null }))} /></label>
+              <label className="space-y-1 text-sm"><span>Energy today (1-10)</span><input type="number" min={1} max={10} className="w-full rounded-lg border border-slate-300 bg-white p-2 dark:border-slate-600 dark:bg-slate-900" value={checkInDraft.energy_level ?? ""} onChange={(event) => setCheckInDraft((current) => ({ ...current, energy_level: event.target.value ? Number(event.target.value) : null }))} /></label>
+              <label className="space-y-1 text-sm"><span>Stress today</span><select className="w-full rounded-lg border border-slate-300 bg-white p-2 dark:border-slate-600 dark:bg-slate-900" value={checkInDraft.stress_level ?? ""} onChange={(event) => setCheckInDraft((current) => ({ ...current, stress_level: (event.target.value || null) as DailyCheckInUpsertRequest["stress_level"] }))}><option value="">Select</option><option value="low">Low</option><option value="moderate">Moderate</option><option value="high">High</option></select></label>
+              <label className="space-y-1 text-sm"><span>Exercise today</span><select className="w-full rounded-lg border border-slate-300 bg-white p-2 dark:border-slate-600 dark:bg-slate-900" value={checkInDraft.exercised_today === null ? "" : checkInDraft.exercised_today ? "yes" : "no"} onChange={(event) => setCheckInDraft((current) => ({ ...current, exercised_today: event.target.value === "" ? null : event.target.value === "yes" }))}><option value="">Select</option><option value="yes">Yes</option><option value="no">No</option></select></label>
+              <label className="space-y-1 text-sm md:col-span-2"><span>Note (optional)</span><textarea rows={2} maxLength={300} className="w-full rounded-lg border border-slate-300 bg-white p-2 dark:border-slate-600 dark:bg-slate-900" value={checkInDraft.note ?? ""} onChange={(event) => setCheckInDraft((current) => ({ ...current, note: event.target.value || null }))} /></label>
+              <div className="md:col-span-2"><button type="submit" disabled={checkInSaving} className="rounded-lg bg-brand-700 px-4 py-2 text-sm font-medium text-white disabled:opacity-60">{checkInSaving ? "Saving..." : "Save check-in"}</button></div>
+            </form>
+          ) : null}
+          <div className="grid min-w-0 gap-2 md:grid-cols-3">
+            {recentCheckIns.slice(0, 3).map((entry) => (
+              <div key={entry.id} className="rounded-lg border border-slate-200/80 bg-white/70 p-3 text-xs dark:border-slate-700 dark:bg-slate-900/50">
+                <p className="font-semibold text-slate-800 dark:text-slate-200">{new Date(entry.date).toLocaleDateString()}</p>
+                <p className="mt-1 text-slate-600 dark:text-slate-300">Sleep {entry.sleep_hours ?? "—"}h · Energy {entry.energy_level ?? "—"}/10 · Stress {entry.stress_level ?? "—"}</p>
+              </div>
+            ))}
+            {recentCheckIns.length === 0 ? <p className="text-xs text-slate-500 dark:text-slate-400">No check-ins yet. Add today’s entry to start trend tracking.</p> : null}
+          </div>
+        </section>
+
+        <section className="space-y-4">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-brand-700">3. Health Baseline</p>
+            <h2 className="text-xl font-semibold text-slate-900 dark:text-slate-100">Profile foundation</h2>
+          </div>
+
+          <div className="grid min-w-0 gap-4 md:grid-cols-3">
+            <article className="premium-card p-4 md:col-span-2">
+              <p className="text-xs uppercase tracking-[0.15em] text-slate-500 dark:text-slate-400">Profile completion</p>
+              <p className="mt-2 text-3xl font-semibold text-slate-900 dark:text-slate-100">{completionPercent}%</p>
+              <div className="mt-3 h-2 rounded-full bg-slate-200 dark:bg-slate-800">
+                <div className="h-2 rounded-full bg-gradient-to-r from-blue-500 to-cyan-400 transition-all duration-500 ease-out" style={{ width: `${completionPercent}%` }} />
+              </div>
+              <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">Complete key basics for better weekly coaching quality.</p>
+            </article>
+
+            <article className="premium-card p-4">
+              <p className="text-xs uppercase tracking-[0.15em] text-slate-500 dark:text-slate-400">Last updated</p>
+              <p className="mt-2 text-sm font-medium text-slate-900 dark:text-slate-100">{profile.updated_at ? new Date(profile.updated_at).toLocaleString() : "Not saved yet"}</p>
+              <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">Saved to your account for continuity across sessions.</p>
+            </article>
+          </div>
+
+          <div className="grid min-w-0 gap-4 md:grid-cols-2">
+            <article className="premium-card space-y-4 p-5">
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-brand-700">Health Baseline Inputs</p>
+              <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Core profile</h3>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <label className="space-y-1 text-sm"><span>Age</span><input className="w-full rounded-lg border border-slate-300 bg-white p-2 dark:border-slate-600 dark:bg-slate-900" type="number" value={profile.age ?? ""} onChange={(event) => updateField("age", event.target.value ? Number(event.target.value) : null)} /></label>
+                <label className="space-y-1 text-sm"><span>Sex</span><select className="w-full rounded-lg border border-slate-300 bg-white p-2 dark:border-slate-600 dark:bg-slate-900" value={profile.sex ?? ""} onChange={(event) => updateField("sex", (event.target.value || null) as HealthProfile["sex"])}><option value="">Select</option><option value="female">Female</option><option value="male">Male</option><option value="non_binary">Non-binary</option><option value="other">Other</option><option value="prefer_not_to_say">Prefer not to say</option></select></label>
+                <label className="space-y-1 text-sm"><span>Height (cm)</span><input className="w-full rounded-lg border border-slate-300 bg-white p-2 dark:border-slate-600 dark:bg-slate-900" type="number" value={profile.height_cm ?? ""} onChange={(event) => updateField("height_cm", event.target.value ? Number(event.target.value) : null)} /></label>
+                <label className="space-y-1 text-sm"><span>Weight (kg)</span><input className="w-full rounded-lg border border-slate-300 bg-white p-2 dark:border-slate-600 dark:bg-slate-900" type="number" value={profile.weight_kg ?? ""} onChange={(event) => updateField("weight_kg", event.target.value ? Number(event.target.value) : null)} /></label>
+              </div>
+            </article>
+
+            <article className="premium-card space-y-4 p-5">
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-brand-700">Health Baseline Inputs</p>
+              <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Lifestyle snapshot</h3>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <label className="space-y-1 text-sm"><span>Activity level</span><select className="w-full rounded-lg border border-slate-300 bg-white p-2 dark:border-slate-600 dark:bg-slate-900" value={profile.activity_level ?? ""} onChange={(event) => updateField("activity_level", (event.target.value || null) as HealthProfile["activity_level"])}><option value="">Select</option><option value="low">Low</option><option value="moderate">Moderate</option><option value="active">Active</option><option value="very_active">Very active</option></select></label>
+                <label className="space-y-1 text-sm"><span>Smoking / vaping</span><select className="w-full rounded-lg border border-slate-300 bg-white p-2 dark:border-slate-600 dark:bg-slate-900" value={profile.smoking_vaping_status ?? ""} onChange={(event) => updateField("smoking_vaping_status", (event.target.value || null) as HealthProfile["smoking_vaping_status"])}><option value="">Select</option><option value="none">None</option><option value="former">Former</option><option value="occasional">Occasional</option><option value="daily">Daily</option></select></label>
+                <label className="space-y-1 text-sm"><span>Alcohol frequency</span><select className="w-full rounded-lg border border-slate-300 bg-white p-2 dark:border-slate-600 dark:bg-slate-900" value={profile.alcohol_frequency ?? ""} onChange={(event) => updateField("alcohol_frequency", (event.target.value || null) as HealthProfile["alcohol_frequency"])}><option value="">Select</option><option value="never">Never</option><option value="monthly">Monthly</option><option value="weekly">Weekly</option><option value="several_times_weekly">Several times weekly</option><option value="daily">Daily</option></select></label>
+                <label className="space-y-1 text-sm"><span>Sleep average (hours)</span><input className="w-full rounded-lg border border-slate-300 bg-white p-2 dark:border-slate-600 dark:bg-slate-900" type="number" step="0.5" value={profile.sleep_average_hours ?? ""} onChange={(event) => updateField("sleep_average_hours", event.target.value ? Number(event.target.value) : null)} /></label>
+                <label className="space-y-1 text-sm sm:col-span-2"><span>Stress level</span><select className="w-full rounded-lg border border-slate-300 bg-white p-2 dark:border-slate-600 dark:bg-slate-900" value={profile.stress_level ?? ""} onChange={(event) => updateField("stress_level", (event.target.value || null) as HealthProfile["stress_level"])}><option value="">Select</option><option value="low">Low</option><option value="moderate">Moderate</option><option value="high">High</option><option value="very_high">Very high</option></select></label>
+              </div>
+            </article>
+
+            <article className="premium-card space-y-4 p-5 md:col-span-2">
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-brand-700">Health Baseline Inputs</p>
+              <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">History + optional metrics</h3>
+              <div className="grid gap-3 md:grid-cols-2">
+                <label className="space-y-1 text-sm"><span>Known conditions</span><input className="w-full rounded-lg border border-slate-300 bg-white p-2 dark:border-slate-600 dark:bg-slate-900" placeholder="e.g. hypertension, asthma" value={joinList(profile.known_conditions)} onChange={(event) => updateField("known_conditions", parseList(event.target.value))} /></label>
+                <div className="space-y-1 text-sm"><span>Current medications</span><div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600 dark:border-slate-700 dark:bg-slate-800/60 dark:text-slate-300">Managed below in Medication Tracker ({profile.medications.length} active).</div></div>
+                <label className="space-y-1 text-sm md:col-span-2"><span>Family history</span><input className="w-full rounded-lg border border-slate-300 bg-white p-2 dark:border-slate-600 dark:bg-slate-900" placeholder="e.g. heart disease, type 2 diabetes" value={joinList(profile.family_history)} onChange={(event) => updateField("family_history", parseList(event.target.value))} /></label>
+              </div>
+              <div className="grid gap-3 sm:grid-cols-3">
+                <label className="space-y-1 text-sm"><span>Systolic BP (optional)</span><input className="w-full rounded-lg border border-slate-300 bg-white p-2 dark:border-slate-600 dark:bg-slate-900" type="number" value={profile.systolic_bp ?? ""} onChange={(event) => updateField("systolic_bp", event.target.value ? Number(event.target.value) : null)} /></label>
+                <label className="space-y-1 text-sm"><span>Diastolic BP (optional)</span><input className="w-full rounded-lg border border-slate-300 bg-white p-2 dark:border-slate-600 dark:bg-slate-900" type="number" value={profile.diastolic_bp ?? ""} onChange={(event) => updateField("diastolic_bp", event.target.value ? Number(event.target.value) : null)} /></label>
+                <label className="space-y-1 text-sm"><span>Total cholesterol (optional)</span><input className="w-full rounded-lg border border-slate-300 bg-white p-2 dark:border-slate-600 dark:bg-slate-900" type="number" value={profile.total_cholesterol ?? ""} onChange={(event) => updateField("total_cholesterol", event.target.value ? Number(event.target.value) : null)} /></label>
+              </div>
+            </article>
+          </div>
+        </section>
+
+        <section className="grid min-w-0 gap-4 lg:grid-cols-[1.1fr_0.9fr]">
+          <article className="premium-card min-w-0 p-5">
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-brand-700">4. Momentum / Streak rail</p>
+            <div className="mt-3 flex flex-wrap items-end justify-between gap-3">
+              <div>
+                <p className="text-xs uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400">Momentum score</p>
+                <p className="mt-1 text-4xl font-semibold text-slate-900 dark:text-slate-100">{momentum.score}</p>
+              </div>
+              <span className="rounded-full border border-cyan-300/70 bg-cyan-50 px-3 py-1 text-xs font-semibold text-cyan-800 dark:border-cyan-800 dark:bg-cyan-950/30 dark:text-cyan-200">{momentum.label}</span>
+            </div>
+            <div className="mt-3 h-2 rounded-full bg-slate-200 dark:bg-slate-800"><div className="h-2 rounded-full bg-gradient-to-r from-cyan-500 to-blue-500" style={{ width: `${momentum.score}%` }} /></div>
+            <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">{trendSignal}</p>
+          </article>
+          <article className="premium-card min-w-0 p-5">
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">Streak highlights</p>
+            <div className="mt-3 space-y-3">
+              {streakHighlights.map((item) => (
+                <div key={item.label} className="flex items-center justify-between gap-3 rounded-xl border border-slate-200/80 bg-slate-50/70 px-3 py-2 dark:border-slate-700 dark:bg-slate-900/60">
+                  <p className="text-sm font-medium text-slate-900 dark:text-slate-100">{item.label}</p>
+                  <p className="text-sm font-semibold text-slate-800 dark:text-slate-200">{item.value}</p>
+                </div>
+              ))}
+            </div>
+          </article>
+        </section>
+
+        <section className="space-y-4 rounded-2xl border border-brand-200/70 bg-gradient-to-br from-brand-50/80 to-cyan-50/70 p-5 dark:border-brand-900/50 dark:from-slate-900 dark:to-slate-900/80">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-brand-700">5. Weekly Coaching Plan</p>
+              <h2 className="mt-1 text-xl font-semibold text-slate-900 dark:text-slate-100">Weekly coaching plan</h2>
+              <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">Actionable guidance from your current baseline and momentum context.</p>
+            </div>
+            <p className="rounded-full border border-slate-300/70 bg-white/70 px-3 py-1 text-xs text-slate-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200">Refreshed {guidance?.refreshedAt ? new Date(guidance.refreshedAt).toLocaleString() : "Not yet"}</p>
+          </div>
+
+          <div className="grid min-w-0 gap-4 lg:grid-cols-2">
+            <article className="premium-card p-4">
+              <h3 className="text-sm font-semibold uppercase tracking-[0.12em] text-slate-700 dark:text-slate-300">Snapshot Summary</h3>
+              <p className="mt-2 text-sm text-slate-700 dark:text-slate-200">{guidance?.snapshot ?? "Save your profile to generate your first personalized snapshot."}</p>
+            </article>
+            <article className="premium-card p-4">
+              <h3 className="text-sm font-semibold uppercase tracking-[0.12em] text-slate-700 dark:text-slate-300">This Week&apos;s Focus</h3>
+              <p className="mt-2 text-base font-semibold text-slate-900 dark:text-slate-100">{guidance?.focus ?? "Complete your baseline"}</p>
+            </article>
+            <article className="premium-card p-4">
+              <h3 className="text-sm font-semibold uppercase tracking-[0.12em] text-slate-700 dark:text-slate-300">Today&apos;s Small Win</h3>
+              <p className="mt-2 text-sm text-slate-700 dark:text-slate-200">{guidance?.todaysSmallWin ?? "Save your profile to generate today's small win."}</p>
+              <p className="mt-3 text-xs text-slate-500 dark:text-slate-400">Why this matters: {guidance?.whyThisMatters ?? "Small daily wins build weekly health momentum."}</p>
+            </article>
+            <article className="premium-card p-4">
+              <h3 className="text-sm font-semibold uppercase tracking-[0.12em] text-slate-700 dark:text-slate-300">Watchlist</h3>
+              {(guidance?.watchlist?.length ?? 0) > 0 ? <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-slate-700 dark:text-slate-200">{guidance?.watchlist.map((risk) => <li key={risk}>{risk}</li>)}</ul> : <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">No major watchlist flags from current profile data.</p>}
+            </article>
+          </div>
+          <article className="premium-card min-w-0 p-4">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <h3 className="text-sm font-semibold uppercase tracking-[0.12em] text-slate-700 dark:text-slate-300">This Week Summary</h3>
+              <p className="rounded-full border border-slate-300/80 bg-white/80 px-3 py-1 text-xs text-slate-600 dark:border-slate-700 dark:bg-slate-900/70 dark:text-slate-200">{weeklySummary.completion}</p>
+            </div>
+            <div className="mt-3 grid min-w-0 gap-3 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+              <div className="rounded-lg border border-slate-200/80 bg-slate-50/70 p-3 dark:border-slate-700 dark:bg-slate-900/60"><p className="text-[11px] uppercase tracking-[0.13em] text-slate-500 dark:text-slate-400">Avg sleep</p><p className="mt-1 text-sm font-semibold text-slate-900 dark:text-slate-100">{weeklySummary.averageSleep}</p></div>
+              <div className="rounded-lg border border-slate-200/80 bg-slate-50/70 p-3 dark:border-slate-700 dark:bg-slate-900/60"><p className="text-[11px] uppercase tracking-[0.13em] text-slate-500 dark:text-slate-400">Avg energy</p><p className="mt-1 text-sm font-semibold text-slate-900 dark:text-slate-100">{weeklySummary.averageEnergy}</p></div>
+              <div className="rounded-lg border border-slate-200/80 bg-slate-50/70 p-3 dark:border-slate-700 dark:bg-slate-900/60"><p className="text-[11px] uppercase tracking-[0.13em] text-slate-500 dark:text-slate-400">Stress pattern</p><p className="mt-1 text-sm font-semibold text-slate-900 dark:text-slate-100">{weeklySummary.stressPattern}</p></div>
+              <div className="rounded-lg border border-slate-200/80 bg-slate-50/70 p-3 dark:border-slate-700 dark:bg-slate-900/60"><p className="text-[11px] uppercase tracking-[0.13em] text-slate-500 dark:text-slate-400">Exercise</p><p className="mt-1 text-sm font-semibold text-slate-900 dark:text-slate-100">{weeklySummary.exerciseSummary}</p></div>
+              <div className="rounded-xl border border-brand-200/90 bg-gradient-to-r from-brand-50/90 to-cyan-50/80 p-4 md:col-span-2 lg:col-span-3 xl:col-span-5 dark:border-brand-900/60 dark:from-slate-900 dark:to-slate-900/70"><p className="text-[11px] uppercase tracking-[0.13em] text-brand-700 dark:text-brand-300">Takeaway</p><p className="mt-1 text-sm font-semibold text-slate-900 dark:text-slate-100">{weeklySummary.takeaway}</p></div>
+            </div>
+          </article>
+          <article className="premium-card p-4">
+            <h3 className="text-sm font-semibold uppercase tracking-[0.12em] text-slate-700 dark:text-slate-300">Recommended Goals</h3>
+            <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-slate-700 dark:text-slate-200">{(guidance?.goals ?? []).map((goal) => <li key={goal}>{goal}</li>)}</ul>
+          </article>
+        </section>
+
 
         <section className="space-y-4 rounded-2xl border border-slate-200/80 bg-white/80 p-5 dark:border-slate-700 dark:bg-slate-900/70">
           <div>
@@ -1286,7 +1253,6 @@ export default function ProfilePage() {
                 <div className="mt-3 grid gap-2">
                   <button type="button" onClick={() => setCheckInOpen(true)} className="rounded-lg bg-brand-700 px-3 py-2 text-xs font-medium text-white">Complete Check-In</button>
                   <button type="button" onClick={jumpToCoach} className="rounded-lg border border-slate-600 bg-slate-800 px-3 py-2 text-xs font-medium text-slate-100">Ask Coach</button>
-                  <Link href="/health-trends" className="rounded-lg border border-slate-600 bg-slate-800 px-3 py-2 text-center text-xs font-medium text-slate-100">View Trends</Link>
                 </div>
               </section>
 
