@@ -5,6 +5,21 @@ from app.schemas.health_profile import HealthProfileRead
 from app.services.ai_provider import get_ai_provider
 
 
+def classify_coach_question(question: str) -> str:
+    q = question.lower()
+    if any(k in q for k in ["doctor", "clinician", "appointment", "provider", "visit"]):
+        return "clinician_prep"
+    if any(k in q for k in ["tomorrow", "today", "next 24", "next day"]):
+        return "next_action"
+    if any(k in q for k in ["plan", "week", "schedule", "routine"]):
+        return "plan_builder"
+    if any(k in q for k in ["why", "low", "tired", "energy", "stress", "sleep"]):
+        return "pattern_explanation"
+    if any(k in q for k in ["improve", "better", "optimize", "momentum"]):
+        return "improvement_strategy"
+    return "general_coaching"
+
+
 def _profile_signals(profile: HealthProfileRead) -> tuple[list[str], list[str]]:
     drags: list[str] = []
     positives: list[str] = []
@@ -52,6 +67,89 @@ def _build_checkin_summary(checkins: list[DailyCheckInRead]) -> str:
     return " ".join(summaries)
 
 
+def _fallback_coach_answer(
+    *,
+    question_type: str,
+    question: str,
+    momentum_score: int,
+    momentum_label: str,
+    trend_direction: str,
+    weekly_focus: str,
+    drags: list[str],
+    positives: list[str],
+    recent_checkins: list[DailyCheckInRead],
+) -> str:
+    primary_drag = drags[0] if drags else (weekly_focus or "consistency")
+    strength = positives[0] if positives else "your current routine"
+    latest_checkin_signal = (
+        f"Latest check-in sleep {recent_checkins[0].sleep_hours or 'n/a'}h and energy {recent_checkins[0].energy_level or 'n/a'}/10."
+        if recent_checkins
+        else "No recent check-ins available yet."
+    )
+
+    if question_type == "plan_builder":
+        return (
+            "This Week's Plan\n"
+            f"- Sleep: Set a consistent sleep window to reduce {primary_drag} friction.\n"
+            "- Movement: Schedule 3 short movement sessions (20-30 min) on fixed days.\n"
+            "- Check-in: Log sleep + energy daily so we can adjust the plan quickly.\n"
+            f"- Recovery: Keep one lower-intensity day to protect {strength}.\n"
+            "Measurable target: Complete at least 5 daily check-ins and 3 movement sessions this week.\n"
+            "If you miss a day: Resume at the next planned block; do not try to 'make up' everything at once.\n"
+            "Educational note: Coaching guidance only, not a diagnosis."
+        )
+
+    if question_type == "next_action":
+        return (
+            "Next 24-48h Focus\n"
+            f"- First priority: stabilize {primary_drag} with one small action you can complete today.\n"
+            "- Tomorrow anchor: choose one fixed time for movement or a recovery walk.\n"
+            f"- Feedback loop: use your next check-in to record sleep/energy and refine tomorrow's plan. {latest_checkin_signal}\n"
+            "Educational note: Coaching guidance only, not a diagnosis."
+        )
+
+    if question_type == "pattern_explanation":
+        return (
+            "Likely Pattern Drivers\n"
+            f"- Your trend is {trend_direction.lower()} while {primary_drag} remains a drag, which can suppress day-to-day energy.\n"
+            f"- Recent signal: {latest_checkin_signal}\n"
+            f"- Stable strength: {strength} can help buffer this pattern while you improve consistency.\n"
+            "Educational note: This explains likely behavior patterns, not a medical diagnosis."
+        )
+
+    if question_type == "improvement_strategy":
+        return (
+            "Top Leverage Points (Ranked)\n"
+            f"1) Stabilize {primary_drag}: make this your daily non-negotiable because it likely has the biggest downstream effect on your momentum score.\n"
+            "2) Tighten your next-day plan: choose tomorrow's first action the night before to reduce friction.\n"
+            f"3) Preserve {strength}: keep your strongest routine steady so momentum does not reset.\n"
+            "Educational note: Educational coaching only, not medical advice."
+        )
+
+    if question_type == "clinician_prep":
+        return (
+            "Clinician Visit Prep\n"
+            "Questions to bring:\n"
+            "1) Which behavior change would have the highest impact given my recent sleep/energy/stress pattern?\n"
+            "2) Which warning signs should make me seek care sooner rather than waiting for routine follow-up?\n"
+            "3) What should I track daily so our next visit can be more specific?\n"
+            "Track before visit: sleep hours, energy score, stress level, and any symptom timing patterns for 7 days.\n"
+            "Educational note: This prepares a visit and does not replace clinical care."
+        )
+
+    return (
+        f"Quick read: For '{question}', your momentum score is {momentum_score}/100 ({momentum_label}), and {primary_drag} looks like your most useful lever right now.\n\n"
+        "What I'm seeing:\n"
+        f"- Trend direction is {trend_direction.lower()} and weekly focus is {weekly_focus}.\n"
+        f"- {latest_checkin_signal}\n\n"
+        "Next steps:\n"
+        f"- Protect one specific daily action around {primary_drag} for the next 3 days.\n"
+        f"- Keep {strength} steady while tracking one signal in your next check-in.\n"
+        "- Bring your current coaching goal into your next coach question so advice stays aligned.\n\n"
+        "Educational note: This is educational guidance, not a diagnosis; seek medical care for severe, sudden, or worsening symptoms."
+    )
+
+
 def answer_with_context(
     *,
     question: str,
@@ -68,6 +166,7 @@ def answer_with_context(
     history: list[dict[str, str]] | None = None,
 ) -> str:
     drags, positives = _profile_signals(profile)
+    question_type = classify_coach_question(question)
 
     weekly_summary = context.get("weeklySummary") if isinstance(context, dict) else None
     momentum_context = context.get("momentum") if isinstance(context, dict) else None
@@ -77,11 +176,35 @@ def answer_with_context(
     context_checkins = context.get("recentCheckIns") if isinstance(context, dict) else None
 
     response_contract = (
-        "Format responses with this structure:\n"
-        "1) One short opening sentence that acknowledges the user's question directly.\n"
-        "2) 'What I'm seeing:' with 1-2 bullet points using concrete data points when available.\n"
-        "3) 'Next steps:' with 2-3 practical, behavior-focused bullets.\n"
-        "4) One short educational safety note line.\n"
+        "You must first decide what the user is asking for, then choose the best answer format. "
+        "Do not reuse the same structure if it does not fit the question.\n"
+        "For plan_builder questions, produce an actual plan with time horizon and steps.\n"
+        "For next_action questions, focus only on the next 24-48 hours.\n"
+        "For pattern_explanation questions, explain likely drivers using available data.\n"
+        "For improvement_strategy questions, give 2-3 leverage points ranked by impact.\n"
+        "For clinician_prep questions, produce questions or notes to bring to a clinician.\n"
+        "Decision rule: You must commit to ONE primary action. Do not give multiple equal options.\n"
+        "For all answers except clinician_prep, you must clearly state ONE primary action the user should take next.\n"
+        "Include one short 'why this matters' explanation connecting the action to the user's outcome.\n"
+        "Do not default to 'maintain your routine' unless explicitly justified by data. Prefer a small improvement action instead.\n"
+        "Vary phrasing and structure slightly across responses to avoid repetition.\n"
+        "Do not reuse the same opening sentence from prior responses.\n"
+        "Never answer only with a profile summary. Every response must include a concrete requested deliverable:\n"
+        "- plan_builder: actual plan\n"
+        "- next_action: exact next 1-2 actions\n"
+        "- pattern_explanation: likely drivers and why\n"
+        "- improvement_strategy: ranked leverage points\n"
+        "- clinician_prep: questions/notes for clinician\n"
+        "Compare the current question with recent conversation. If the user already received similar advice, do not repeat it. "
+        "Give a new angle, more specific action, or a clearer plan.\n"
+        "If recent conversation contains similar wording, change the structure and provide a more specific next layer instead of repeating.\n"
+        "Do not copy the same opening sentence from prior answers.\n"
+        "If the question type is plan_builder, include:\n"
+        "- A short plan title\n"
+        "- 3-5 practical steps\n"
+        "- A simple weekly rhythm if the user asks for a week\n"
+        "- One measurable target\n"
+        "- One fallback option if the user misses a day\n"
         "Keep it concise and avoid long paragraphs."
     )
     system_prompt = (
@@ -102,6 +225,7 @@ def answer_with_context(
 
     user_prompt = (
         f"User question: {question}\n"
+        f"Question type: {question_type}\n"
         f"Momentum: {momentum_score}/100 ({momentum_label}), trend={trend_direction}.\n"
         f"Client momentum context: {momentum_context or 'not available yet'}.\n"
         f"Weekly focus: {weekly_focus}.\n"
@@ -121,6 +245,8 @@ def answer_with_context(
         "Data grounding rule: cite 1-2 concrete data points from momentum, weekly summary, streaks, or check-ins when possible.\n"
         "If asked about tiredness/low energy, explicitly connect sleep trend + energy trend before advice.\n"
         "Use persistent memory only when relevant. Do not claim to remember details not present in memory or current context.\n"
+        "Answer must directly satisfy the user's request, not only summarize their profile.\n"
+        "Decision rule: answer must directly satisfy the user's request, not summarize their profile.\n"
         "Use educational guidance only and include a one-line educational safety note at the end."
     )
 
@@ -129,21 +255,14 @@ def answer_with_context(
         return ai_answer
 
     # safe fallback when AI provider is unavailable
-    primary_drag = drags[0] if drags else weekly_focus
-    strength = positives[0] if positives else "your current routine"
-    latest_checkin_signal = (
-        f"Latest check-in sleep {recent_checkins[0].sleep_hours or 'n/a'}h and energy {recent_checkins[0].energy_level or 'n/a'}/10."
-        if recent_checkins
-        else "No recent check-ins available yet."
-    )
-    return (
-        f"Quick read: Your momentum score is {momentum_score}/100 ({momentum_label}), and {primary_drag} looks like your most useful lever right now.\n\n"
-        "What I'm seeing:\n"
-        f"- Trend direction is {trend_direction.lower()} and weekly focus is {weekly_focus}.\n"
-        f"- {latest_checkin_signal}\n\n"
-        "Next steps:\n"
-        f"- Protect one specific daily action around {primary_drag} for the next 3 days.\n"
-        f"- Keep {strength} steady while tracking one signal in your next check-in.\n"
-        "- Bring your current coaching goal into your next coach question so advice stays aligned.\n\n"
-        "Educational note: This is educational guidance, not a diagnosis; seek medical care for severe, sudden, or worsening symptoms."
+    return _fallback_coach_answer(
+        question_type=question_type,
+        question=question,
+        momentum_score=momentum_score,
+        momentum_label=momentum_label,
+        trend_direction=trend_direction,
+        weekly_focus=weekly_focus,
+        drags=drags,
+        positives=positives,
+        recent_checkins=recent_checkins,
     )
