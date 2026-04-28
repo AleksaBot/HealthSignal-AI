@@ -5,6 +5,36 @@ from app.schemas.health_profile import HealthProfileRead
 from app.services.ai_provider import get_ai_provider
 
 
+def normalize_behavior_lever(value: str | None) -> str:
+    cleaned = (value or "").strip()
+    if not cleaned:
+        return "consistency"
+
+    bad_phrases = [
+        "maintain your current routines",
+        "continue periodic check-ins",
+        "not available",
+        "none",
+    ]
+    if any(phrase in cleaned.lower() for phrase in bad_phrases):
+        return "consistency"
+    if len(cleaned) > 40:
+        return "consistency"
+    return cleaned
+
+
+def render_behavior_lever(lever: str) -> str:
+    if lever == "consistency":
+        return "your daily consistency"
+    if lever == "sleep consistency":
+        return "your sleep consistency"
+    if lever == "movement":
+        return "your movement routine"
+    if lever == "stress":
+        return "your stress levels"
+    return lever
+
+
 def classify_coach_question(question: str) -> str:
     q = question.lower()
     if any(k in q for k in ["doctor", "clinician", "appointment", "provider", "visit"]):
@@ -79,7 +109,8 @@ def _fallback_coach_answer(
     positives: list[str],
     recent_checkins: list[DailyCheckInRead],
 ) -> str:
-    primary_drag = drags[0] if drags else (weekly_focus or "consistency")
+    normalized_weekly_focus = normalize_behavior_lever(weekly_focus)
+    primary_drag = normalize_behavior_lever(drags[0] if drags else normalized_weekly_focus)
     strength = positives[0] if positives else "your current routine"
     latest_checkin_signal = (
         f"Latest check-in sleep {recent_checkins[0].sleep_hours or 'n/a'}h and energy {recent_checkins[0].energy_level or 'n/a'}/10."
@@ -88,9 +119,14 @@ def _fallback_coach_answer(
     )
 
     if question_type == "plan_builder":
+        sleep_line = (
+            "- Sleep: Keep a consistent wind-down time."
+            if primary_drag == "consistency"
+            else f"- Sleep: Set a consistent sleep window to improve {render_behavior_lever(primary_drag)}."
+        )
         return (
             "This Week's Plan\n"
-            f"- Sleep: Set a consistent sleep window to reduce {primary_drag} friction.\n"
+            f"{sleep_line}\n"
             "- Movement: Schedule 3 short movement sessions (20-30 min) on fixed days.\n"
             "- Check-in: Log sleep + energy daily so we can adjust the plan quickly.\n"
             f"- Recovery: Keep one lower-intensity day to protect {strength}.\n"
@@ -100,9 +136,14 @@ def _fallback_coach_answer(
         )
 
     if question_type == "next_action":
+        first_priority_line = (
+            "- First priority: stick to one consistent action today."
+            if primary_drag == "consistency"
+            else f"- First priority: stabilize your {render_behavior_lever(primary_drag)} with one small action today."
+        )
         return (
             "Next 24-48h Focus\n"
-            f"- First priority: stabilize {primary_drag} with one small action you can complete today.\n"
+            f"{first_priority_line}\n"
             "- Tomorrow anchor: choose one fixed time for movement or a recovery walk.\n"
             f"- Feedback loop: use your next check-in to record sleep/energy and refine tomorrow's plan. {latest_checkin_signal}\n"
             "Educational note: Coaching guidance only, not a diagnosis."
@@ -120,7 +161,7 @@ def _fallback_coach_answer(
     if question_type == "improvement_strategy":
         return (
             "Top Leverage Points (Ranked)\n"
-            f"1) Stabilize {primary_drag}: make this your daily non-negotiable because it likely has the biggest downstream effect on your momentum score.\n"
+            f"1) Stabilize {render_behavior_lever(primary_drag)}: make this your daily non-negotiable because it likely has the biggest downstream effect on your momentum score.\n"
             "2) Tighten your next-day plan: choose tomorrow's first action the night before to reduce friction.\n"
             f"3) Preserve {strength}: keep your strongest routine steady so momentum does not reset.\n"
             "Educational note: Educational coaching only, not medical advice."
@@ -137,13 +178,19 @@ def _fallback_coach_answer(
             "Educational note: This prepares a visit and does not replace clinical care."
         )
 
+    consistency_line = (
+        "- Protect one small repeatable habit."
+        if primary_drag == "consistency"
+        else f"- Protect one specific daily action around {render_behavior_lever(primary_drag)}."
+    )
+
     return (
-        f"Quick read: For '{question}', your momentum score is {momentum_score}/100 ({momentum_label}), and {primary_drag} looks like your most useful lever right now.\n\n"
+        f"Quick read: For '{question}', your momentum score is {momentum_score}/100 ({momentum_label}), and {render_behavior_lever(primary_drag)} looks like your most useful lever right now.\n\n"
         "What I'm seeing:\n"
         f"- Trend direction is {trend_direction.lower()} and weekly focus is {weekly_focus}.\n"
         f"- {latest_checkin_signal}\n\n"
         "Next steps:\n"
-        f"- Protect one specific daily action around {primary_drag} for the next 3 days.\n"
+        f"{consistency_line}\n"
         f"- Keep {strength} steady while tracking one signal in your next check-in.\n"
         "- Bring your current coaching goal into your next coach question so advice stays aligned.\n\n"
         "Educational note: This is educational guidance, not a diagnosis; seek medical care for severe, sudden, or worsening symptoms."
@@ -242,6 +289,8 @@ def answer_with_context(
         f"Client provided recent 3 check-ins: {context_checkins or 'not available yet'}.\n"
         f"Recent conversation:\n{conversation if conversation else 'No prior chat in this session.'}\n"
         "Behavior lever rule: identify the single most likely behavior lever before giving steps.\n"
+        "Do not use full sentences from weekly focus as behavior labels. Convert them into short behavior levers like sleep consistency, movement, stress regulation, medication consistency, or check-in consistency.\n"
+        "Avoid abstract phrases like 'reduce friction' or 'optimize consistency'. Use simple, human coaching language instead.\n"
         "Data grounding rule: cite 1-2 concrete data points from momentum, weekly summary, streaks, or check-ins when possible.\n"
         "If asked about tiredness/low energy, explicitly connect sleep trend + energy trend before advice.\n"
         "Use persistent memory only when relevant. Do not claim to remember details not present in memory or current context.\n"

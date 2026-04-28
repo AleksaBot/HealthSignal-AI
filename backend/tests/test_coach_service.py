@@ -132,3 +132,58 @@ def test_fallback_clinician_prep_includes_clinician_questions(monkeypatch) -> No
 
     assert "questions to bring" in answer.lower()
     assert "clinician" in answer.lower() or "doctor" in answer.lower()
+
+
+def test_normalize_behavior_lever_rejects_sentence_phrases() -> None:
+    lever = coach_service.normalize_behavior_lever("Maintain your current routines and continue periodic check-ins.")
+    assert lever == "consistency"
+
+
+def test_fallback_plan_builder_avoids_bad_weekly_focus_phrase(monkeypatch) -> None:
+    monkeypatch.setattr(coach_service, "get_ai_provider", lambda: _NoopAIProvider())
+
+    answer = coach_service.answer_with_context(
+        question="make my plan for this week",
+        momentum_score=58,
+        momentum_label="Building",
+        trend_direction="stable",
+        weekly_focus="Maintain your current routines and continue periodic check-ins.",
+        profile=HealthProfileRead(
+            age=30,
+            height_cm=175,
+            weight_kg=75,
+            activity_level="moderate",
+            sleep_average_hours=7.5,
+            stress_level="moderate",
+        ),
+        watchlist=[],
+        medication_summary="none",
+        recent_trend_summary="steady",
+        recent_checkins=[],
+        context={},
+        history=[],
+    )
+
+    assert "Maintain your current routines" not in answer
+    assert "Sleep: Keep a consistent wind-down time." in answer
+
+
+def test_fallback_next_action_avoids_bad_weekly_focus_phrase(monkeypatch) -> None:
+    monkeypatch.setattr(coach_service, "get_ai_provider", lambda: _NoopAIProvider())
+
+    answer = coach_service.answer_with_context(
+        question="what should I focus on tomorrow?",
+        momentum_score=58,
+        momentum_label="Building",
+        trend_direction="stable",
+        weekly_focus="Maintain your current routines and continue periodic check-ins.",
+        profile=_build_profile(),
+        watchlist=[],
+        medication_summary="none",
+        recent_trend_summary="steady",
+        recent_checkins=[],
+        context={},
+        history=[],
+    )
+
+    assert "Maintain your current routines" not in answer

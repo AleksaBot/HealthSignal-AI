@@ -10,6 +10,7 @@ import { applyTheme, readStoredThemePreference, THEME_STORAGE_KEY, ThemePreferen
 const navItems = [
   { href: "/", label: "Dashboard", emphasis: false },
   { href: "/profile", label: "My Health", emphasis: true },
+  { href: "/coach", label: "AI Coach", emphasis: false },
   { href: "/health-trends", label: "Health Trends", emphasis: false },
   { href: "/history", label: "Reports", emphasis: false },
   { href: "/pricing", label: "Pricing", emphasis: false }

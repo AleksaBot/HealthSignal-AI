@@ -9,13 +9,11 @@ import {
   getRecentCheckIns,
   getTodayCheckIn,
   getUserErrorMessage,
-  queryCoach,
   updateTodayMedicationStatus,
   upsertHealthProfile,
   upsertTodayCheckIn
 } from "@/lib/api";
 import {
-  CoachMessage,
   DailyCheckIn,
   DailyCheckInUpsertRequest,
   HealthProfile,
@@ -88,16 +86,6 @@ const EMPTY_MEDICATION_DRAFT: MedicationDraft = {
 const FREE_FEATURES = ["Momentum Score", "Weekly coaching plan", "Medication tracker", "Structured AI coach prompts", "Trends overview"];
 
 const PREMIUM_FEATURES = ["Adaptive coaching routines", "Long-term momentum history", "Advanced reminder flows", "Deeper AI guidance personalization", "Expanded trend analytics"];
-
-const COACH_SUGGESTED_PROMPTS = [
-  "Why is my energy low?",
-  "What should I focus on tomorrow?",
-  "How can I improve my momentum score?",
-  "Make this week’s plan easier",
-  "What should I ask my doctor next?"
-];
-
-const COACH_QUICK_FILL_PROMPTS = ["What should I focus on tomorrow?", "Make this week’s plan easier"];
 
 function parseList(value: string) {
   return value
@@ -415,32 +403,6 @@ function deriveCoachInsight(
   return "Coach Insight: Your routines are fairly steady; lock in one repeatable habit tomorrow to convert consistency into stronger momentum.";
 }
 
-function buildCoachMemorySummary(
-  question: string,
-  answer: string,
-  weeklyTakeaway: string,
-  momentum: MomentumScore,
-  recentCheckIns: DailyCheckIn[]
-) {
-  const lowerQuestion = question.toLowerCase();
-  const topic = lowerQuestion.includes("energy")
-    ? "low energy"
-    : lowerQuestion.includes("sleep")
-      ? "sleep"
-      : lowerQuestion.includes("stress")
-        ? "stress"
-        : lowerQuestion.includes("tomorrow")
-          ? "tomorrow's focus"
-          : "weekly priorities";
-  const withSleep = recentCheckIns.filter((entry) => typeof entry.sleep_hours === "number");
-  const averageSleep =
-    withSleep.length > 0 ? (withSleep.reduce((sum, entry) => sum + (entry.sleep_hours ?? 0), 0) / withSleep.length).toFixed(1) : null;
-  const answerLeansSleep = answer.toLowerCase().includes("sleep");
-  const primaryLever = answerLeansSleep || weeklyTakeaway.toLowerCase().includes("sleep") ? "sleep consistency" : "daily consistency";
-
-  return `User asked about ${topic}. Current coaching context points to ${primaryLever}, ${momentum.label.toLowerCase()} momentum (${momentum.score}/100)${averageSleep ? `, and recent sleep around ${averageSleep}h.` : "."}`;
-}
-
 function emptyCheckInDraft(): DailyCheckInUpsertRequest {
   return {
     sleep_hours: null,
@@ -520,9 +482,6 @@ export default function ProfilePage() {
   const [medicationDraft, setMedicationDraft] = useState<MedicationDraft>(EMPTY_MEDICATION_DRAFT);
   const [updatingMedicationId, setUpdatingMedicationId] = useState<string | null>(null);
   const [guidance, setGuidance] = useState<GuidancePlan | null>(null);
-  const [coachQuestion, setCoachQuestion] = useState("");
-  const [coachLoading, setCoachLoading] = useState(false);
-  const [coachMessages, setCoachMessages] = useState<CoachMessage[]>([]);
   const [coachMemorySummary, setCoachMemorySummary] = useState<string | null>(null);
   const [todayCheckIn, setTodayCheckIn] = useState<DailyCheckIn | null>(null);
   const [recentCheckIns, setRecentCheckIns] = useState<DailyCheckIn[]>([]);
@@ -610,28 +569,6 @@ export default function ProfilePage() {
     ],
     [checkInStreak, medicationStreak, sleepStreak]
   );
-  const coachContextPayload = useMemo(
-    () => ({
-      weeklySummary,
-      momentum: {
-        score: momentum.score,
-        label: momentum.label,
-        explanation: momentum.explanation
-      },
-      streakHighlights,
-      goals: guidance?.goals ?? [],
-      coachMemorySummary: coachMemorySummary ?? undefined,
-      recentCheckIns: recentCheckIns.slice(0, 3).map((entry) => ({
-        date: entry.date,
-        sleep_hours: entry.sleep_hours,
-        energy_level: entry.energy_level,
-        stress_level: entry.stress_level,
-        exercised_today: entry.exercised_today,
-        note: entry.note
-      }))
-    }),
-    [coachMemorySummary, guidance?.goals, momentum.explanation, momentum.label, momentum.score, recentCheckIns, streakHighlights, weeklySummary]
-  );
   const isPremium = userTier === "premium";
   const coachInsight = useMemo(
     () => deriveCoachInsight(weeklySummary, momentum, streakHighlights, recentCheckIns),
@@ -668,7 +605,6 @@ export default function ProfilePage() {
         ]);
         setTodayCheckIn(todayResponse);
         setRecentCheckIns(recentResponse.items);
-        setCoachMessages(coachHistory.messages ?? []);
         setCoachMemorySummary(coachHistory.memory_summary ?? null);
         if (todayResponse) {
           setCheckInDraft({
@@ -758,41 +694,9 @@ export default function ProfilePage() {
     }
   }
 
-  function jumpToCoach() {
-    setCoachQuestion((current) => current || "What should I prioritize today?");
-    document.getElementById("coach-workspace")?.scrollIntoView({ behavior: "smooth", block: "start" });
-  }
-
   function onStartCheckIn() {
     setCheckInOpen(true);
     document.getElementById("daily-pulse")?.scrollIntoView({ behavior: "smooth", block: "start" });
-  }
-
-  async function onAskCoach(event?: FormEvent) {
-    event?.preventDefault();
-    const question = coachQuestion.trim();
-    if (!question || coachLoading) return;
-
-    const nextMessages: CoachMessage[] = [...coachMessages, { role: "user", content: question }];
-    setCoachMessages(nextMessages);
-    setCoachQuestion("");
-    setCoachLoading(true);
-
-    try {
-      const response = await queryCoach({ question, history: nextMessages, context: coachContextPayload });
-      setCoachMessages((current) => [...current, { role: "coach", content: response.answer }]);
-      setCoachMemorySummary(
-        response.memory_summary ??
-          buildCoachMemorySummary(question, response.answer, weeklySummary.takeaway, momentum, recentCheckIns)
-      );
-    } catch (err) {
-      setCoachMessages((current) => [
-        ...current,
-        { role: "coach", content: getUserErrorMessage(err, "Coach is temporarily unavailable. Please try again in a moment.") }
-      ]);
-    } finally {
-      setCoachLoading(false);
-    }
   }
 
   async function onSaveTodayCheckIn(event?: FormEvent) {
@@ -840,7 +744,7 @@ export default function ProfilePage() {
         </div>
 
         <div className="flex flex-wrap gap-3">
-          <button type="button" onClick={jumpToCoach} className="rounded-lg bg-brand-700 px-4 py-2 text-sm font-medium text-white">Ask Coach</button>
+          <Link href="/coach" className="rounded-lg bg-brand-700 px-4 py-2 text-sm font-medium text-white">Ask Coach</Link>
           <button type="button" onClick={onStartCheckIn} className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:-translate-y-0.5 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700">Complete Check-in</button>
         </div>
 
@@ -881,15 +785,19 @@ export default function ProfilePage() {
             </article>
           </div>
 
-          <article id="coach-workspace" className="premium-card min-w-0 p-5">
+          <article className="premium-card min-w-0 p-5">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-brand-700">Ask AI Health Coach</p>
-                <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Coach chat workspace</h3>
-                <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">Personalized, educational coaching grounded in your baseline, momentum, medications, and daily check-ins.</p>
-                <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Using your profile, weekly summary, streaks, and recent check-ins.</p>
+                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-brand-700">AI Coach Preview</p>
+                <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Keep coaching focused</h3>
+                <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">Use the dedicated AI Coach workspace for conversational planning and follow-up questions.</p>
                 <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{coachMemorySummary ? "Coach memory active • Using saved coaching context" : "Memory begins after your first coach conversation"}</p>
               </div>
+              <Link href="/coach" className="rounded-lg bg-brand-700 px-4 py-2 text-sm font-medium text-white">Open AI Coach</Link>
+            </div>
+            <div className="mt-3 rounded-lg border border-brand-200/90 bg-brand-50/70 p-3 dark:border-brand-900/60 dark:bg-slate-900/70">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.13em] text-brand-700 dark:text-brand-300">Latest coach insight</p>
+              <p className="mt-1 text-sm font-medium text-slate-900 dark:text-slate-100">{coachInsight}</p>
             </div>
             {coachMemorySummary ? (
               <details className="mt-3 rounded-lg border border-slate-200/80 bg-white/80 px-3 py-2 text-xs text-slate-600 dark:border-slate-700 dark:bg-slate-900/70 dark:text-slate-300">
@@ -897,49 +805,6 @@ export default function ProfilePage() {
                 <p className="mt-2">{coachMemorySummary}</p>
               </details>
             ) : null}
-            <div className="mt-4 flex flex-wrap gap-2">
-              {COACH_SUGGESTED_PROMPTS.map((prompt) => (
-                <button
-                  key={prompt}
-                  className="rounded-full border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:hover:bg-slate-800"
-                  onClick={() => setCoachQuestion(prompt)}
-                >
-                  {prompt}
-                </button>
-              ))}
-            </div>
-            <div className="mt-4 max-h-80 space-y-5 overflow-x-hidden overflow-y-auto rounded-xl border border-slate-200/80 bg-slate-50/60 p-4 dark:border-slate-700 dark:bg-slate-900/60">
-              {coachMessages.length === 0 ? <p className="text-sm text-slate-500 dark:text-slate-400">Start a conversation with your coach. Ask about this week, low energy patterns, stress, or momentum score changes.</p> : null}
-              {coachMessages.map((message, index) => (
-                <div key={`${message.role}-${index}`} className={`max-w-full break-words rounded-xl p-3.5 text-sm leading-relaxed ${message.role === "user" ? "bg-brand-700/95 text-white shadow-sm md:ml-10" : "border border-cyan-200/80 bg-cyan-50/90 text-slate-800 dark:border-cyan-900/60 dark:bg-cyan-950/35 dark:text-slate-100 md:mr-10"}`}>
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.12em] opacity-70">{message.role === "user" ? "You" : "Coach"}</p>
-                  <p className="mt-2 whitespace-pre-wrap">{message.content}</p>
-                </div>
-              ))}
-              {coachLoading ? <p className="rounded-lg border border-slate-200/80 bg-white/70 px-3 py-2 text-xs text-slate-500 dark:border-slate-700 dark:bg-slate-800/70 dark:text-slate-300">Coach is thinking...</p> : null}
-            </div>
-            <form onSubmit={onAskCoach} className="mt-4 grid gap-3 md:grid-cols-[1fr_auto]">
-              <input
-                value={coachQuestion}
-                onChange={(event) => setCoachQuestion(event.target.value)}
-                placeholder="Ask a coaching question..."
-                className="w-full rounded-lg border border-slate-300 bg-white p-2.5 text-sm dark:border-slate-600 dark:bg-slate-900"
-              />
-              <button type="submit" disabled={coachLoading} className="rounded-lg bg-brand-700 px-4 py-2 text-sm font-medium text-white disabled:opacity-60">{coachLoading ? "Thinking..." : "Ask Coach"}</button>
-            </form>
-            <div className="mt-3 flex flex-wrap gap-2">
-              {COACH_QUICK_FILL_PROMPTS.map((suggestion) => (
-                <button
-                  key={suggestion}
-                  type="button"
-                  onClick={() => setCoachQuestion(suggestion)}
-                  className="rounded-full border border-slate-300/90 bg-white/90 px-3 py-1.5 text-xs font-medium text-slate-700 transition hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:hover:bg-slate-800"
-                >
-                  {suggestion}
-                </button>
-              ))}
-            </div>
-            <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">Educational only. Not medical diagnosis or emergency guidance.</p>
           </article>
         </section>
         <section id="daily-pulse" className="premium-card min-w-0 max-w-full overflow-x-hidden space-y-4 p-5">
@@ -1252,7 +1117,7 @@ export default function ProfilePage() {
                 <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-300">Quick actions</p>
                 <div className="mt-3 grid gap-2">
                   <button type="button" onClick={() => setCheckInOpen(true)} className="rounded-lg bg-brand-700 px-3 py-2 text-xs font-medium text-white">Complete Check-In</button>
-                  <button type="button" onClick={jumpToCoach} className="rounded-lg border border-slate-600 bg-slate-800 px-3 py-2 text-xs font-medium text-slate-100">Ask Coach</button>
+                  <Link href="/coach" className="rounded-lg border border-slate-600 bg-slate-800 px-3 py-2 text-xs font-medium text-slate-100">Ask Coach</Link>
                 </div>
               </section>
 
