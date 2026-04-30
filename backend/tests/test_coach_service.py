@@ -187,3 +187,52 @@ def test_fallback_next_action_avoids_bad_weekly_focus_phrase(monkeypatch) -> Non
     )
 
     assert "Maintain your current routines" not in answer
+
+
+def test_classify_follow_up_clarification_question() -> None:
+    assert coach_service.classify_coach_question("are you sure i shouldn't make up if I miss a day?") == "follow_up_clarification"
+
+
+def test_fallback_follow_up_clarification_is_direct(monkeypatch) -> None:
+    monkeypatch.setattr(coach_service, "get_ai_provider", lambda: _NoopAIProvider())
+
+    answer = coach_service.answer_with_context(
+        question="are you sure i shouldn't make up if I miss a day?",
+        momentum_score=58,
+        momentum_label="Building",
+        trend_direction="stable",
+        weekly_focus="sleep consistency",
+        profile=_build_profile(),
+        watchlist=[],
+        medication_summary="none",
+        recent_trend_summary="steady",
+        recent_checkins=[],
+        context={},
+        history=[],
+    )
+
+    lowered = answer.lower()
+    assert "momentum score" not in lowered
+    assert "not to overcorrect" in lowered or "restart at the next planned block" in lowered
+
+
+def test_fallback_general_coaching_uses_normalized_weekly_focus(monkeypatch) -> None:
+    monkeypatch.setattr(coach_service, "get_ai_provider", lambda: _NoopAIProvider())
+
+    answer = coach_service.answer_with_context(
+        question="can you coach me in general?",
+        momentum_score=58,
+        momentum_label="Building",
+        trend_direction="stable",
+        weekly_focus="Maintain your current routines and continue periodic check-ins.",
+        profile=_build_profile(),
+        watchlist=[],
+        medication_summary="none",
+        recent_trend_summary="steady",
+        recent_checkins=[],
+        context={},
+        history=[],
+    )
+
+    assert "Maintain your current routines and continue periodic check-ins." not in answer
+    assert "weekly focus is your daily consistency" in answer

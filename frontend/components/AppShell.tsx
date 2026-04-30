@@ -12,8 +12,7 @@ const navItems = [
   { href: "/profile", label: "My Health", emphasis: true },
   { href: "/coach", label: "AI Coach", emphasis: false },
   { href: "/health-trends", label: "Health Trends", emphasis: false },
-  { href: "/history", label: "Reports", emphasis: false },
-  { href: "/pricing", label: "Pricing", emphasis: false }
+  { href: "/history", label: "Reports", emphasis: false }
 ] as const;
 
 export function AppShell({ children }: { children: ReactNode }) {
@@ -161,6 +160,13 @@ export function AppShell({ children }: { children: ReactNode }) {
 
           <div className="flex items-center gap-2 text-sm">
             {authenticated ? (
+              <>
+                <Link
+                  href="/pricing"
+                  className={`hidden rounded-full border px-3 py-1.5 text-xs font-medium transition sm:inline-flex ${pathname === "/pricing" ? "border-brand-500/70 bg-brand-700 text-white shadow-md shadow-brand-700/25" : "border-slate-300 bg-white text-slate-700 hover:border-slate-400 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-200"}`}
+                >
+                  Pricing
+                </Link>
               <div className="relative" ref={menuRef}>
                 <button
                   onClick={() => setMenuOpen((open) => !open)}
@@ -209,6 +215,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                   </div>
                 ) : null}
               </div>
+              </>
             ) : (
               <Link
                 href="/auth"

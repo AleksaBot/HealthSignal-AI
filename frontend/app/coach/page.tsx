@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { RequireAuth } from "@/components/RequireAuth";
 import { getCoachHistory, getHealthProfile, getRecentCheckIns, getUserErrorMessage, queryCoach } from "@/lib/api";
 import { CoachMessage, DailyCheckIn, HealthProfile } from "@/lib/types";
@@ -106,6 +106,8 @@ export default function CoachPage() {
   const [coachLoading, setCoachLoading] = useState(false);
   const [profile, setProfile] = useState<HealthProfile>(EMPTY_PROFILE);
   const [recentCheckIns, setRecentCheckIns] = useState<DailyCheckIn[]>([]);
+  const messagesContainerRef = useRef<HTMLDivElement | null>(null);
+  const messagesEndRef = useRef<HTMLDivElement | null>(null);
 
   const weeklySummary = useMemo(() => summarizeWeekly(recentCheckIns), [recentCheckIns]);
   const momentum = useMemo(() => deriveMomentum(profile), [profile]);
@@ -144,6 +146,11 @@ export default function CoachPage() {
 
     loadCoachWorkspace();
   }, []);
+
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+  }, [coachMessages, coachLoading]);
 
   async function onAskCoach(event?: FormEvent) {
     event?.preventDefault();
@@ -203,15 +210,16 @@ export default function CoachPage() {
             <p className="text-xs text-slate-500 dark:text-slate-400">Momentum: {momentum.score}/100 ({momentum.label})</p>
           </div>
 
-          <div className="max-h-[420px] space-y-4 overflow-y-auto rounded-xl border border-slate-200/80 bg-slate-50/70 p-4 dark:border-slate-700 dark:bg-slate-900/60">
+          <div ref={messagesContainerRef} className="max-h-[440px] space-y-5 overflow-y-auto rounded-xl border border-slate-200/80 bg-slate-100/60 p-4 dark:border-slate-700 dark:bg-slate-900/50">
             {coachMessages.length === 0 ? <p className="text-sm text-slate-500 dark:text-slate-400">Start a conversation with your coach. Try sleep, stress, goals, or next actions.</p> : null}
             {coachMessages.map((message, index) => (
-              <div key={`${message.role}-${index}`} className={`max-w-full break-words rounded-xl p-3 text-sm leading-relaxed ${message.role === "user" ? "bg-brand-700/95 text-white md:ml-10" : "border border-cyan-200/80 bg-cyan-50/90 text-slate-800 dark:border-cyan-900/60 dark:bg-cyan-950/35 dark:text-slate-100 md:mr-10"}`}>
+              <div key={`${message.role}-${index}`} className={`max-w-full break-words rounded-2xl px-3.5 py-3 text-sm leading-relaxed ${message.role === "user" ? "ml-auto w-full bg-brand-700/90 text-white md:w-[80%] lg:w-[72%]" : "mr-auto w-full border border-cyan-200/70 bg-cyan-50/70 text-slate-800 dark:border-cyan-900/50 dark:bg-cyan-950/25 dark:text-slate-100 md:w-[88%] lg:w-[82%]"}`}>
                 <p className="text-[11px] font-semibold uppercase tracking-[0.12em] opacity-70">{message.role === "user" ? "You" : "Coach"}</p>
                 <p className="mt-2 whitespace-pre-wrap">{message.content}</p>
               </div>
             ))}
             {coachLoading ? <p className="text-xs text-slate-500 dark:text-slate-400">Coach is thinking...</p> : null}
+            <div ref={messagesEndRef} />
           </div>
 
           <div className="mt-4 flex flex-wrap gap-2">
@@ -227,7 +235,7 @@ export default function CoachPage() {
             ))}
           </div>
 
-          <form onSubmit={onAskCoach} className="mt-4 grid gap-3 md:grid-cols-[1fr_auto]">
+          <form onSubmit={onAskCoach} className="mt-5 grid gap-3 border-t border-slate-200/70 pt-4 dark:border-slate-700/70 md:grid-cols-[1fr_auto]">
             <input
               value={coachQuestion}
               onChange={(event) => setCoachQuestion(event.target.value)}
