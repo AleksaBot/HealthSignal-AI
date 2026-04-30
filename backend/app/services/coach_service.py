@@ -39,6 +39,10 @@ def classify_coach_question(question: str) -> str:
     q = question.lower()
     if any(k in q for k in ["doctor", "clinician", "appointment", "provider", "visit"]):
         return "clinician_prep"
+    follow_up_markers = ["are you sure", "shouldn't", "what if", "if i miss", "make up", "miss a day", "why not"]
+    asks_should_i_followup = "should i" in q and not any(k in q for k in ["what should i focus", "what should i do today", "what should i do tomorrow"])
+    if any(k in q for k in follow_up_markers) or asks_should_i_followup:
+        return "follow_up_clarification"
     if any(k in q for k in ["tomorrow", "today", "next 24", "next day"]):
         return "next_action"
     if any(k in q for k in ["plan", "week", "schedule", "routine"]):
@@ -110,6 +114,7 @@ def _fallback_coach_answer(
     recent_checkins: list[DailyCheckInRead],
 ) -> str:
     normalized_weekly_focus = normalize_behavior_lever(weekly_focus)
+    display_weekly_focus = render_behavior_lever(normalized_weekly_focus)
     primary_drag = normalize_behavior_lever(drags[0] if drags else normalized_weekly_focus)
     strength = positives[0] if positives else "your current routine"
     latest_checkin_signal = (
@@ -117,6 +122,20 @@ def _fallback_coach_answer(
         if recent_checkins
         else "No recent check-ins available yet."
     )
+
+
+    if question_type == "follow_up_clarification":
+        return (
+            "Yes — in most habit plans, it is better not to overcorrect after one missed day.\n\n"
+            "Why:\n"
+            "- Trying to make up everything at once can turn one missed day into extra fatigue or inconsistency.\n"
+            "- The better move is to restart at the next planned block.\n\n"
+            "What to do instead:\n"
+            "- Do the next scheduled action.\n"
+            "- If you want to make it up, do a lighter version, not double volume.\n"
+            "- Log the miss in your next check-in so the plan can adjust.\n\n"
+            "Educational note: Coaching guidance only, not a diagnosis."
+        )
 
     if question_type == "plan_builder":
         sleep_line = (
@@ -187,7 +206,7 @@ def _fallback_coach_answer(
     return (
         f"Quick read: For '{question}', your momentum score is {momentum_score}/100 ({momentum_label}), and {render_behavior_lever(primary_drag)} looks like your most useful lever right now.\n\n"
         "What I'm seeing:\n"
-        f"- Trend direction is {trend_direction.lower()} and weekly focus is {weekly_focus}.\n"
+        f"- Trend direction is {trend_direction.lower()} and weekly focus is {display_weekly_focus}.\n"
         f"- {latest_checkin_signal}\n\n"
         "Next steps:\n"
         f"{consistency_line}\n"
@@ -230,6 +249,8 @@ def answer_with_context(
         "For pattern_explanation questions, explain likely drivers using available data.\n"
         "For improvement_strategy questions, give 2-3 leverage points ranked by impact.\n"
         "For clinician_prep questions, produce questions or notes to bring to a clinician.\n"
+        "For follow_up_clarification questions, directly answer the user's concern first, then explain the reasoning. Do not restart with a profile summary.\n"
+        "If the user asks whether they should make up a missed day, explain that they usually should not overcorrect; they should resume the next planned action or do a lighter recovery version.\n"
         "Decision rule: You must commit to ONE primary action. Do not give multiple equal options.\n"
         "For all answers except clinician_prep, you must clearly state ONE primary action the user should take next.\n"
         "Include one short 'why this matters' explanation connecting the action to the user's outcome.\n"
