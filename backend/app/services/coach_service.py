@@ -37,12 +37,64 @@ def render_behavior_lever(lever: str) -> str:
 
 def classify_coach_question(question: str) -> str:
     q = question.lower()
+    words = [word for word in q.replace("?", " ").replace("!", " ").replace(".", " ").split() if word]
+    filler_words = {
+        "my",
+        "the",
+        "a",
+        "an",
+        "and",
+        "or",
+        "to",
+        "of",
+        "for",
+        "is",
+        "it",
+        "this",
+        "that",
+        "i",
+        "me",
+        "you",
+        "we",
+        "be",
+        "honest",
+        "current",
+        "now",
+        "what",
+        "do",
+        "think",
+    }
+    meaningful_words = [word for word in words if word not in filler_words]
     if any(k in q for k in ["doctor", "clinician", "appointment", "provider", "visit"]):
         return "clinician_prep"
     follow_up_markers = ["are you sure", "shouldn't", "what if", "if i miss", "make up", "miss a day", "why not"]
     asks_should_i_followup = "should i" in q and not any(k in q for k in ["what should i focus", "what should i do today", "what should i do tomorrow"])
     if any(k in q for k in follow_up_markers) or asks_should_i_followup:
         return "follow_up_clarification"
+    vague_markers = ["what do you think", "be honest", "honest", "current", "what now"]
+    if any(marker in q for marker in vague_markers):
+        return "vague_reflection"
+    clear_intent_markers = [
+        "plan",
+        "today",
+        "tomorrow",
+        "sleep",
+        "energy",
+        "stress",
+        "doctor",
+        "improve",
+        "why",
+        "low",
+        "tired",
+        "week",
+        "schedule",
+        "routine",
+        "momentum",
+        "better",
+        "optimize",
+    ]
+    if len(meaningful_words) < 4 and not any(k in q for k in clear_intent_markers):
+        return "vague_reflection"
     if any(k in q for k in ["tomorrow", "today", "next 24", "next day"]):
         return "next_action"
     if any(k in q for k in ["plan", "week", "schedule", "routine"]):
@@ -197,6 +249,41 @@ def _fallback_coach_answer(
             "Educational note: This prepares a visit and does not replace clinical care."
         )
 
+    if question_type == "vague_reflection":
+        direction_phrase = (
+            "you’re improving"
+            if "up" in trend_direction.lower() or "improving" in trend_direction.lower()
+            else "you’re mostly stable"
+            if "stable" in trend_direction.lower()
+            else "your momentum may be slipping"
+        )
+        progress_interpretation = (
+            "but stability is not the same as progress"
+            if "stable" in trend_direction.lower()
+            else "and the next move is to protect what is working"
+            if "up" in trend_direction.lower() or "improving" in trend_direction.lower()
+            else "so the priority is to stop the slide before adding complexity"
+        )
+        primary_lever = render_behavior_lever(primary_drag)
+        strength_lever = strength
+        return (
+            "Here’s my honest read:\n"
+            f"- Right now {direction_phrase}, {progress_interpretation}.\n"
+            f"- The thing most likely holding you back is {primary_lever}.\n"
+            f"- Your useful base is {strength_lever}, so the goal is not to restart everything — it is to sharpen one lever.\n\n"
+            "What actually matters:\n"
+            "- Do not chase five improvements at once. Pick one behavior that you can repeat for 3 days.\n"
+            "- A good plan should feel almost too easy at first; consistency beats intensity here.\n\n"
+            "Best next move:\n"
+            f"- For the next 3 days, make {primary_lever} the only thing you try to improve.\n"
+            "- Track one signal daily: sleep, energy, stress, or check-in completion.\n\n"
+            "Sharper questions you can ask next:\n"
+            "- What should I focus on tomorrow?\n"
+            "- Why is my energy low this week?\n"
+            "- Make me a simple 3-day plan.\n\n"
+            "Educational note: This is educational coaching, not a diagnosis."
+        )
+
     consistency_line = (
         "- Protect one small repeatable habit."
         if primary_drag == "consistency"
@@ -204,7 +291,7 @@ def _fallback_coach_answer(
     )
 
     return (
-        f"Quick read: For '{question}', your momentum score is {momentum_score}/100 ({momentum_label}), and {render_behavior_lever(primary_drag)} looks like your most useful lever right now.\n\n"
+        f"Here’s the coaching read: your momentum score is {momentum_score}/100 ({momentum_label}), and {render_behavior_lever(primary_drag)} looks like your most useful lever right now.\n\n"
         "What I'm seeing:\n"
         f"- Trend direction is {trend_direction.lower()} and weekly focus is {display_weekly_focus}.\n"
         f"- {latest_checkin_signal}\n\n"
@@ -316,6 +403,7 @@ def answer_with_context(
         "If asked about tiredness/low energy, explicitly connect sleep trend + energy trend before advice.\n"
         "Use persistent memory only when relevant. Do not claim to remember details not present in memory or current context.\n"
         "Answer must directly satisfy the user's request, not only summarize their profile.\n"
+        "For vague_reflection questions, do not summarize the profile. Give a direct interpretation of what the situation means, what matters most, and one next move.\n"
         "Decision rule: answer must directly satisfy the user's request, not summarize their profile.\n"
         "Use educational guidance only and include a one-line educational safety note at the end."
     )
