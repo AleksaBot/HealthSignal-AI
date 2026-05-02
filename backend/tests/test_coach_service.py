@@ -193,6 +193,14 @@ def test_classify_follow_up_clarification_question() -> None:
     assert coach_service.classify_coach_question("are you sure i shouldn't make up if I miss a day?") == "follow_up_clarification"
 
 
+def test_classify_vague_reflection_question() -> None:
+    assert coach_service.classify_coach_question("my honest current current") == "vague_reflection"
+
+
+def test_classify_short_clear_intent_question_not_vague() -> None:
+    assert coach_service.classify_coach_question("why am i tired") == "pattern_explanation"
+
+
 def test_fallback_follow_up_clarification_is_direct(monkeypatch) -> None:
     monkeypatch.setattr(coach_service, "get_ai_provider", lambda: _NoopAIProvider())
 
@@ -214,6 +222,33 @@ def test_fallback_follow_up_clarification_is_direct(monkeypatch) -> None:
     lowered = answer.lower()
     assert "momentum score" not in lowered
     assert "not to overcorrect" in lowered or "restart at the next planned block" in lowered
+
+
+def test_vague_reflection_is_interpretive_not_summary(monkeypatch) -> None:
+    monkeypatch.setattr(coach_service, "get_ai_provider", lambda: _NoopAIProvider())
+
+    answer = coach_service.answer_with_context(
+        question="what do you think",
+        momentum_score=58,
+        momentum_label="Building",
+        trend_direction="stable",
+        weekly_focus="sleep consistency",
+        profile=_build_profile(),
+        watchlist=[],
+        medication_summary="none",
+        recent_trend_summary="steady",
+        recent_checkins=[],
+        context={},
+        history=[],
+    )
+
+    lowered = answer.lower()
+    assert "quick read" not in lowered
+    assert "momentum score is" not in lowered
+    assert "honest read" in lowered
+    assert "what actually matters" in lowered
+    assert "best next move" in lowered
+    assert "stability is not the same as progress" in lowered or "pick one behavior" in lowered
 
 
 def test_fallback_general_coaching_uses_normalized_weekly_focus(monkeypatch) -> None:
