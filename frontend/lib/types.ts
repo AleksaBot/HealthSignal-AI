@@ -328,9 +328,14 @@ export type CoachMessage = {
   content: string;
 };
 
+export type CoachHistoryMessage = {
+  role: "user" | "assistant";
+  content: string;
+};
+
 export type CoachQueryRequest = {
   question: string;
-  history?: CoachMessage[];
+  history?: CoachHistoryMessage[];
   context?: {
     weeklySummary?: {
       averageSleep: string;
