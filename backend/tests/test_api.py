@@ -559,6 +559,35 @@ def test_coach_query_accepts_history_and_returns_disclaimer(client: TestClient, 
     assert "disclaimer" in body
 
 
+
+
+def test_coach_query_accepts_assistant_history_role(client: TestClient, auth_headers: dict[str, str]):
+    response = client.post(
+        "/api/coach/query",
+        json={
+            "question": "What should I focus on next?",
+            "history": [
+                {"role": "user", "content": "I slept poorly this week"},
+                {"role": "assistant", "content": "Try a consistent bedtime"},
+            ],
+        },
+        headers=auth_headers,
+    )
+    assert response.status_code == 200
+    assert response.json()["answer"]
+
+
+def test_coach_query_accepts_legacy_coach_history_role(client: TestClient, auth_headers: dict[str, str]):
+    response = client.post(
+        "/api/coach/query",
+        json={
+            "question": "How can I stay consistent?",
+            "history": [{"role": "coach", "content": "Start with one tiny habit"}],
+        },
+        headers=auth_headers,
+    )
+    assert response.status_code == 200
+
 def test_coach_history_empty_returns_safely(client: TestClient, auth_headers: dict[str, str]):
     response = client.get("/api/coach/history", headers=auth_headers)
     assert response.status_code == 200

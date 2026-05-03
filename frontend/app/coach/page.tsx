@@ -4,7 +4,7 @@ import Link from "next/link";
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { RequireAuth } from "@/components/RequireAuth";
 import { getCoachHistory, getHealthProfile, getRecentCheckIns, getUserErrorMessage, queryCoach } from "@/lib/api";
-import { CoachMessage, DailyCheckIn, HealthProfile } from "@/lib/types";
+import { CoachHistoryMessage, CoachMessage, DailyCheckIn, HealthProfile } from "@/lib/types";
 
 const COACH_PROMPTS = [
   "What should I focus on tomorrow?",
@@ -162,14 +162,19 @@ export default function CoachPage() {
     setCoachQuestion("");
     setCoachLoading(true);
 
+    const apiHistory: CoachHistoryMessage[] = nextMessages.map((message) => ({
+      role: message.role === "coach" ? "assistant" : "user",
+      content: message.content
+    }));
+
     try {
-      const response = await queryCoach({ question, history: nextMessages, context: contextPayload });
+      const response = await queryCoach({ question, history: apiHistory, context: contextPayload });
       setCoachMessages((current) => [...current, { role: "coach", content: response.answer }]);
       setCoachMemorySummary(response.memory_summary ?? coachMemorySummary);
     } catch (err) {
       setCoachMessages((current) => [
         ...current,
-        { role: "coach", content: getUserErrorMessage(err, "Coach is temporarily unavailable. Please try again shortly.") }
+        { role: "coach", content: getUserErrorMessage(err, "Coach request could not be processed. Please try again.") }
       ]);
     } finally {
       setCoachLoading(false);
