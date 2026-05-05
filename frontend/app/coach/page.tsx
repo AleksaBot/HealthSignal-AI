@@ -162,10 +162,17 @@ export default function CoachPage() {
     setCoachQuestion("");
     setCoachLoading(true);
 
-    const apiHistory: CoachHistoryMessage[] = nextMessages.map((message) => ({
-      role: message.role === "coach" ? "assistant" : "user",
-      content: message.content
-    }));
+    const apiHistory: CoachHistoryMessage[] = coachMessages
+      .slice(-10)
+      .filter((message) => {
+        const content = message.content.trim();
+        const normalized = content.toLowerCase();
+        return content && !normalized.includes("request failed with status") && !normalized.startsWith("request failed");
+      })
+      .map((message) => ({
+        role: message.role === "coach" ? "assistant" : "user",
+        content: message.content.trim().slice(0, 1000)
+      }));
 
     try {
       const response = await queryCoach({ question, history: apiHistory, context: contextPayload });
