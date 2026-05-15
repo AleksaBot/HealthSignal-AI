@@ -97,12 +97,13 @@ def classify_coach_question(question: str) -> str:
         return "vague_reflection"
     if any(k in q for k in ["tomorrow", "today", "next 24", "next day"]):
         return "next_action"
-    if any(k in q for k in ["plan", "week", "schedule", "routine"]):
-        return "plan_builder"
     if any(k in q for k in ["why", "low", "tired", "energy", "stress", "sleep"]):
         return "pattern_explanation"
     if any(k in q for k in ["improve", "better", "optimize", "momentum"]):
         return "improvement_strategy"
+    plan_builder_markers = ["plan", "schedule", "make me", "build me", "next 7 days", "weekly plan"]
+    if any(k in q for k in plan_builder_markers):
+        return "plan_builder"
     return "general_coaching"
 
 
@@ -334,6 +335,7 @@ def answer_with_context(
         "For plan_builder questions, produce an actual plan with time horizon and steps.\n"
         "For next_action questions, focus only on the next 24-48 hours.\n"
         "For pattern_explanation questions, explain likely drivers using available data.\n"
+        "If the user asks why something is happening, explain likely drivers first. Do not return a plan unless the user explicitly asks for a plan.\n"
         "For improvement_strategy questions, give 2-3 leverage points ranked by impact.\n"
         "For clinician_prep questions, produce questions or notes to bring to a clinician.\n"
         "For follow_up_clarification questions, directly answer the user's concern first, then explain the reasoning. Do not restart with a profile summary.\n"

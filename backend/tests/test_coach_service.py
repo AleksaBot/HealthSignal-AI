@@ -22,6 +22,18 @@ def test_classify_coach_question_plan_builder() -> None:
     assert coach_service.classify_coach_question("make my plan for this week") == "plan_builder"
 
 
+def test_classify_coach_question_energy_week_is_pattern_explanation() -> None:
+    assert coach_service.classify_coach_question("Why is my energy low this week?") == "pattern_explanation"
+
+
+def test_classify_coach_question_next_7_days_is_plan_builder() -> None:
+    assert coach_service.classify_coach_question("Help me plan the next 7 days.") == "plan_builder"
+
+
+def test_classify_coach_question_weekly_plan_is_plan_builder() -> None:
+    assert coach_service.classify_coach_question("Make me a simple weekly plan") == "plan_builder"
+
+
 def test_classify_coach_question_next_action() -> None:
     assert coach_service.classify_coach_question("what should I focus on tomorrow") == "next_action"
 
@@ -57,6 +69,27 @@ def test_fallback_plan_builder_contains_weekly_plan(monkeypatch) -> None:
     )
 
     assert "this week" in answer.lower() or "plan" in answer.lower()
+
+
+def test_fallback_energy_week_question_does_not_return_weekly_plan(monkeypatch) -> None:
+    monkeypatch.setattr(coach_service, "get_ai_provider", lambda: _NoopAIProvider())
+
+    answer = coach_service.answer_with_context(
+        question="Why is my energy low this week?",
+        momentum_score=58,
+        momentum_label="Building",
+        trend_direction="stable",
+        weekly_focus="sleep consistency",
+        profile=_build_profile(),
+        watchlist=[],
+        medication_summary="none",
+        recent_trend_summary="steady",
+        recent_checkins=[],
+        context={},
+        history=[],
+    )
+
+    assert "This Week's Plan" not in answer
 
 
 def test_fallback_next_action_differs_from_plan_builder(monkeypatch) -> None:
